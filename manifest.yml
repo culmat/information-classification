@@ -10,7 +10,6 @@ modules:
       icon: icon/classification-default.svg
       tooltip:
         i18n: byline.tooltip
-      contentPropertyKey: culmat_page_classification_byline
   confluence:globalSettings:
     - key: classification-admin
       title:
