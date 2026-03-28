@@ -174,14 +174,17 @@ const App = () => {
     setConfig(updated);
   };
 
-  const moveLevel = (index, direction) => {
-    const levels = [...(config?.levels || [])];
+  const moveLevel = (levelId, direction) => {
+    // Sort levels by sortOrder first, then find the level to move by ID
+    const sorted = [...(config?.levels || [])].sort((a, b) => a.sortOrder - b.sortOrder);
+    const index = sorted.findIndex((l) => l.id === levelId);
     const newIndex = index + direction;
-    if (newIndex < 0 || newIndex >= levels.length) return;
-    [levels[index], levels[newIndex]] = [levels[newIndex], levels[index]];
-    // Update sort orders to match new positions
-    levels.forEach((l, i) => { l.sortOrder = i; });
-    setConfig({ ...config, levels });
+    if (newIndex < 0 || newIndex >= sorted.length) return;
+    // Swap the two levels
+    [sorted[index], sorted[newIndex]] = [sorted[newIndex], sorted[index]];
+    // Reassign sort orders as deep copies to avoid stale state
+    const updated = sorted.map((l, i) => ({ ...l, sortOrder: i }));
+    setConfig({ ...config, levels: updated });
   };
 
   // --- Contact operations ---
@@ -275,8 +278,8 @@ const App = () => {
           key: 'actions',
           content: (
             <ButtonGroup>
-              <Button appearance="subtle" onClick={() => moveLevel(index, -1)} isDisabled={index === 0}>{t('admin.levels.move_up')}</Button>
-              <Button appearance="subtle" onClick={() => moveLevel(index, 1)} isDisabled={index === config.levels.length - 1}>{t('admin.levels.move_down')}</Button>
+              <Button appearance="subtle" onClick={() => moveLevel(level.id, -1)} isDisabled={index === 0}>{t('admin.levels.move_up')}</Button>
+              <Button appearance="subtle" onClick={() => moveLevel(level.id, 1)} isDisabled={index === config.levels.length - 1}>{t('admin.levels.move_down')}</Button>
               <Button appearance="subtle" onClick={() => editLevel(level)}>{t('admin.levels.edit_button')}</Button>
               <Button appearance="danger" onClick={() => deleteLevel(level.id)}>{t('admin.levels.delete_button')}</Button>
             </ButtonGroup>
