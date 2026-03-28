@@ -175,16 +175,16 @@ const App = () => {
   };
 
   const moveLevel = (levelId, direction) => {
-    // Sort levels by sortOrder first, then find the level to move by ID
-    const sorted = [...(config?.levels || [])].sort((a, b) => a.sortOrder - b.sortOrder);
-    const index = sorted.findIndex((l) => l.id === levelId);
-    const newIndex = index + direction;
-    if (newIndex < 0 || newIndex >= sorted.length) return;
-    // Swap the two levels
-    [sorted[index], sorted[newIndex]] = [sorted[newIndex], sorted[index]];
-    // Reassign sort orders as deep copies to avoid stale state
-    const updated = sorted.map((l, i) => ({ ...l, sortOrder: i }));
-    setConfig({ ...config, levels: updated });
+    // Use functional update to avoid stale closure issues on rapid clicks
+    setConfig((prev) => {
+      const sorted = [...(prev?.levels || [])].sort((a, b) => a.sortOrder - b.sortOrder);
+      const index = sorted.findIndex((l) => l.id === levelId);
+      const newIndex = index + direction;
+      if (newIndex < 0 || newIndex >= sorted.length) return prev;
+      [sorted[index], sorted[newIndex]] = [sorted[newIndex], sorted[index]];
+      const updated = sorted.map((l, i) => ({ ...l, sortOrder: i }));
+      return { ...prev, levels: updated };
+    });
   };
 
   // --- Contact operations ---
