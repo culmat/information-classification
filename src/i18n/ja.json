@@ -1,0 +1,111 @@
+{
+  "app": {
+    "title": "情報分類",
+    "admin_title": "情報分類管理",
+    "space_settings_title": "情報分類"
+  },
+  "byline": {
+    "tooltip": "ページの分類レベル",
+    "description": "説明",
+    "contacts": "連絡先",
+    "links": "関連リンク",
+    "change_button": "分類を変更",
+    "no_contacts": "連絡先が設定されていません。",
+    "no_links": "リンクが設定されていません。"
+  },
+  "classify": {
+    "title": "分類を変更",
+    "current_level": "現在の分類",
+    "select_level": "分類レベルを選択",
+    "apply_recursive": "すべてのサブページに適用",
+    "apply_button": "適用",
+    "cancel_button": "キャンセル",
+    "disallowed": "許可されていません",
+    "success": "分類が更新されました。",
+    "success_recursive": "{classified}ページの分類が更新されました。",
+    "success_recursive_partial": "{classified}ページの分類が更新されました（{failed}件失敗、タイムアウト）。",
+    "error": "分類の更新に失敗しました。",
+    "requires_protection": "この分類レベルにはページ制限が必要です。このページへのアクセスを制限してください。",
+    "restriction_link": "ページ制限を管理"
+  },
+  "admin": {
+    "tabs": {
+      "levels": "レベル",
+      "contacts": "連絡先",
+      "links": "リンク",
+      "audit": "監査"
+    },
+    "levels": {
+      "title": "分類レベル",
+      "add_button": "レベルを追加",
+      "edit_button": "編集",
+      "delete_button": "削除",
+      "name": "名前",
+      "color": "色",
+      "allowed": "許可",
+      "requires_protection": "保護が必要",
+      "sort_order": "順序",
+      "description": "説明",
+      "error_message": "エラーメッセージ（不許可時）",
+      "default_level": "デフォルトレベル",
+      "move_up": "上に移動",
+      "move_down": "下に移動",
+      "confirm_delete": "このレベルを削除してもよろしいですか？",
+      "validation": {
+        "at_least_one": "少なくとも1つの許可されたレベルが必要です。",
+        "default_must_be_allowed": "デフォルトレベルは許可されている必要があります。",
+        "unique_ids": "レベルIDは一意である必要があります。",
+        "name_required": "英語名は必須です。"
+      }
+    },
+    "contacts": {
+      "title": "連絡先",
+      "add_button": "連絡先を追加",
+      "type": "タイプ",
+      "type_user": "Confluenceユーザー",
+      "type_email": "メール",
+      "type_text": "フリーテキスト",
+      "value": "値",
+      "role": "役割",
+      "applies_to": "適用対象",
+      "applies_to_all": "すべてのレベル"
+    },
+    "links": {
+      "title": "リンク",
+      "add_button": "リンクを追加",
+      "url": "URL",
+      "label": "ラベル",
+      "applies_to": "適用対象",
+      "applies_to_all": "すべてのレベル"
+    },
+    "audit": {
+      "title": "監査証跡",
+      "total_changes": "変更総数",
+      "changes_this_month": "今月の変更",
+      "recent_changes": "最近の変更",
+      "page": "ページ",
+      "from": "変更前",
+      "to": "変更後",
+      "by": "変更者",
+      "date": "日付",
+      "recursive": "再帰的"
+    },
+    "save_button": "設定を保存",
+    "save_success": "設定が正常に保存されました。",
+    "save_error": "設定の保存に失敗しました。"
+  },
+  "space_settings": {
+    "title": "情報分類設定",
+    "description": "このスペースで利用可能な分類レベルを設定します。",
+    "enabled_levels": "有効なレベル",
+    "default_level": "デフォルトレベル",
+    "reset_button": "グローバルデフォルトにリセット",
+    "save_button": "保存",
+    "save_success": "スペース設定が保存されました。",
+    "reset_success": "グローバルデフォルトにリセットされました。"
+  },
+  "license": {
+    "inactive_title": "ライセンスが必要",
+    "inactive_message": "Information Classification for Confluenceにはアクティブなライセンスが必要です。Atlassian Marketplaceでライセンスをインストールまたは更新してください。"
+  }
+}

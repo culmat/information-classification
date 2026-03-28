@@ -1,0 +1,91 @@
+modules:
+  confluence:contentBylineItem:
+    - key: classification-byline
+      resource: byline-ui
+      render: native
+      resolver:
+        function: resolver
+      title:
+        i18n: app.title
+      icon: icon/classification-default.svg
+      tooltip:
+        i18n: byline.tooltip
+      contentPropertyKey: culmat_page_classification_byline
+  confluence:globalSettings:
+    - key: classification-admin
+      title:
+        i18n: app.admin_title
+      resource: admin-ui
+      render: native
+      resolver:
+        function: resolver
+  confluence:spaceSettings:
+    - key: classification-space-settings
+      title:
+        i18n: app.space_settings_title
+      resource: space-settings-ui
+      render: native
+      resolver:
+        function: resolver
+      route: information-classification
+  confluence:contentProperty:
+    - key: classification-index
+      propertyKey: culmat_page_classification
+      values:
+        - path: level
+          type: string
+          searchAlias: culmat_classification_level
+          uiSupport:
+            valueType: string
+            name: Classification Level
+            defaultOperator: "="
+            tooltip: The classification level of the page
+        - path: classifiedAt
+          type: date
+          searchAlias: culmat_classification_date
+        - path: classifiedBy
+          type: string
+          searchAlias: culmat_classified_by
+  function:
+    - key: resolver
+      handler: index.handler
+  sql:
+    - key: db
+      engine: mysql
+resources:
+  - key: byline-ui
+    path: src/frontend/byline.jsx
+  - key: admin-ui
+    path: src/frontend/admin.jsx
+  - key: space-settings-ui
+    path: src/frontend/spaceSettings.jsx
+translations:
+  resources:
+    - key: en-US
+      path: src/i18n/en.json
+    - key: de-DE
+      path: src/i18n/de.json
+    - key: fr-FR
+      path: src/i18n/fr.json
+    - key: ja-JP
+      path: src/i18n/ja.json
+  fallback:
+    default: en-US
+app:
+  runtime:
+    name: nodejs22.x
+    memoryMB: 256
+    architecture: arm64
+  id: ari:cloud:ecosystem::app/PLACEHOLDER
+  licensing:
+    enabled: true
+permissions:
+  scopes:
+    - storage:app
+    - read:page:confluence
+    - read:space:confluence
+    - read:content.property:confluence
+    - write:content.property:confluence
+    - read:content.restriction:confluence
+    - read:content.permission:confluence
+    - read:user:confluence

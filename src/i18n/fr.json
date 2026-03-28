@@ -1,0 +1,111 @@
+{
+  "app": {
+    "title": "Classification des informations",
+    "admin_title": "Administration de la classification",
+    "space_settings_title": "Classification des informations"
+  },
+  "byline": {
+    "tooltip": "Niveau de classification de la page",
+    "description": "Description",
+    "contacts": "Contacts",
+    "links": "Liens associés",
+    "change_button": "Modifier la classification",
+    "no_contacts": "Aucun contact configuré.",
+    "no_links": "Aucun lien configuré."
+  },
+  "classify": {
+    "title": "Modifier la classification",
+    "current_level": "Classification actuelle",
+    "select_level": "Sélectionner le niveau de classification",
+    "apply_recursive": "Appliquer à toutes les sous-pages",
+    "apply_button": "Appliquer",
+    "cancel_button": "Annuler",
+    "disallowed": "Non autorisé",
+    "success": "Classification mise à jour.",
+    "success_recursive": "Classification mise à jour pour {classified} pages.",
+    "success_recursive_partial": "Classification mise à jour pour {classified} pages ({failed} échouées, délai dépassé).",
+    "error": "Impossible de mettre à jour la classification.",
+    "requires_protection": "Ce niveau de classification nécessite des restrictions de page. Veuillez restreindre l'accès à cette page.",
+    "restriction_link": "Gérer les restrictions de page"
+  },
+  "admin": {
+    "tabs": {
+      "levels": "Niveaux",
+      "contacts": "Contacts",
+      "links": "Liens",
+      "audit": "Audit"
+    },
+    "levels": {
+      "title": "Niveaux de classification",
+      "add_button": "Ajouter un niveau",
+      "edit_button": "Modifier",
+      "delete_button": "Supprimer",
+      "name": "Nom",
+      "color": "Couleur",
+      "allowed": "Autorisé",
+      "requires_protection": "Protection requise",
+      "sort_order": "Ordre",
+      "description": "Description",
+      "error_message": "Message d'erreur (si non autorisé)",
+      "default_level": "Niveau par défaut",
+      "move_up": "Monter",
+      "move_down": "Descendre",
+      "confirm_delete": "Êtes-vous sûr de vouloir supprimer ce niveau ?",
+      "validation": {
+        "at_least_one": "Au moins un niveau autorisé est requis.",
+        "default_must_be_allowed": "Le niveau par défaut doit être autorisé.",
+        "unique_ids": "Les identifiants de niveau doivent être uniques.",
+        "name_required": "Un nom en anglais est requis."
+      }
+    },
+    "contacts": {
+      "title": "Contacts",
+      "add_button": "Ajouter un contact",
+      "type": "Type",
+      "type_user": "Utilisateur Confluence",
+      "type_email": "E-mail",
+      "type_text": "Texte libre",
+      "value": "Valeur",
+      "role": "Rôle",
+      "applies_to": "S'applique à",
+      "applies_to_all": "Tous les niveaux"
+    },
+    "links": {
+      "title": "Liens",
+      "add_button": "Ajouter un lien",
+      "url": "URL",
+      "label": "Libellé",
+      "applies_to": "S'applique à",
+      "applies_to_all": "Tous les niveaux"
+    },
+    "audit": {
+      "title": "Journal d'audit",
+      "total_changes": "Total des modifications",
+      "changes_this_month": "Modifications ce mois-ci",
+      "recent_changes": "Modifications récentes",
+      "page": "Page",
+      "from": "De",
+      "to": "À",
+      "by": "Par",
+      "date": "Date",
+      "recursive": "Récursif"
+    },
+    "save_button": "Enregistrer la configuration",
+    "save_success": "Configuration enregistrée avec succès.",
+    "save_error": "Impossible d'enregistrer la configuration."
+  },
+  "space_settings": {
+    "title": "Paramètres de classification",
+    "description": "Configurez les niveaux de classification disponibles dans cet espace.",
+    "enabled_levels": "Niveaux activés",
+    "default_level": "Niveau par défaut",
+    "reset_button": "Réinitialiser aux valeurs globales",
+    "save_button": "Enregistrer",
+    "save_success": "Paramètres d'espace enregistrés.",
+    "reset_success": "Réinitialisé aux valeurs globales."
+  },
+  "license": {
+    "inactive_title": "Licence requise",
+    "inactive_message": "La classification des informations pour Confluence nécessite une licence active. Veuillez installer ou renouveler votre licence sur l'Atlassian Marketplace."
+  }
+}

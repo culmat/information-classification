@@ -1,0 +1,111 @@
+{
+  "app": {
+    "title": "Informationsklassifizierung",
+    "admin_title": "Informationsklassifizierung Admin",
+    "space_settings_title": "Informationsklassifizierung"
+  },
+  "byline": {
+    "tooltip": "Klassifizierungsstufe der Seite",
+    "description": "Beschreibung",
+    "contacts": "Kontakte",
+    "links": "Weiterführende Links",
+    "change_button": "Klassifizierung ändern",
+    "no_contacts": "Keine Kontakte konfiguriert.",
+    "no_links": "Keine Links konfiguriert."
+  },
+  "classify": {
+    "title": "Klassifizierung ändern",
+    "current_level": "Aktuelle Klassifizierung",
+    "select_level": "Klassifizierungsstufe wählen",
+    "apply_recursive": "Auf alle Unterseiten anwenden",
+    "apply_button": "Anwenden",
+    "cancel_button": "Abbrechen",
+    "disallowed": "Nicht erlaubt",
+    "success": "Klassifizierung wurde aktualisiert.",
+    "success_recursive": "Klassifizierung für {classified} Seiten aktualisiert.",
+    "success_recursive_partial": "Klassifizierung für {classified} Seiten aktualisiert ({failed} fehlgeschlagen, Zeitüberschreitung).",
+    "error": "Klassifizierung konnte nicht aktualisiert werden.",
+    "requires_protection": "Diese Klassifizierungsstufe erfordert Seitenbeschränkungen. Bitte schränken Sie den Zugriff auf diese Seite ein.",
+    "restriction_link": "Seitenbeschränkungen verwalten"
+  },
+  "admin": {
+    "tabs": {
+      "levels": "Stufen",
+      "contacts": "Kontakte",
+      "links": "Links",
+      "audit": "Protokoll"
+    },
+    "levels": {
+      "title": "Klassifizierungsstufen",
+      "add_button": "Stufe hinzufügen",
+      "edit_button": "Bearbeiten",
+      "delete_button": "Löschen",
+      "name": "Name",
+      "color": "Farbe",
+      "allowed": "Erlaubt",
+      "requires_protection": "Erfordert Schutz",
+      "sort_order": "Reihenfolge",
+      "description": "Beschreibung",
+      "error_message": "Fehlermeldung (wenn nicht erlaubt)",
+      "default_level": "Standardstufe",
+      "move_up": "Nach oben",
+      "move_down": "Nach unten",
+      "confirm_delete": "Sind Sie sicher, dass Sie diese Stufe löschen möchten?",
+      "validation": {
+        "at_least_one": "Mindestens eine erlaubte Stufe ist erforderlich.",
+        "default_must_be_allowed": "Die Standardstufe muss erlaubt sein.",
+        "unique_ids": "Stufen-IDs müssen eindeutig sein.",
+        "name_required": "Ein englischer Name ist erforderlich."
+      }
+    },
+    "contacts": {
+      "title": "Kontakte",
+      "add_button": "Kontakt hinzufügen",
+      "type": "Typ",
+      "type_user": "Confluence-Benutzer",
+      "type_email": "E-Mail",
+      "type_text": "Freitext",
+      "value": "Wert",
+      "role": "Rolle",
+      "applies_to": "Gilt für",
+      "applies_to_all": "Alle Stufen"
+    },
+    "links": {
+      "title": "Links",
+      "add_button": "Link hinzufügen",
+      "url": "URL",
+      "label": "Bezeichnung",
+      "applies_to": "Gilt für",
+      "applies_to_all": "Alle Stufen"
+    },
+    "audit": {
+      "title": "Änderungsprotokoll",
+      "total_changes": "Änderungen gesamt",
+      "changes_this_month": "Änderungen diesen Monat",
+      "recent_changes": "Letzte Änderungen",
+      "page": "Seite",
+      "from": "Von",
+      "to": "Nach",
+      "by": "Von",
+      "date": "Datum",
+      "recursive": "Rekursiv"
+    },
+    "save_button": "Konfiguration speichern",
+    "save_success": "Konfiguration erfolgreich gespeichert.",
+    "save_error": "Konfiguration konnte nicht gespeichert werden."
+  },
+  "space_settings": {
+    "title": "Einstellungen Informationsklassifizierung",
+    "description": "Konfigurieren Sie, welche Klassifizierungsstufen in diesem Bereich verfügbar sind.",
+    "enabled_levels": "Aktivierte Stufen",
+    "default_level": "Standardstufe",
+    "reset_button": "Auf globale Standardwerte zurücksetzen",
+    "save_button": "Speichern",
+    "save_success": "Bereichseinstellungen gespeichert.",
+    "reset_success": "Auf globale Standardwerte zurückgesetzt."
+  },
+  "license": {
+    "inactive_title": "Lizenz erforderlich",
+    "inactive_message": "Informationsklassifizierung für Confluence erfordert eine aktive Lizenz. Bitte installieren oder erneuern Sie Ihre Lizenz im Atlassian Marketplace."
+  }
+}

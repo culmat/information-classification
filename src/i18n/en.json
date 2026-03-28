@@ -1,0 +1,111 @@
+{
+  "app": {
+    "title": "Information Classification",
+    "admin_title": "Information Classification Admin",
+    "space_settings_title": "Information Classification"
+  },
+  "byline": {
+    "tooltip": "Page classification level",
+    "description": "Description",
+    "contacts": "Contacts",
+    "links": "Related Links",
+    "change_button": "Change Classification",
+    "no_contacts": "No contacts configured.",
+    "no_links": "No links configured."
+  },
+  "classify": {
+    "title": "Change Classification",
+    "current_level": "Current classification",
+    "select_level": "Select classification level",
+    "apply_recursive": "Apply to all sub-pages",
+    "apply_button": "Apply",
+    "cancel_button": "Cancel",
+    "disallowed": "Not allowed",
+    "success": "Classification updated.",
+    "success_recursive": "Classification updated for {classified} pages.",
+    "success_recursive_partial": "Classification updated for {classified} pages ({failed} failed, timed out).",
+    "error": "Failed to update classification.",
+    "requires_protection": "This classification level requires page restrictions. Please restrict access to this page.",
+    "restriction_link": "Manage page restrictions"
+  },
+  "admin": {
+    "tabs": {
+      "levels": "Levels",
+      "contacts": "Contacts",
+      "links": "Links",
+      "audit": "Audit"
+    },
+    "levels": {
+      "title": "Classification Levels",
+      "add_button": "Add Level",
+      "edit_button": "Edit",
+      "delete_button": "Delete",
+      "name": "Name",
+      "color": "Color",
+      "allowed": "Allowed",
+      "requires_protection": "Requires Protection",
+      "sort_order": "Order",
+      "description": "Description",
+      "error_message": "Error Message (when disallowed)",
+      "default_level": "Default Level",
+      "move_up": "Move Up",
+      "move_down": "Move Down",
+      "confirm_delete": "Are you sure you want to delete this level?",
+      "validation": {
+        "at_least_one": "At least one allowed level is required.",
+        "default_must_be_allowed": "Default level must be allowed.",
+        "unique_ids": "Level IDs must be unique.",
+        "name_required": "English name is required."
+      }
+    },
+    "contacts": {
+      "title": "Contacts",
+      "add_button": "Add Contact",
+      "type": "Type",
+      "type_user": "Confluence User",
+      "type_email": "Email",
+      "type_text": "Free Text",
+      "value": "Value",
+      "role": "Role",
+      "applies_to": "Applies To",
+      "applies_to_all": "All Levels"
+    },
+    "links": {
+      "title": "Links",
+      "add_button": "Add Link",
+      "url": "URL",
+      "label": "Label",
+      "applies_to": "Applies To",
+      "applies_to_all": "All Levels"
+    },
+    "audit": {
+      "title": "Audit Trail",
+      "total_changes": "Total Changes",
+      "changes_this_month": "Changes This Month",
+      "recent_changes": "Recent Changes",
+      "page": "Page",
+      "from": "From",
+      "to": "To",
+      "by": "By",
+      "date": "Date",
+      "recursive": "Recursive"
+    },
+    "save_button": "Save Configuration",
+    "save_success": "Configuration saved successfully.",
+    "save_error": "Failed to save configuration."
+  },
+  "space_settings": {
+    "title": "Information Classification Settings",
+    "description": "Configure which classification levels are available in this space.",
+    "enabled_levels": "Enabled Levels",
+    "default_level": "Default Level",
+    "reset_button": "Reset to Global Defaults",
+    "save_button": "Save",
+    "save_success": "Space settings saved.",
+    "reset_success": "Reset to global defaults."
+  },
+  "license": {
+    "inactive_title": "License Required",
+    "inactive_message": "Information Classification for Confluence requires an active license. Please install or renew your license in the Atlassian Marketplace."
+  }
+}
