@@ -1,0 +1,311 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Mock all dependencies
+const mockGetEffectiveConfig = vi.fn();
+const mockGetSpaceConfig = vi.fn();
+const mockGetClassification = vi.fn();
+const mockSetClassification = vi.fn();
+const mockLogClassificationChange = vi.fn();
+const mockHasViewRestrictions = vi.fn();
+
+vi.mock('../../src/storage/configStore', () => ({
+  getEffectiveConfig: (...args) => mockGetEffectiveConfig(...args),
+}));
+
+vi.mock('../../src/storage/spaceConfigStore', () => ({
+  getSpaceConfig: (...args) => mockGetSpaceConfig(...args),
+}));
+
+vi.mock('../../src/services/contentPropertyService', () => ({
+  getClassification: (...args) => mockGetClassification(...args),
+  setClassification: (...args) => mockSetClassification(...args),
+}));
+
+vi.mock('../../src/storage/auditStore', () => ({
+  logClassificationChange: (...args) => mockLogClassificationChange(...args),
+}));
+
+vi.mock('../../src/services/restrictionService', () => ({
+  hasViewRestrictions: (...args) => mockHasViewRestrictions(...args),
+}));
+
+// Mock @forge/api for the recursive child page fetching
+vi.mock('@forge/api', () => ({
+  default: {
+    asApp: () => ({
+      requestConfluence: vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ results: [], _links: {} }),
+      }),
+    }),
+  },
+  route: (strings, ...values) => strings.reduce((acc, str, i) => acc + str + (values[i] || ''), ''),
+}));
+
+const { getPageClassification, classifyPage } = await import(
+  '../../src/services/classificationService'
+);
+
+const effectiveConfig = {
+  levels: [
+    {
+      id: 'public',
+      name: { en: 'Public' },
+      color: 'green',
+      description: { en: 'Public info.' },
+      allowed: true,
+      requiresProtection: false,
+      sortOrder: 0,
+      errorMessage: null,
+    },
+    {
+      id: 'internal',
+      name: { en: 'Internal' },
+      color: 'yellow',
+      description: { en: 'Internal info.' },
+      allowed: true,
+      requiresProtection: false,
+      sortOrder: 1,
+      errorMessage: null,
+    },
+    {
+      id: 'confidential',
+      name: { en: 'Confidential' },
+      color: 'orange',
+      description: { en: 'Confidential info.' },
+      allowed: true,
+      requiresProtection: true,
+      sortOrder: 2,
+      errorMessage: null,
+    },
+    {
+      id: 'secret',
+      name: { en: 'Secret', de: 'Geheim' },
+      color: 'red',
+      description: { en: 'Secret info.' },
+      allowed: false,
+      requiresProtection: false,
+      sortOrder: 3,
+      errorMessage: { en: 'Secret not allowed.', de: 'Geheim nicht erlaubt.' },
+    },
+  ],
+  defaultLevelId: 'internal',
+  contacts: [],
+  links: [],
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockGetSpaceConfig.mockResolvedValue(null);
+  mockGetEffectiveConfig.mockResolvedValue(effectiveConfig);
+  mockSetClassification.mockResolvedValue(true);
+  mockLogClassificationChange.mockResolvedValue(undefined);
+});
+
+describe('getPageClassification', () => {
+  it('should return classification and config', async () => {
+    mockGetClassification.mockResolvedValue({ level: 'internal' });
+
+    const result = await getPageClassification('123', 'DEV');
+    expect(result.classification).toEqual({ level: 'internal' });
+    expect(result.config).toEqual(effectiveConfig);
+  });
+
+  it('should return null classification for unclassified pages', async () => {
+    mockGetClassification.mockResolvedValue(null);
+
+    const result = await getPageClassification('123', 'DEV');
+    expect(result.classification).toBeNull();
+    expect(result.config).toBeTruthy();
+  });
+});
+
+describe('classifyPage', () => {
+  it('should classify a page with an allowed level', async () => {
+    mockGetClassification.mockResolvedValue(null);
+    mockHasViewRestrictions.mockResolvedValue(false);
+
+    const result = await classifyPage({
+      pageId: '123',
+      spaceKey: 'DEV',
+      levelId: 'public',
+      accountId: 'user-1',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.classification.level).toBe('public');
+    expect(mockSetClassification).toHaveBeenCalledOnce();
+    expect(mockLogClassificationChange).toHaveBeenCalledOnce();
+  });
+
+  it('should reject a disallowed level with configured error message', async () => {
+    const result = await classifyPage({
+      pageId: '123',
+      spaceKey: 'DEV',
+      levelId: 'secret',
+      accountId: 'user-1',
+      locale: 'en',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('level_disallowed');
+    expect(result.message).toBe('Secret not allowed.');
+    expect(mockSetClassification).not.toHaveBeenCalled();
+  });
+
+  it('should return localized error message for disallowed level', async () => {
+    const result = await classifyPage({
+      pageId: '123',
+      spaceKey: 'DEV',
+      levelId: 'secret',
+      accountId: 'user-1',
+      locale: 'de',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.message).toBe('Geheim nicht erlaubt.');
+  });
+
+  it('should reject unknown level', async () => {
+    const result = await classifyPage({
+      pageId: '123',
+      spaceKey: 'DEV',
+      levelId: 'nonexistent',
+      accountId: 'user-1',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('invalid_level');
+  });
+
+  it('should return restriction warning when level requires protection and page is unprotected', async () => {
+    mockGetClassification.mockResolvedValue(null);
+    mockHasViewRestrictions.mockResolvedValue(false);
+
+    const result = await classifyPage({
+      pageId: '123',
+      spaceKey: 'DEV',
+      levelId: 'confidential',
+      accountId: 'user-1',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.restrictionWarning).toBe('requires_protection');
+  });
+
+  it('should not warn when level requires protection and page IS protected', async () => {
+    mockGetClassification.mockResolvedValue(null);
+    mockHasViewRestrictions.mockResolvedValue(true);
+
+    const result = await classifyPage({
+      pageId: '123',
+      spaceKey: 'DEV',
+      levelId: 'confidential',
+      accountId: 'user-1',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.restrictionWarning).toBeNull();
+  });
+
+  it('should not warn for levels that do not require protection', async () => {
+    mockGetClassification.mockResolvedValue(null);
+    mockHasViewRestrictions.mockResolvedValue(false);
+
+    const result = await classifyPage({
+      pageId: '123',
+      spaceKey: 'DEV',
+      levelId: 'public',
+      accountId: 'user-1',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.restrictionWarning).toBeNull();
+  });
+
+  it('should log the previous level in the audit trail', async () => {
+    mockGetClassification.mockResolvedValue({ level: 'internal' });
+    mockHasViewRestrictions.mockResolvedValue(false);
+
+    await classifyPage({
+      pageId: '123',
+      spaceKey: 'DEV',
+      levelId: 'confidential',
+      accountId: 'user-1',
+    });
+
+    expect(mockLogClassificationChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previousLevel: 'internal',
+        newLevel: 'confidential',
+      })
+    );
+  });
+
+  it('should log null previous level for first classification', async () => {
+    mockGetClassification.mockResolvedValue(null);
+    mockHasViewRestrictions.mockResolvedValue(false);
+
+    await classifyPage({
+      pageId: '123',
+      spaceKey: 'DEV',
+      levelId: 'public',
+      accountId: 'user-1',
+    });
+
+    expect(mockLogClassificationChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previousLevel: null,
+        newLevel: 'public',
+      })
+    );
+  });
+
+  it('should return unchanged when level is same and not recursive', async () => {
+    mockGetClassification.mockResolvedValue({ level: 'internal' });
+
+    const result = await classifyPage({
+      pageId: '123',
+      spaceKey: 'DEV',
+      levelId: 'internal',
+      accountId: 'user-1',
+      recursive: false,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.unchanged).toBe(true);
+    expect(mockSetClassification).not.toHaveBeenCalled();
+  });
+
+  it('should return error when write fails', async () => {
+    mockGetClassification.mockResolvedValue(null);
+    mockSetClassification.mockResolvedValue(false);
+
+    const result = await classifyPage({
+      pageId: '123',
+      spaceKey: 'DEV',
+      levelId: 'public',
+      accountId: 'user-1',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('write_failed');
+  });
+
+  it('should pass recursive flag to audit log', async () => {
+    mockGetClassification.mockResolvedValue(null);
+    mockHasViewRestrictions.mockResolvedValue(false);
+
+    await classifyPage({
+      pageId: '123',
+      spaceKey: 'DEV',
+      levelId: 'public',
+      accountId: 'user-1',
+      recursive: true,
+    });
+
+    expect(mockLogClassificationChange).toHaveBeenCalledWith(
+      expect.objectContaining({ recursive: true })
+    );
+  });
+});

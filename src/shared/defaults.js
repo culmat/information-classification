@@ -78,7 +78,7 @@ export const DEFAULT_LEVELS = [
  */
 export function getDefaultConfig() {
   return {
-    levels: DEFAULT_LEVELS,
+    levels: structuredClone(DEFAULT_LEVELS),
     defaultLevelId: 'internal',
     contacts: [],
     links: [],
