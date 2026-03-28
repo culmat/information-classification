@@ -76,7 +76,7 @@ app:
     name: nodejs22.x
     memoryMB: 256
     architecture: arm64
-  id: ari:cloud:ecosystem::app/PLACEHOLDER
+  id: ari:cloud:ecosystem::app/c5452f23-8798-4ee2-b33c-ee3d3a792547
   licensing:
     enabled: true
 permissions:
