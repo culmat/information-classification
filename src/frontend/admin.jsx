@@ -261,9 +261,9 @@ const App = () => {
   }
 
   // --- Table data ---
-  // Array position IS the display order — no sorting needed
+  // Use numeric keys to prevent DynamicTable from re-sorting rows alphabetically
   const levelRows = (config?.levels || []).map((level, index) => ({
-      key: level.id,
+      key: `level-${index}`,
       cells: [
         {
           key: 'color',
