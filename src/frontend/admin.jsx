@@ -134,7 +134,7 @@ const App = () => {
       name: { en: '' },
       color: 'gray',
       description: { en: '' },
-      sortOrder: (config?.levels?.length || 0),
+      // New levels are appended at the end; array position is the order
       allowed: true,
       requiresProtection: false,
       errorMessage: { en: '' },
@@ -175,15 +175,17 @@ const App = () => {
   };
 
   const moveLevel = (levelId, direction) => {
-    // Use functional update to avoid stale closure issues on rapid clicks
+    // Use functional update to avoid stale closure issues on rapid clicks.
+    // Array position IS the order — no sortOrder field needed.
     setConfig((prev) => {
-      const sorted = [...(prev?.levels || [])].sort((a, b) => a.sortOrder - b.sortOrder);
-      const index = sorted.findIndex((l) => l.id === levelId);
+      const levels = [...(prev?.levels || [])];
+      const index = levels.findIndex((l) => l.id === levelId);
       const newIndex = index + direction;
-      if (newIndex < 0 || newIndex >= sorted.length) return prev;
-      [sorted[index], sorted[newIndex]] = [sorted[newIndex], sorted[index]];
-      const updated = sorted.map((l, i) => ({ ...l, sortOrder: i }));
-      return { ...prev, levels: updated };
+      if (newIndex < 0 || newIndex >= levels.length) return prev;
+      // Splice out and insert at new position
+      const [moved] = levels.splice(index, 1);
+      levels.splice(newIndex, 0, moved);
+      return { ...prev, levels };
     });
   };
 
@@ -259,9 +261,8 @@ const App = () => {
   }
 
   // --- Table data ---
-  const levelRows = (config?.levels || [])
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((level, index) => ({
+  // Array position IS the display order — no sorting needed
+  const levelRows = (config?.levels || []).map((level, index) => ({
       key: level.id,
       cells: [
         {

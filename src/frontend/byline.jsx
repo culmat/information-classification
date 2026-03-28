@@ -268,7 +268,7 @@ const App = () => {
                   value={selectedLevel}
                   onChange={(e) => setSelectedLevel(e.target.value)}
                   options={(config?.levels || [])
-                    .sort((a, b) => a.sortOrder - b.sortOrder)
+                    // Array position is the display order
                     .map((level) => ({
                       label: localize(level.name, locale),
                       value: level.id,
