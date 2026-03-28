@@ -9,7 +9,7 @@
  * - links: array of reference links (global or per-level)
  */
 
-import { storage } from '@forge/api';
+import { kvs } from '@forge/kvs';
 import { GLOBAL_CONFIG_KEY } from '../shared/constants';
 import { getDefaultConfig } from '../shared/defaults';
 
@@ -20,12 +20,12 @@ import { getDefaultConfig } from '../shared/defaults';
  * @returns {Promise<Object>} the global config object
  */
 export async function getGlobalConfig() {
-  let config = await storage.get(GLOBAL_CONFIG_KEY);
+  let config = await kvs.get(GLOBAL_CONFIG_KEY);
 
   // First-time initialization: save defaults so admin sees them in the UI
   if (!config) {
     config = getDefaultConfig();
-    await storage.set(GLOBAL_CONFIG_KEY, config);
+    await kvs.set(GLOBAL_CONFIG_KEY, config);
     console.log('Initialized global config with defaults');
   }
 
@@ -40,7 +40,7 @@ export async function getGlobalConfig() {
  * @returns {Promise<void>}
  */
 export async function setGlobalConfig(config) {
-  await storage.set(GLOBAL_CONFIG_KEY, config);
+  await kvs.set(GLOBAL_CONFIG_KEY, config);
 }
 
 /**

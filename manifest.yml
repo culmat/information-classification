@@ -83,9 +83,12 @@ permissions:
   scopes:
     - storage:app
     - read:page:confluence
+    - write:page:confluence
     - read:space:confluence
     - read:content.property:confluence
     - write:content.property:confluence
     - read:content.restriction:confluence
     - read:content.permission:confluence
     - read:user:confluence
+    - read:confluence-content.all
+    - read:confluence-user

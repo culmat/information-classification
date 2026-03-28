@@ -4,7 +4,7 @@
  * and set a different default level.
  */
 
-import { storage } from '@forge/api';
+import { kvs } from '@forge/kvs';
 import { spaceConfigKey } from '../shared/constants';
 
 /**
@@ -14,7 +14,7 @@ import { spaceConfigKey } from '../shared/constants';
  * @returns {Promise<Object|null>} space config or null if no override exists
  */
 export async function getSpaceConfig(spaceKey) {
-  return await storage.get(spaceConfigKey(spaceKey));
+  return await kvs.get(spaceConfigKey(spaceKey));
 }
 
 /**
@@ -25,7 +25,7 @@ export async function getSpaceConfig(spaceKey) {
  * @returns {Promise<void>}
  */
 export async function setSpaceConfig(spaceKey, config) {
-  await storage.set(spaceConfigKey(spaceKey), config);
+  await kvs.set(spaceConfigKey(spaceKey), config);
 }
 
 /**
@@ -35,5 +35,5 @@ export async function setSpaceConfig(spaceKey, config) {
  * @returns {Promise<void>}
  */
 export async function deleteSpaceConfig(spaceKey) {
-  await storage.delete(spaceConfigKey(spaceKey));
+  await kvs.delete(spaceConfigKey(spaceKey));
 }

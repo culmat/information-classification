@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock @forge/api storage before importing the module under test
+// Mock @forge/kvs before importing the module under test
 const mockStorage = {
   get: vi.fn(),
   set: vi.fn(),
 };
-vi.mock('@forge/api', () => ({
-  storage: mockStorage,
+vi.mock('@forge/kvs', () => ({
+  kvs: mockStorage,
 }));
 
 // Import after mocking
