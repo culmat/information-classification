@@ -3,22 +3,27 @@
  *
  * Uses the Forge migration runner to version database changes.
  * Each migration is idempotent and runs in order on first resolver invocation.
+ *
+ * Note: Forge SQL supports a subset of MySQL. Column/table COMMENTs and
+ * some DDL features may not work. Keep migrations simple.
  */
 
 import { migrationRunner } from '@forge/sql';
 
 // Table: classification_audit — logs every classification change for compliance
+// Forge SQL migrations run exactly once per migration name.
+// Using same patterns as digital-signature (TIMESTAMP(6), COMMENT).
 export const CREATE_AUDIT_TABLE = `
-  CREATE TABLE IF NOT EXISTS classification_audit (
+  CREATE TABLE classification_audit (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    pageId BIGINT NOT NULL COMMENT 'Confluence page ID',
-    spaceKey VARCHAR(255) NOT NULL COMMENT 'Confluence space key',
-    previousLevel VARCHAR(64) COMMENT 'Previous classification level ID, NULL if first classification',
-    newLevel VARCHAR(64) NOT NULL COMMENT 'New classification level ID',
-    classifiedBy VARCHAR(128) NOT NULL COMMENT 'Atlassian account ID of user who made the change',
-    classifiedAt TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT 'When the change was made (UTC)',
-    recursive BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Whether this was a recursive (sub-pages) operation'
-  ) COMMENT = 'Audit trail of all classification changes'
+    pageId BIGINT NOT NULL,
+    spaceKey VARCHAR(255) NOT NULL,
+    previousLevel VARCHAR(64),
+    newLevel VARCHAR(64) NOT NULL,
+    classifiedBy VARCHAR(128) NOT NULL,
+    classifiedAt TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    recursive TINYINT(1) NOT NULL DEFAULT 0
+  )
 `;
 
 export const CREATE_AUDIT_INDEX_PAGE_ID = `

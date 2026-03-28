@@ -85,22 +85,26 @@ const App = () => {
   const [editingLink, setEditingLink] = useState(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
 
-  // Load config and audit data on mount
+  // Load config and audit data on mount — separate calls so config
+  // still loads even if audit (SQL-dependent) fails
   useEffect(() => {
     (async () => {
       try {
-        const [configResult, auditResult] = await Promise.all([
-          invoke('getConfig'),
-          invoke('getAuditData'),
-        ]);
+        const configResult = await invoke('getConfig');
         if (configResult.success) setConfig(configResult.config);
+      } catch (error) {
+        console.error('Failed to load config:', error);
+        setMessage({ type: 'error', text: t('admin.save_error') });
+      }
+
+      try {
+        const auditResult = await invoke('getAuditData');
         if (auditResult.success) setAuditData(auditResult);
       } catch (error) {
-        console.error('Failed to load admin data:', error);
-        setMessage({ type: 'error', text: t('admin.save_error') });
-      } finally {
-        setLoading(false);
+        console.error('Failed to load audit data (SQL may not be provisioned yet):', error);
       }
+
+      setLoading(false);
     })();
   }, [t]);
 

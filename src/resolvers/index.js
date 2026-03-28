@@ -31,12 +31,17 @@ function logConnectedSite(context) {
 /**
  * Ensures database migrations have been run.
  * Called automatically on first resolver execution in this process.
+ * Non-fatal: logs the error but does not block resolvers that don't need SQL.
  */
 async function ensureMigrationsRun() {
   if (!migrationsInitialized) {
-    console.log('Initializing database schema...');
-    await runSchemaMigrations();
-    migrationsInitialized = true;
+    try {
+      console.log('Initializing database schema...');
+      await runSchemaMigrations();
+      migrationsInitialized = true;
+    } catch (error) {
+      console.error('Migration failed (non-fatal for non-SQL resolvers):', error.message);
+    }
   }
 }
 

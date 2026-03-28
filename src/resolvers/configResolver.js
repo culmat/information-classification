@@ -1,11 +1,11 @@
 /**
  * Resolvers for global admin configuration.
- * Only accessible to Confluence administrators.
+ * Access control: the confluence:globalSettings module restricts access
+ * to Confluence admins at the module level — no additional auth check needed here.
  */
 
 import { getGlobalConfig, setGlobalConfig } from '../storage/configStore';
 import { getAuditStatistics, getRecentAuditEntries } from '../storage/auditStore';
-import { isConfluenceAdmin } from '../utils/adminAuth';
 import { successResponse, errorResponse, validationError } from '../utils/responseHelper';
 import { VALID_COLORS } from '../shared/constants';
 
@@ -13,12 +13,7 @@ import { VALID_COLORS } from '../shared/constants';
  * Resolver: getConfig
  * Returns the global classification configuration.
  */
-export async function getConfigResolver(req) {
-  const accountId = req.context.accountId;
-  if (!accountId || !(await isConfluenceAdmin(accountId))) {
-    return errorResponse('Admin access required', 403);
-  }
-
+export async function getConfigResolver(_req) {
   try {
     const config = await getGlobalConfig();
     return successResponse({ config });
@@ -34,11 +29,6 @@ export async function getConfigResolver(req) {
  * Validates the config before saving.
  */
 export async function setConfigResolver(req) {
-  const accountId = req.context.accountId;
-  if (!accountId || !(await isConfluenceAdmin(accountId))) {
-    return errorResponse('Admin access required', 403);
-  }
-
   const { config } = req.payload;
   if (!config) {
     return validationError('config is required');
@@ -63,12 +53,7 @@ export async function setConfigResolver(req) {
  * Resolver: getAuditData
  * Returns audit statistics and recent entries for the admin dashboard.
  */
-export async function getAuditDataResolver(req) {
-  const accountId = req.context.accountId;
-  if (!accountId || !(await isConfluenceAdmin(accountId))) {
-    return errorResponse('Admin access required', 403);
-  }
-
+export async function getAuditDataResolver(_req) {
   try {
     const [statistics, recentEntries] = await Promise.all([
       getAuditStatistics(),
