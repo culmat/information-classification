@@ -22,7 +22,7 @@ export const CREATE_AUDIT_TABLE = `
     newLevel VARCHAR(64) NOT NULL,
     classifiedBy VARCHAR(128) NOT NULL,
     classifiedAt TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    recursive TINYINT(1) NOT NULL DEFAULT 0
+    isRecursive TINYINT(1) NOT NULL DEFAULT 0
   )
 `;
 
@@ -67,7 +67,12 @@ export async function runSchemaMigrations() {
 
     console.log('Database schema migrations completed successfully');
   } catch (error) {
-    console.error('Schema migration failed:', error);
+    // Log full error details including the debug field from Forge SQL
+    console.error('Schema migration failed:', error.message);
+    console.error('Migration name:', error.migrationName);
+    console.error('Error code:', error.cause?.code);
+    console.error('Response details:', JSON.stringify(error.cause?.responseDetails));
+    console.error('Debug info:', JSON.stringify(error.cause?.context?.debug));
     throw new Error(`Database schema migration failed: ${error.message}`);
   }
 }

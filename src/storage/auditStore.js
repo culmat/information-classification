@@ -26,7 +26,7 @@ export async function logClassificationChange({
   recursive = false,
 }) {
   await sql`
-    INSERT INTO classification_audit (pageId, spaceKey, previousLevel, newLevel, classifiedBy, recursive)
+    INSERT INTO classification_audit (pageId, spaceKey, previousLevel, newLevel, classifiedBy, isRecursive)
     VALUES (${pageId}, ${spaceKey}, ${previousLevel}, ${newLevel}, ${classifiedBy}, ${recursive})
   `;
 }
