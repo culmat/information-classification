@@ -4,17 +4,14 @@
  * Returns the current classification level name (e.g. "Internal") so the byline
  * shows the actual classification instead of the static app name.
  *
- * This is a standalone function (not a resolver) because dynamicProperties
- * uses a different invocation pattern than @forge/resolver.
+ * Also checks for restriction mismatches and adds a warning indicator.
  */
 
 import { getEffectiveConfig } from './storage/configStore';
 import { getSpaceConfig } from './storage/spaceConfigStore';
 import { getClassification } from './services/contentPropertyService';
+import { hasViewRestrictions } from './services/restrictionService';
 
-/**
- * Resolve a localized string from a { lang: text } object.
- */
 function localize(obj, locale) {
   if (!obj || typeof obj === 'string') return obj || '';
   const lang = (locale || 'en').substring(0, 2);
@@ -42,9 +39,25 @@ export async function handler(req) {
       return { title: effectiveConfig.defaultLevelId || 'Unclassified' };
     }
 
+    const levelName = localize(level.name, locale);
+
+    // Check restriction mismatch
+    const isProtected = await hasViewRestrictions(String(pageId));
+    let warning = false;
+    if (level.requiresProtection && !isProtected) {
+      warning = true; // needs protection but has none
+    } else if (!level.requiresProtection && isProtected) {
+      warning = true; // has protection but level doesn't require it
+    }
+
+    // Add warning indicator to byline title if mismatch detected
+    const title = warning ? `\u26A0\uFE0F ${levelName}` : levelName;
+
     return {
-      title: localize(level.name, locale),
-      tooltip: localize(level.name, locale),
+      title,
+      tooltip: warning
+        ? `${levelName} — restriction mismatch`
+        : levelName,
     };
   } catch (error) {
     console.error('Error in dynamicProperties:', error);

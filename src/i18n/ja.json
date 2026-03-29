@@ -26,6 +26,7 @@
     "success_recursive_partial": "{classified}ページの分類が更新されました（{failed}件失敗、タイムアウト）。",
     "error": "分類の更新に失敗しました。",
     "requires_protection": "この分類レベルにはページ制限が必要です。このページへのアクセスを制限してください。",
+    "has_unnecessary_protection": "このページにはアクセス制限がありますが、分類レベルでは必要ありません。制限を削除するか、分類を変更することを検討してください。",
     "restriction_link": "ページ制限を管理"
   },
   "admin": {

@@ -85,6 +85,7 @@ const App = () => {
   const [recursive, setRecursive] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const [restrictionWarning, setRestrictionWarning] = useState(null);
 
   // Extract page and space info from context
   const pageId = context?.extension?.content?.id;
@@ -101,6 +102,7 @@ const App = () => {
       if (result.success) {
         setClassification(result.classification);
         setConfig(result.config);
+        setRestrictionWarning(result.restrictionWarning);
       }
     } catch (error) {
       console.error('Failed to load classification:', error);
@@ -209,6 +211,18 @@ const App = () => {
             <Heading size="xsmall">{t('byline.description')}</Heading>
             <Text>{localize(currentLevel.description, locale)}</Text>
           </Box>
+        )}
+
+        {/* Restriction mismatch warning */}
+        {restrictionWarning === 'requires_protection' && (
+          <SectionMessage appearance="warning">
+            <Text>{t('classify.requires_protection')}</Text>
+          </SectionMessage>
+        )}
+        {restrictionWarning === 'has_unnecessary_protection' && (
+          <SectionMessage appearance="warning">
+            <Text>{t('classify.has_unnecessary_protection')}</Text>
+          </SectionMessage>
         )}
 
         {/* Contacts section */}

@@ -33,9 +33,26 @@ export async function getPageClassification(pageId, spaceKey) {
   const effectiveConfig = await getEffectiveConfig(spaceKey, spConfig);
   const classification = await getClassification(pageId);
 
+  // Check restriction mismatch on every load
+  const levelId = classification?.level || effectiveConfig.defaultLevelId;
+  const level = effectiveConfig.levels.find((l) => l.id === levelId);
+  let restrictionWarning = null;
+
+  if (level) {
+    const isProtected = await hasViewRestrictions(pageId);
+    if (level.requiresProtection && !isProtected) {
+      // Confidential page without restrictions
+      restrictionWarning = 'requires_protection';
+    } else if (!level.requiresProtection && isProtected && levelId !== 'confidential') {
+      // Non-confidential page (e.g. Internal, Public) WITH restrictions — mismatch
+      restrictionWarning = 'has_unnecessary_protection';
+    }
+  }
+
   return {
     classification,
     config: effectiveConfig,
+    restrictionWarning,
   };
 }
 
