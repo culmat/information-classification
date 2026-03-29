@@ -1,13 +1,14 @@
 modules:
   confluence:contentBylineItem:
     - key: classification-byline
+      title:
+        i18n: app.title
+      dynamicProperties:
+        function: dynamic-props
       resource: byline-ui
       render: native
       resolver:
         function: resolver
-      title:
-        i18n: app.title
-      icon: icon/classification-default.svg
       tooltip:
         i18n: byline.tooltip
   confluence:globalSettings:
@@ -48,6 +49,8 @@ modules:
   function:
     - key: resolver
       handler: index.handler
+    - key: dynamic-props
+      handler: dynamicProperties.handler
   sql:
     - key: db
       engine: mysql

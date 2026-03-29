@@ -5,7 +5,7 @@
  */
 
 import Resolver from '@forge/resolver';
-import { getClassificationResolver, setClassificationResolver } from './classifyResolver';
+import { getClassificationResolver, setClassificationResolver, getDynamicPropertiesResolver } from './classifyResolver';
 import { getConfigResolver, setConfigResolver, getAuditDataResolver } from './configResolver';
 import { getSpaceConfigResolver, setSpaceConfigResolver, resetSpaceConfigResolver } from './spaceConfigResolver';
 import { runSchemaMigrations } from '../storage/migrations/schema';
@@ -60,6 +60,9 @@ function wrapResolver(resolverFn) {
 // Classification operations (used by byline frontend)
 resolver.define('getClassification', wrapResolver(getClassificationResolver));
 resolver.define('setClassification', wrapResolver(setClassificationResolver));
+
+// Dynamic properties — called by Confluence to set byline title/icon before popup opens
+resolver.define('getDynamicProperties', wrapResolver(getDynamicPropertiesResolver));
 
 // Global admin config operations (used by admin frontend)
 resolver.define('getConfig', wrapResolver(getConfigResolver));
