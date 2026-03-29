@@ -25,7 +25,7 @@
     "success_recursive": "Classification updated for {classified} pages.",
     "success_recursive_partial": "Classification updated for {classified} pages ({failed} failed, timed out).",
     "error": "Failed to update classification.",
-    "requires_protection": "This classification level requires page restrictions. Please restrict access to this page.",
+    "requires_protection": "This classification level requires page restrictions. Use the Share button or the padlock icon to restrict access to this page.",
     "has_unnecessary_protection": "This page has access restrictions, but the classification level does not require them. Consider removing restrictions or changing the classification.",
     "restriction_link": "Manage page restrictions"
   },

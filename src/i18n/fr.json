@@ -25,7 +25,7 @@
     "success_recursive": "Classification mise à jour pour {classified} pages.",
     "success_recursive_partial": "Classification mise à jour pour {classified} pages ({failed} échouées, délai dépassé).",
     "error": "Impossible de mettre à jour la classification.",
-    "requires_protection": "Ce niveau de classification nécessite des restrictions de page. Veuillez restreindre l'accès à cette page.",
+    "requires_protection": "Ce niveau de classification nécessite des restrictions de page. Utilisez le bouton Partager ou l'icône de cadenas pour restreindre l'accès.",
     "has_unnecessary_protection": "Cette page a des restrictions d'accès, mais le niveau de classification ne les nécessite pas. Envisagez de supprimer les restrictions ou de modifier la classification.",
     "restriction_link": "Gérer les restrictions de page"
   },

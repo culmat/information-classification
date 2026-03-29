@@ -25,7 +25,7 @@
     "success_recursive": "Klassifizierung für {classified} Seiten aktualisiert.",
     "success_recursive_partial": "Klassifizierung für {classified} Seiten aktualisiert ({failed} fehlgeschlagen, Zeitüberschreitung).",
     "error": "Klassifizierung konnte nicht aktualisiert werden.",
-    "requires_protection": "Diese Klassifizierungsstufe erfordert Seitenbeschränkungen. Bitte schränken Sie den Zugriff auf diese Seite ein.",
+    "requires_protection": "Diese Klassifizierungsstufe erfordert Seitenbeschränkungen. Verwenden Sie die Schaltfläche \"Teilen\" oder das Schloss-Symbol, um den Zugriff einzuschränken.",
     "has_unnecessary_protection": "Diese Seite hat Zugriffsbeschränkungen, die Klassifizierungsstufe erfordert diese jedoch nicht. Erwägen Sie, die Beschränkungen zu entfernen oder die Klassifizierung zu ändern.",
     "restriction_link": "Seitenbeschränkungen verwalten"
   },
