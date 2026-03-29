@@ -282,11 +282,9 @@ const App = () => {
                   value={selectedLevel}
                   onChange={(e) => setSelectedLevel(e.target.value)}
                   options={(config?.levels || [])
-                    // Array position is the display order
                     .map((level) => ({
                       label: localize(level.name, locale),
                       value: level.id,
-                      isDisabled: !level.allowed,
                     }))}
                 />
 
