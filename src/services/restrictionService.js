@@ -15,7 +15,7 @@ import api, { route } from '@forge/api';
 export async function hasViewRestrictions(pageId) {
   try {
     const response = await api
-      .asApp()
+      .asUser()
       .requestConfluence(
         route`/wiki/rest/api/content/${pageId}/restriction/byOperation/read`,
         { headers: { Accept: 'application/json' } }

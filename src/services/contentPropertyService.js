@@ -47,7 +47,7 @@ async function getProperty(pageId, key) {
   try {
     // v2 API: list all properties, then find by key
     const response = await api
-      .asApp()
+      .asUser()
       .requestConfluence(
         route`/wiki/api/v2/pages/${pageId}/properties?key=${key}`,
         { headers: { Accept: 'application/json' } }
@@ -77,7 +77,7 @@ async function upsertProperty(pageId, key, value) {
   try {
     // First check if property exists
     const listResponse = await api
-      .asApp()
+      .asUser()
       .requestConfluence(
         route`/wiki/api/v2/pages/${pageId}/properties?key=${key}`,
         { headers: { Accept: 'application/json' } }
@@ -95,7 +95,7 @@ async function upsertProperty(pageId, key, value) {
     if (!existing) {
       // Property doesn't exist — create it
       const createResponse = await api
-        .asApp()
+        .asUser()
         .requestConfluence(route`/wiki/api/v2/pages/${pageId}/properties`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -115,7 +115,7 @@ async function upsertProperty(pageId, key, value) {
     const version = existing.version?.number || 1;
 
     const updateResponse = await api
-      .asApp()
+      .asUser()
       .requestConfluence(
         route`/wiki/api/v2/pages/${pageId}/properties/${propId}`,
         {
