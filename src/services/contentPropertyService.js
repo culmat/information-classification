@@ -39,31 +39,31 @@ export async function setClassification(pageId, classificationData, bylineData) 
 }
 
 /**
- * Reads a content property by key using the v1 REST API.
+ * Reads a content property by key using the v2 REST API.
+ * The v2 API uses granular scopes (read:content.property:confluence).
  * Returns the property value or null if not found.
  */
 async function getProperty(pageId, key) {
   try {
-    // v1 API: GET /rest/api/content/{id}/property/{key}
+    // v2 API: list all properties, then find by key
     const response = await api
       .asApp()
       .requestConfluence(
-        route`/wiki/rest/api/content/${pageId}/property/${key}`,
+        route`/wiki/api/v2/pages/${pageId}/properties?key=${key}`,
         { headers: { Accept: 'application/json' } }
       );
 
-    if (response.status === 404) {
-      return null;
-    }
-
     if (!response.ok) {
+      if (response.status === 404) return null;
       const errorBody = await response.text();
       console.error(`Failed to read property ${key}:`, response.status, errorBody);
       return null;
     }
 
     const data = await response.json();
-    return data.value || null;
+    // v2 returns { results: [...] } when filtering by key
+    const prop = data.results?.[0];
+    return prop?.value || null;
   } catch (error) {
     console.error(`Error reading property ${key}:`, error);
     return null;
@@ -71,24 +71,32 @@ async function getProperty(pageId, key) {
 }
 
 /**
- * Creates or updates a content property on a page using the v1 REST API.
- * Tries GET first to check if property exists, then POST (create) or PUT (update).
+ * Creates or updates a content property on a page using the v2 REST API.
  */
 async function upsertProperty(pageId, key, value) {
   try {
-    // Check if property exists
-    const getResponse = await api
+    // First check if property exists
+    const listResponse = await api
       .asApp()
       .requestConfluence(
-        route`/wiki/rest/api/content/${pageId}/property/${key}`,
+        route`/wiki/api/v2/pages/${pageId}/properties?key=${key}`,
         { headers: { Accept: 'application/json' } }
       );
 
-    if (getResponse.status === 404) {
+    if (!listResponse.ok && listResponse.status !== 404) {
+      const errorBody = await listResponse.text();
+      console.error(`Failed to list property ${key}:`, listResponse.status, errorBody);
+      return false;
+    }
+
+    const listData = listResponse.ok ? await listResponse.json() : { results: [] };
+    const existing = listData.results?.[0];
+
+    if (!existing) {
       // Property doesn't exist — create it
       const createResponse = await api
         .asApp()
-        .requestConfluence(route`/wiki/rest/api/content/${pageId}/property`, {
+        .requestConfluence(route`/wiki/api/v2/pages/${pageId}/properties`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({ key, value }),
@@ -102,20 +110,14 @@ async function upsertProperty(pageId, key, value) {
       return true;
     }
 
-    if (!getResponse.ok) {
-      const errorBody = await getResponse.text();
-      console.error(`Failed to read property ${key} for update:`, getResponse.status, errorBody);
-      return false;
-    }
-
-    // Property exists — update it with incremented version
-    const existing = await getResponse.json();
+    // Property exists — update it
+    const propId = existing.id;
     const version = existing.version?.number || 1;
 
     const updateResponse = await api
       .asApp()
       .requestConfluence(
-        route`/wiki/rest/api/content/${pageId}/property/${key}`,
+        route`/wiki/api/v2/pages/${pageId}/properties/${propId}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
