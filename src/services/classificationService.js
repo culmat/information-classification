@@ -150,14 +150,17 @@ export async function classifyPage({
   // Handle recursive classification for child pages
   let recursiveResult = null;
   if (recursive) {
-    recursiveResult = await classifyChildPages({
+    recursiveResult = await classifyDescendants({
       pageId,
       spaceKey,
       levelId,
       accountId,
       locale,
       level,
+      startTime: Date.now(),
     });
+    // Include the parent page in the count
+    recursiveResult.classified += 1;
   }
 
   return {
@@ -169,96 +172,102 @@ export async function classifyPage({
 }
 
 /**
- * Recursively classifies all child pages of the given page.
- * Uses pagination to handle large page trees and tracks progress.
+ * Recursively classifies ALL descendants of a page (children, grandchildren, etc.).
+ * Uses a queue-based breadth-first traversal to process the full page tree.
  * Stops if approaching the Forge function timeout (25s).
  *
  * @param {Object} params
- * @returns {Promise<Object>} { classified, failed, total }
+ * @returns {Promise<Object>} { classified, failed, timedOut }
  */
-async function classifyChildPages({ pageId, spaceKey, levelId, accountId, locale, level }) {
-  const startTime = Date.now();
+async function classifyDescendants({ pageId, spaceKey, levelId, accountId, locale, level, startTime }) {
   const MAX_DURATION_MS = 20000; // Stop 5 seconds before the 25s Forge timeout
 
   let classified = 0;
   let failed = 0;
-  let cursor = null;
 
   const lang = locale.substring(0, 2);
   const levelName = level.name?.[lang] || level.name?.en || levelId;
   const now = new Date().toISOString();
 
-  // Paginate through all child pages
-  do {
-    // Check if we're running out of time
-    if (Date.now() - startTime > MAX_DURATION_MS) {
-      console.warn(`Recursive classification timed out after ${classified} pages`);
-      return { classified, failed, timedOut: true };
-    }
+  // Breadth-first queue of page IDs whose children need processing
+  const queue = [pageId];
 
-    // Fetch a batch of child pages
-    const url = cursor
-      ? route`/wiki/api/v2/pages/${pageId}/children?limit=25&cursor=${cursor}`
-      : route`/wiki/api/v2/pages/${pageId}/children?limit=25`;
+  while (queue.length > 0) {
+    const currentPageId = queue.shift();
+    let cursor = null;
 
-    const response = await api.asApp().requestConfluence(url, {
-      headers: { Accept: 'application/json' },
-    });
-
-    if (!response.ok) {
-      console.error('Failed to fetch child pages:', response.status);
-      break;
-    }
-
-    const data = await response.json();
-    const children = data.results || [];
-
-    // Classify each child page
-    for (const child of children) {
-      // Time check per page
+    // Paginate through all direct children of the current page
+    do {
       if (Date.now() - startTime > MAX_DURATION_MS) {
+        console.warn(`Recursive classification timed out after ${classified} descendants`);
         return { classified, failed, timedOut: true };
       }
 
-      try {
-        const childClassification = await getClassification(String(child.id));
-        const childPreviousLevel = childClassification?.level || null;
+      const url = cursor
+        ? route`/wiki/api/v2/pages/${currentPageId}/children?limit=25&cursor=${cursor}`
+        : route`/wiki/api/v2/pages/${currentPageId}/children?limit=25`;
 
-        const classificationData = {
-          level: levelId,
-          classifiedBy: accountId,
-          classifiedAt: now,
-        };
-        const bylineData = { title: levelName, tooltip: levelName };
+      const response = await api.asUser().requestConfluence(url, {
+        headers: { Accept: 'application/json' },
+      });
 
-        const success = await setClassification(
-          String(child.id),
-          classificationData,
-          bylineData
-        );
+      if (!response.ok) {
+        console.error('Failed to fetch child pages:', response.status);
+        break;
+      }
 
-        if (success) {
-          await logClassificationChange({
-            pageId: Number(child.id),
-            spaceKey,
-            previousLevel: childPreviousLevel,
-            newLevel: levelId,
+      const data = await response.json();
+      const children = data.results || [];
+
+      for (const child of children) {
+        if (Date.now() - startTime > MAX_DURATION_MS) {
+          return { classified, failed, timedOut: true };
+        }
+
+        // Add this child to the queue so its children get processed too
+        queue.push(String(child.id));
+
+        try {
+          const childClassification = await getClassification(String(child.id));
+          const childPreviousLevel = childClassification?.level || null;
+
+          const classificationData = {
+            level: levelId,
             classifiedBy: accountId,
-            recursive: true,
-          });
-          classified++;
-        } else {
+            classifiedAt: now,
+          };
+          const bylineData = { title: levelName, tooltip: levelName };
+
+          const success = await setClassification(
+            String(child.id),
+            classificationData,
+            bylineData
+          );
+
+          if (success) {
+            await logClassificationChange({
+              pageId: Number(child.id),
+              spaceKey,
+              previousLevel: childPreviousLevel,
+              newLevel: levelId,
+              classifiedBy: accountId,
+              recursive: true,
+            });
+            classified++;
+          } else {
+            failed++;
+          }
+        } catch (error) {
+          console.error(`Failed to classify descendant page ${child.id}:`, error);
           failed++;
         }
-      } catch (error) {
-        console.error(`Failed to classify child page ${child.id}:`, error);
-        failed++;
       }
-    }
 
-    // Get cursor for next page of results
-    cursor = data._links?.next ? new URL(data._links.next, 'https://placeholder').searchParams.get('cursor') : null;
-  } while (cursor);
+      cursor = data._links?.next
+        ? new URL(data._links.next, 'https://placeholder').searchParams.get('cursor')
+        : null;
+    } while (cursor);
+  }
 
   return { classified, failed, timedOut: false };
 }

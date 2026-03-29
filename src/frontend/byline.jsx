@@ -330,7 +330,12 @@ const App = () => {
                   appearance="primary"
                   onClick={handleClassify}
                   isLoading={saving}
-                  isDisabled={!selectedLevel || saving || !(config?.levels?.find((l) => l.id === selectedLevel)?.allowed)}
+                  isDisabled={
+                    !selectedLevel ||
+                    saving ||
+                    !(config?.levels?.find((l) => l.id === selectedLevel)?.allowed) ||
+                    (selectedLevel === currentLevelId && !recursive)
+                  }
                 >
                   {t('classify.apply_button')}
                 </Button>
