@@ -1,10 +1,10 @@
 /**
  * Service for reading and writing Confluence content properties.
- * Uses the v2 REST API to store classification data on pages.
+ * Uses the REST API to store classification data on pages.
  *
  * Two properties are written per page:
  * 1. culmat_page_classification — authoritative data (level, who, when), indexed for CQL
- * 2. culmat_page_classification_byline — display data (title, tooltip) for zero-invocation byline rendering
+ * 2. culmat_page_classification_byline — display data (title, tooltip) for byline rendering
  */
 
 import api, { route } from '@forge/api';
@@ -17,29 +17,7 @@ import { CONTENT_PROPERTY_KEY, BYLINE_PROPERTY_KEY } from '../shared/constants';
  * @returns {Promise<Object|null>} { level, classifiedBy, classifiedAt } or null if not set
  */
 export async function getClassification(pageId) {
-  try {
-    const response = await api
-      .asApp()
-      .requestConfluence(
-        route`/wiki/api/v2/pages/${pageId}/properties/${CONTENT_PROPERTY_KEY}`,
-        { headers: { Accept: 'application/json' } }
-      );
-
-    if (response.status === 404) {
-      return null; // Page has not been classified yet
-    }
-
-    if (!response.ok) {
-      console.error('Failed to read classification property:', response.status);
-      return null;
-    }
-
-    const data = await response.json();
-    return data.value || null;
-  } catch (error) {
-    console.error('Error reading classification property:', error);
-    return null;
-  }
+  return await getProperty(pageId, CONTENT_PROPERTY_KEY);
 }
 
 /**
@@ -61,29 +39,56 @@ export async function setClassification(pageId, classificationData, bylineData) 
 }
 
 /**
- * Creates or updates a content property on a page.
- * Tries PUT (update) first; if 404, falls back to POST (create).
- *
- * @param {string} pageId - Confluence page ID
- * @param {string} key - property key
- * @param {Object} value - property value
- * @returns {Promise<boolean>} true if successful
+ * Reads a content property by key using the v1 REST API.
+ * Returns the property value or null if not found.
+ */
+async function getProperty(pageId, key) {
+  try {
+    // v1 API: GET /rest/api/content/{id}/property/{key}
+    const response = await api
+      .asApp()
+      .requestConfluence(
+        route`/wiki/rest/api/content/${pageId}/property/${key}`,
+        { headers: { Accept: 'application/json' } }
+      );
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(`Failed to read property ${key}:`, response.status, errorBody);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.value || null;
+  } catch (error) {
+    console.error(`Error reading property ${key}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Creates or updates a content property on a page using the v1 REST API.
+ * Tries GET first to check if property exists, then POST (create) or PUT (update).
  */
 async function upsertProperty(pageId, key, value) {
   try {
-    // Try to get existing property to get its version number
+    // Check if property exists
     const getResponse = await api
       .asApp()
       .requestConfluence(
-        route`/wiki/api/v2/pages/${pageId}/properties/${key}`,
+        route`/wiki/rest/api/content/${pageId}/property/${key}`,
         { headers: { Accept: 'application/json' } }
       );
 
     if (getResponse.status === 404) {
-      // Property doesn't exist yet — create it
+      // Property doesn't exist — create it
       const createResponse = await api
         .asApp()
-        .requestConfluence(route`/wiki/api/v2/pages/${pageId}/properties`, {
+        .requestConfluence(route`/wiki/rest/api/content/${pageId}/property`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({ key, value }),
@@ -98,7 +103,8 @@ async function upsertProperty(pageId, key, value) {
     }
 
     if (!getResponse.ok) {
-      console.error(`Failed to read property ${key}:`, getResponse.status);
+      const errorBody = await getResponse.text();
+      console.error(`Failed to read property ${key} for update:`, getResponse.status, errorBody);
       return false;
     }
 
@@ -109,7 +115,7 @@ async function upsertProperty(pageId, key, value) {
     const updateResponse = await api
       .asApp()
       .requestConfluence(
-        route`/wiki/api/v2/pages/${pageId}/properties/${key}`,
+        route`/wiki/rest/api/content/${pageId}/property/${key}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },

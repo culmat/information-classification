@@ -93,4 +93,5 @@ permissions:
     - read:content.permission:confluence
     - read:user:confluence
     - read:confluence-content.all
+    - write:confluence-content
     - read:confluence-user
