@@ -45,7 +45,7 @@ import ForgeReconciler, {
   xcss,
 } from '@forge/react';
 import { invoke } from '@forge/bridge';
-import { COLOR_TO_LOZENGE, VALID_COLORS } from '../shared/constants';
+import { COLOR_OPTIONS, colorToLozenge } from '../shared/constants';
 
 /**
  * Helper to resolve a localized string from a { lang: text } object.
@@ -132,7 +132,7 @@ const App = () => {
     setEditingLevel({
       id: '',
       name: { en: '' },
-      color: 'gray',
+      color: 'grey',
       description: { en: '' },
       // New levels are appended at the end; array position is the order
       allowed: true,
@@ -268,9 +268,7 @@ const App = () => {
         {
           key: 'color',
           content: (
-            <Lozenge appearance={COLOR_TO_LOZENGE[level.color] || 'default'} isBold>
-              {localize(level.name, 'en')}
-            </Lozenge>
+            <Lozenge appearance={colorToLozenge(level.color)}>{localize(level.name, 'en')}</Lozenge>
           ),
         },
         { key: 'allowed', content: level.allowed ? <Badge appearance="added">Yes</Badge> : <Badge appearance="removed">No</Badge> },
@@ -564,10 +562,17 @@ const LevelModal = ({ level, onSave, onClose, t }) => {
             <Label labelFor="level-color">{t('admin.levels.color')}</Label>
             <Select
               inputId="level-color"
-              value={{ label: data.color, value: data.color }}
-              options={VALID_COLORS.map((c) => ({ label: c, value: c }))}
+              value={COLOR_OPTIONS.find((c) => c.value === data.color) || { label: data.color, value: data.color }}
+              options={COLOR_OPTIONS}
               onChange={(option) => update('color', option.value)}
             />
+            {/* Live preview of the selected color */}
+            {data.name?.en && (
+              <Inline space="space.100" alignBlock="center">
+                <Text>{t('admin.levels.color_preview')}:</Text>
+                <Lozenge appearance={colorToLozenge(data.color)}>{data.name.en}</Lozenge>
+              </Inline>
+            )}
           </Stack>
           <Stack space="space.050">
             <Label labelFor="level-desc-en">{t('admin.levels.description')} (English)</Label>

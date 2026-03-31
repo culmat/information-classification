@@ -23,7 +23,7 @@ export const DEFAULT_LEVELS = [
   {
     id: 'internal',
     name: { en: 'Internal', de: 'Intern', fr: 'Interne', ja: '社内' },
-    color: 'yellow',
+    color: 'blue',
     description: {
       en: 'Internal information is available to all employees. Release to third parties is only permitted in the course of normal business activities.',
       de: 'Interne Informationen stehen grundsätzlich allen Mitarbeitenden zur Verfügung.',

@@ -28,7 +28,7 @@ import ForgeReconciler, {
   xcss,
 } from '@forge/react';
 import { invoke } from '@forge/bridge';
-import { COLOR_TO_LOZENGE } from '../shared/constants';
+import { colorToLozenge } from '../shared/constants';
 
 function localize(obj, locale) {
   if (!obj || typeof obj === 'string') return obj || '';
@@ -161,9 +161,7 @@ const App = () => {
                 onChange={() => handleToggleLevel(level.id)}
                 label=""
               />
-              <Lozenge appearance={COLOR_TO_LOZENGE[level.color] || 'default'} isBold>
-                {localize(level.name, 'en')}
-              </Lozenge>
+              <Lozenge appearance={colorToLozenge(level.color)}>{localize(level.name, 'en')}</Lozenge>
             </Inline>
           ))}
         </Stack>

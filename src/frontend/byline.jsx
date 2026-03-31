@@ -23,6 +23,7 @@ import ForgeReconciler, {
   Stack,
   Inline,
   Lozenge,
+  Radio,
   Spinner,
   SectionMessage,
   Modal,
@@ -31,7 +32,6 @@ import ForgeReconciler, {
   ModalTitle,
   ModalBody,
   ModalFooter,
-  RadioGroup,
   Toggle,
   Label,
   Link,
@@ -39,7 +39,7 @@ import ForgeReconciler, {
   xcss,
 } from '@forge/react';
 import { invoke, view } from '@forge/bridge';
-import { COLOR_TO_LOZENGE } from '../shared/constants';
+import { colorToLozenge } from '../shared/constants';
 
 /**
  * Helper to resolve a localized string from a { lang: text } object.
@@ -68,6 +68,8 @@ const popupContentStyle = xcss({
 const sectionStyle = xcss({
   paddingTop: 'space.100',
 });
+
+
 
 /**
  * Main byline app component.
@@ -196,12 +198,10 @@ const App = () => {
   return (
     <Box xcss={popupContentStyle}>
       <Stack space="space.150">
-        {/* Current classification level with colored lozenge */}
+        {/* Current classification level with colored tag */}
         {currentLevel && (
           <Inline space="space.100" alignBlock="center">
-            <Lozenge appearance={COLOR_TO_LOZENGE[currentLevel.color] || 'default'} isBold>
-              {localize(currentLevel.name, locale)}
-            </Lozenge>
+            <Lozenge appearance={colorToLozenge(currentLevel.color)}>{localize(currentLevel.name, locale)}</Lozenge>
           </Inline>
         )}
 
@@ -277,16 +277,28 @@ const App = () => {
             </ModalHeader>
             <ModalBody>
               <Stack space="space.200">
-                <RadioGroup
-                  name="classification-level"
-                  value={selectedLevel}
-                  onChange={(e) => setSelectedLevel(e.target.value)}
-                  options={(config?.levels || [])
-                    .map((level) => ({
-                      label: localize(level.name, locale),
-                      value: level.id,
-                    }))}
-                />
+                {/*
+                 * Level picker: each row combines a Radio button (handles selection)
+                 * with a colored Lozenge (shows the classification color).
+                 * Box onClick is not supported in Forge UI Kit, so Radio onChange
+                 * is the only reliable click target.
+                 */}
+                <Stack space="space.075">
+                  {(config?.levels || []).map((level) => (
+                    <Inline key={level.id} space="space.100" alignBlock="center">
+                      <Radio
+                        value={level.id}
+                        isChecked={selectedLevel === level.id}
+                        onChange={() => setSelectedLevel(level.id)}
+                        label=""
+                      />
+                      <Lozenge appearance={colorToLozenge(level.color)}>
+                        {localize(level.name, locale)}
+                      </Lozenge>
+                      {!level.allowed && <Text>({t('classify.not_allowed')})</Text>}
+                    </Inline>
+                  ))}
+                </Stack>
 
                 {/* Show description for selected level */}
                 {selectedLevel && (() => {
