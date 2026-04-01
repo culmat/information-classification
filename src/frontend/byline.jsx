@@ -201,7 +201,7 @@ const App = () => {
         {/* Current classification level with colored tag */}
         {currentLevel && (
           <Inline space="space.100" alignBlock="center">
-            <Lozenge appearance={colorToLozenge(currentLevel.color)}>{localize(currentLevel.name, locale)}</Lozenge>
+            <Lozenge isBold appearance={colorToLozenge(currentLevel.color)}>{localize(currentLevel.name, locale)}</Lozenge>
           </Inline>
         )}
 
@@ -292,7 +292,7 @@ const App = () => {
                         onChange={() => setSelectedLevel(level.id)}
                         label=""
                       />
-                      <Lozenge appearance={colorToLozenge(level.color)}>
+                      <Lozenge isBold appearance={colorToLozenge(level.color)}>
                         {localize(level.name, locale)}
                       </Lozenge>
                       {!level.allowed && <Text>({t('classify.not_allowed')})</Text>}

@@ -161,7 +161,7 @@ const App = () => {
                 onChange={() => handleToggleLevel(level.id)}
                 label=""
               />
-              <Lozenge appearance={colorToLozenge(level.color)}>{localize(level.name, 'en')}</Lozenge>
+              <Lozenge isBold appearance={colorToLozenge(level.color)}>{localize(level.name, 'en')}</Lozenge>
             </Inline>
           ))}
         </Stack>

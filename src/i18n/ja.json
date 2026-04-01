@@ -35,7 +35,8 @@
       "levels": "レベル",
       "contacts": "連絡先",
       "links": "リンク",
-      "audit": "監査"
+      "audit": "監査",
+      "languages": "言語"
     },
     "levels": {
       "title": "分類レベル",
@@ -76,7 +77,11 @@
     "links": {
       "title": "リンク",
       "add_button": "リンクを追加",
+      "type": "タイプ",
+      "type_page": "Confluenceページ",
+      "type_external": "外部URL",
       "url": "URL",
+      "search_page": "ページを検索...",
       "label": "ラベル",
       "applies_to": "適用対象",
       "applies_to_all": "すべてのレベル"
@@ -92,6 +97,15 @@
       "by": "変更者",
       "date": "日付",
       "recursive": "再帰的"
+    },
+    "languages": {
+      "title": "コンテンツ言語",
+      "description": "分類レベル名、説明、その他の翻訳可能なコンテンツに使用できる言語を設定します。",
+      "add_button": "言語を追加",
+      "remove_button": "削除",
+      "english_required": "英語はフォールバック言語として常に必要です。",
+      "language": "言語",
+      "already_added": "この言語はすでに追加されています。"
     },
     "save_button": "設定を保存",
     "save_success": "設定が正常に保存されました。",

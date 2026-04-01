@@ -95,3 +95,4 @@ permissions:
     - read:confluence-content.all
     - write:confluence-content
     - read:confluence-user
+    - search:confluence

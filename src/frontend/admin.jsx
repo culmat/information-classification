@@ -8,7 +8,7 @@
  * 4. Audit — view statistics and recent classification changes
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ForgeReconciler, {
   useTranslation,
   I18nProvider,
@@ -46,6 +46,7 @@ import ForgeReconciler, {
 } from '@forge/react';
 import { invoke } from '@forge/bridge';
 import { COLOR_OPTIONS, colorToLozenge } from '../shared/constants';
+import { SUPPORTED_LANGUAGES } from '../shared/defaults';
 
 /**
  * Helper to resolve a localized string from a { lang: text } object.
@@ -227,6 +228,7 @@ const App = () => {
   const addLink = () => {
     setEditingLink({
       id: generateId(),
+      type: 'external',
       url: '',
       label: { en: '' },
       levelIds: [],
@@ -268,7 +270,7 @@ const App = () => {
         {
           key: 'color',
           content: (
-            <Lozenge appearance={colorToLozenge(level.color)}>{localize(level.name, 'en')}</Lozenge>
+            <Lozenge isBold appearance={colorToLozenge(level.color)}>{localize(level.name, 'en')}</Lozenge>
           ),
         },
         { key: 'allowed', content: level.allowed ? <Badge appearance="added">Yes</Badge> : <Badge appearance="removed">No</Badge> },
@@ -317,6 +319,7 @@ const App = () => {
   const linkRows = (config?.links || []).map((link) => ({
     key: link.id,
     cells: [
+      { key: 'type', content: <Text>{t(`admin.links.type_${link.type || 'external'}`)}</Text> },
       { key: 'label', content: <Text>{localize(link.label, 'en')}</Text> },
       { key: 'url', content: <Link href={link.url} openNewTab>{link.url}</Link> },
       {
@@ -358,6 +361,7 @@ const App = () => {
             <Tab>{t('admin.tabs.contacts')}</Tab>
             <Tab>{t('admin.tabs.links')}</Tab>
             <Tab>{t('admin.tabs.audit')}</Tab>
+            <Tab>{t('admin.tabs.languages')}</Tab>
           </TabList>
 
           {/* Levels Tab */}
@@ -431,6 +435,7 @@ const App = () => {
               <DynamicTable
                 head={{
                   cells: [
+                    { key: 'type', content: t('admin.links.type') },
                     { key: 'label', content: t('admin.links.label') },
                     { key: 'url', content: t('admin.links.url') },
                     { key: 'applies', content: t('admin.links.applies_to') },
@@ -478,6 +483,101 @@ const App = () => {
               />
             </Stack>
           </TabPanel>
+
+          {/* Languages Tab */}
+          <TabPanel>
+            <Stack space="space.200">
+              <Heading size="medium">{t('admin.languages.title')}</Heading>
+              <Text>{t('admin.languages.description')}</Text>
+
+              <DynamicTable
+                head={{
+                  cells: [
+                    { key: 'code', content: t('admin.languages.language') },
+                    { key: 'actions', content: '' },
+                  ],
+                }}
+                rows={(config?.languages || []).map((lang, index) => ({
+                  key: lang.code,
+                  cells: [
+                    { key: 'code', content: <Text>{lang.label} ({lang.code})</Text> },
+                    {
+                      key: 'actions',
+                      content: (
+                        <ButtonGroup>
+                          <Button
+                            appearance="subtle"
+                            onClick={() => {
+                              setConfig((prev) => {
+                                const langs = [...(prev?.languages || [])];
+                                if (index <= 0) return prev;
+                                const [moved] = langs.splice(index, 1);
+                                langs.splice(index - 1, 0, moved);
+                                return { ...prev, languages: langs };
+                              });
+                            }}
+                            isDisabled={index === 0}
+                          >
+                            {t('admin.levels.move_up')}
+                          </Button>
+                          <Button
+                            appearance="subtle"
+                            onClick={() => {
+                              setConfig((prev) => {
+                                const langs = [...(prev?.languages || [])];
+                                if (index >= langs.length - 1) return prev;
+                                const [moved] = langs.splice(index, 1);
+                                langs.splice(index + 1, 0, moved);
+                                return { ...prev, languages: langs };
+                              });
+                            }}
+                            isDisabled={index === (config?.languages || []).length - 1}
+                          >
+                            {t('admin.levels.move_down')}
+                          </Button>
+                          <Button
+                            appearance="danger"
+                            onClick={() => {
+                              const langs = (config?.languages || []).filter((l) => l.code !== lang.code);
+                              setConfig({ ...config, languages: langs });
+                            }}
+                            isDisabled={lang.code === 'en'}
+                          >
+                            {t('admin.languages.remove_button')}
+                          </Button>
+                        </ButtonGroup>
+                      ),
+                    },
+                  ],
+                }))}
+              />
+
+              <SectionMessage>
+                <Text>{t('admin.languages.english_required')}</Text>
+              </SectionMessage>
+
+              {/* Add language dropdown */}
+              <Inline space="space.100" alignBlock="center">
+                <Select
+                  inputId="add-language"
+                  placeholder={t('admin.languages.add_button')}
+                  options={Object.entries(SUPPORTED_LANGUAGES)
+                    .filter(([code]) => !(config?.languages || []).some((l) => l.code === code))
+                    .map(([code, label]) => ({ label: `${label} (${code})`, value: code }))}
+                  onChange={(option) => {
+                    if (!option) return;
+                    const existing = (config?.languages || []).some((l) => l.code === option.value);
+                    if (existing) return;
+                    setConfig({
+                      ...config,
+                      languages: [...(config?.languages || []), { code: option.value, label: SUPPORTED_LANGUAGES[option.value] || option.value }],
+                    });
+                  }}
+                  value={null}
+                />
+              </Inline>
+            </Stack>
+          </TabPanel>
         </Tabs>
 
         {/* Save button and messages */}
@@ -497,6 +597,7 @@ const App = () => {
         {showLevelModal && editingLevel && (
           <LevelModal
             level={editingLevel}
+            languages={config?.languages || [{ code: 'en', label: 'English' }]}
             onSave={saveLevel}
             onClose={() => setShowLevelModal(false)}
             t={t}
@@ -510,6 +611,7 @@ const App = () => {
           <ContactModal
             contact={editingContact}
             levels={config?.levels || []}
+            languages={config?.languages || [{ code: 'en', label: 'English' }]}
             onSave={saveContact}
             onClose={() => setShowContactModal(false)}
             t={t}
@@ -523,6 +625,7 @@ const App = () => {
           <LinkModal
             link={editingLink}
             levels={config?.levels || []}
+            languages={config?.languages || [{ code: 'en', label: 'English' }]}
             onSave={saveLink}
             onClose={() => setShowLinkModal(false)}
             t={t}
@@ -534,14 +637,29 @@ const App = () => {
 };
 
 /**
+ * Renders a translatable field (Textfield or TextArea) for each configured language.
+ */
+const TranslatableField = ({ languages, label, obj, onChange, multiline }) => (
+  <>
+    {languages.map(({ code, label: langLabel }) => (
+      <Stack space="space.050" key={code}>
+        <Label labelFor={`${label}-${code}`}>{label} ({langLabel}){code === 'en' ? ' *' : ''}</Label>
+        {multiline ? (
+          <TextArea id={`${label}-${code}`} value={obj?.[code] || ''} onChange={(e) => onChange(code, e.target.value)} />
+        ) : (
+          <Textfield id={`${label}-${code}`} value={obj?.[code] || ''} onChange={(e) => onChange(code, e.target.value)} />
+        )}
+      </Stack>
+    ))}
+  </>
+);
+
+/**
  * Modal for adding/editing a classification level.
  */
-const LevelModal = ({ level, onSave, onClose, t }) => {
+const LevelModal = ({ level, languages, onSave, onClose, t }) => {
   const [data, setData] = useState({ ...level });
   const update = (field, value) => setData({ ...data, [field]: value });
-  const updateName = (lang, value) => update('name', { ...data.name, [lang]: value });
-  const updateDesc = (lang, value) => update('description', { ...data.description, [lang]: value });
-  const updateError = (lang, value) => update('errorMessage', { ...(data.errorMessage || {}), [lang]: value });
 
   return (
     <Modal onClose={onClose}>
@@ -550,14 +668,12 @@ const LevelModal = ({ level, onSave, onClose, t }) => {
       </ModalHeader>
       <ModalBody>
         <Stack space="space.200">
-          <Stack space="space.050">
-            <Label labelFor="level-name-en">{t('admin.levels.name')} (English)</Label>
-            <Textfield id="level-name-en" value={data.name?.en || ''} onChange={(e) => updateName('en', e.target.value)} />
-          </Stack>
-          <Stack space="space.050">
-            <Label labelFor="level-name-de">{t('admin.levels.name')} (Deutsch)</Label>
-            <Textfield id="level-name-de" value={data.name?.de || ''} onChange={(e) => updateName('de', e.target.value)} />
-          </Stack>
+          <TranslatableField
+            languages={languages}
+            label={t('admin.levels.name')}
+            obj={data.name}
+            onChange={(code, value) => update('name', { ...data.name, [code]: value })}
+          />
           <Stack space="space.050">
             <Label labelFor="level-color">{t('admin.levels.color')}</Label>
             <Select
@@ -566,18 +682,20 @@ const LevelModal = ({ level, onSave, onClose, t }) => {
               options={COLOR_OPTIONS}
               onChange={(option) => update('color', option.value)}
             />
-            {/* Live preview of the selected color */}
             {data.name?.en && (
               <Inline space="space.100" alignBlock="center">
                 <Text>{t('admin.levels.color_preview')}:</Text>
-                <Lozenge appearance={colorToLozenge(data.color)}>{data.name.en}</Lozenge>
+                <Lozenge isBold appearance={colorToLozenge(data.color)}>{data.name.en}</Lozenge>
               </Inline>
             )}
           </Stack>
-          <Stack space="space.050">
-            <Label labelFor="level-desc-en">{t('admin.levels.description')} (English)</Label>
-            <TextArea id="level-desc-en" value={data.description?.en || ''} onChange={(e) => updateDesc('en', e.target.value)} />
-          </Stack>
+          <TranslatableField
+            languages={languages}
+            label={t('admin.levels.description')}
+            obj={data.description}
+            onChange={(code, value) => update('description', { ...data.description, [code]: value })}
+            multiline
+          />
           <Inline space="space.100" alignBlock="center">
             <Toggle id="level-allowed" isChecked={data.allowed} onChange={() => update('allowed', !data.allowed)} />
             <Label labelFor="level-allowed">{t('admin.levels.allowed')}</Label>
@@ -587,10 +705,13 @@ const LevelModal = ({ level, onSave, onClose, t }) => {
             <Label labelFor="level-protection">{t('admin.levels.requires_protection')}</Label>
           </Inline>
           {!data.allowed && (
-            <Stack space="space.050">
-              <Label labelFor="level-error-en">{t('admin.levels.error_message')} (English)</Label>
-              <TextArea id="level-error-en" value={data.errorMessage?.en || ''} onChange={(e) => updateError('en', e.target.value)} />
-            </Stack>
+            <TranslatableField
+              languages={languages}
+              label={t('admin.levels.error_message')}
+              obj={data.errorMessage}
+              onChange={(code, value) => update('errorMessage', { ...(data.errorMessage || {}), [code]: value })}
+              multiline
+            />
           )}
         </Stack>
       </ModalBody>
@@ -609,7 +730,7 @@ const LevelModal = ({ level, onSave, onClose, t }) => {
 /**
  * Modal for adding/editing a contact.
  */
-const ContactModal = ({ contact, levels, onSave, onClose, t }) => {
+const ContactModal = ({ contact, levels, languages, onSave, onClose, t }) => {
   const [data, setData] = useState({ ...contact });
   const update = (field, value) => setData({ ...data, [field]: value });
 
@@ -649,14 +770,12 @@ const ContactModal = ({ contact, levels, onSave, onClose, t }) => {
               />
             )}
           </Stack>
-          <Stack space="space.050">
-            <Label labelFor="contact-role-en">{t('admin.contacts.role')} (English)</Label>
-            <Textfield
-              id="contact-role-en"
-              value={data.role?.en || ''}
-              onChange={(e) => update('role', { ...data.role, en: e.target.value })}
-            />
-          </Stack>
+          <TranslatableField
+            languages={languages}
+            label={t('admin.contacts.role')}
+            obj={data.role}
+            onChange={(code, value) => update('role', { ...data.role, [code]: value })}
+          />
           <Stack space="space.050">
             <Label labelFor="contact-levels">{t('admin.contacts.applies_to')}</Label>
             <Select
@@ -684,10 +803,43 @@ const ContactModal = ({ contact, levels, onSave, onClose, t }) => {
 
 /**
  * Modal for adding/editing a link.
+ * Supports two types: "page" (Confluence page search) and "external" (URL).
  */
-const LinkModal = ({ link, levels, onSave, onClose, t }) => {
+const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
   const [data, setData] = useState({ ...link });
   const update = (field, value) => setData({ ...data, [field]: value });
+
+  // Page search state
+  const [pageOptions, setPageOptions] = useState([]);
+  const [pageSearchLoading, setPageSearchLoading] = useState(false);
+  const debounceRef = useRef(null);
+
+  const searchPages = (inputValue) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!inputValue || inputValue.length < 2) {
+      setPageOptions([]);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      setPageSearchLoading(true);
+      try {
+        const res = await invoke('searchPages', { query: inputValue });
+        if (res?.success) {
+          setPageOptions(
+            (res.data?.results || []).map((p) => ({
+              label: `${p.title}${p.space ? ` — ${p.space}` : ''}`,
+              value: p.url,
+              pageTitle: p.title,
+            }))
+          );
+        }
+      } catch (err) {
+        console.error('Page search failed:', err);
+      } finally {
+        setPageSearchLoading(false);
+      }
+    }, 300);
+  };
 
   return (
     <Modal onClose={onClose}>
@@ -697,21 +849,63 @@ const LinkModal = ({ link, levels, onSave, onClose, t }) => {
       <ModalBody>
         <Stack space="space.200">
           <Stack space="space.050">
-            <Label labelFor="link-label-en">{t('admin.links.label')} (English)</Label>
-            <Textfield
-              id="link-label-en"
-              value={data.label?.en || ''}
-              onChange={(e) => update('label', { ...data.label, en: e.target.value })}
+            <Label labelFor="link-type">{t('admin.links.type')}</Label>
+            <Select
+              inputId="link-type"
+              value={{ label: t(`admin.links.type_${data.type || 'external'}`), value: data.type || 'external' }}
+              options={[
+                { label: t('admin.links.type_page'), value: 'page' },
+                { label: t('admin.links.type_external'), value: 'external' },
+              ]}
+              onChange={(option) => {
+                update('type', option.value);
+                setData((prev) => ({ ...prev, type: option.value, url: '', label: prev.label }));
+                setPageOptions([]);
+              }}
             />
           </Stack>
+          <TranslatableField
+            languages={languages}
+            label={t('admin.links.label')}
+            obj={data.label}
+            onChange={(code, value) => update('label', { ...data.label, [code]: value })}
+          />
           <Stack space="space.050">
             <Label labelFor="link-url">{t('admin.links.url')}</Label>
-            <Textfield
-              id="link-url"
-              value={data.url || ''}
-              onChange={(e) => update('url', e.target.value)}
-              placeholder="https://..."
-            />
+            {(data.type || 'external') === 'page' ? (
+              <>
+                <Select
+                  inputId="link-url"
+                  options={pageOptions}
+                  value={data.url ? { label: data.pageTitle || data.url, value: data.url } : null}
+                  onInputChange={(value) => searchPages(value)}
+                  onChange={(option) => {
+                    setData((prev) => ({
+                      ...prev,
+                      url: option?.value || '',
+                      pageTitle: option?.pageTitle || '',
+                      label: {
+                        ...prev.label,
+                        en: prev.label?.en || option?.pageTitle || '',
+                      },
+                    }));
+                  }}
+                  placeholder={t('admin.links.search_page')}
+                  isLoading={pageSearchLoading}
+                  isClearable
+                />
+                {data.url && (
+                  <Text>{data.url}</Text>
+                )}
+              </>
+            ) : (
+              <Textfield
+                id="link-url"
+                value={data.url || ''}
+                onChange={(e) => update('url', e.target.value)}
+                placeholder="https://..."
+              />
+            )}
           </Stack>
           <Stack space="space.050">
             <Label labelFor="link-levels">{t('admin.links.applies_to')}</Label>

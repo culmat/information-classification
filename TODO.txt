@@ -1,6 +1,3 @@
-- add color to the byline
-- why do we need a logo is it used? add it to the byline or use an emoji?
 - improve admin UI layout: spacing / placement of buttons. modern look
-- rethink I18N. make languages configurable. Why is name tranlated and description, contact role and link label are not? Make i18n an own admin tab?
-- for URL apply similar logic than contact: can be confluence page or external.
-- rehaul audit trail: remove save button. It's empty. ensure it scales. Use filtering / paging?
+- rehaul audit trail: remove save button. It's empty. ensure it scales. Use filtering / paging? -- or remove feature?
+- admin : save configuration button should only be enabled when relevant 

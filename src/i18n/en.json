@@ -35,7 +35,8 @@
       "levels": "Levels",
       "contacts": "Contacts",
       "links": "Links",
-      "audit": "Audit"
+      "audit": "Audit",
+      "languages": "Languages"
     },
     "levels": {
       "title": "Classification Levels",
@@ -76,7 +77,11 @@
     "links": {
       "title": "Links",
       "add_button": "Add Link",
+      "type": "Type",
+      "type_page": "Confluence Page",
+      "type_external": "External URL",
       "url": "URL",
+      "search_page": "Search for a page...",
       "label": "Label",
       "applies_to": "Applies To",
       "applies_to_all": "All Levels"
@@ -92,6 +97,15 @@
       "by": "By",
       "date": "Date",
       "recursive": "Recursive"
+    },
+    "languages": {
+      "title": "Content Languages",
+      "description": "Configure which languages are available for classification level names, descriptions, and other translatable content.",
+      "add_button": "Add Language",
+      "remove_button": "Remove",
+      "english_required": "English is always required as the fallback language.",
+      "language": "Language",
+      "already_added": "This language has already been added."
     },
     "save_button": "Save Configuration",
     "save_success": "Configuration saved successfully.",

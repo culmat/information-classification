@@ -6,7 +6,7 @@
 
 import Resolver from '@forge/resolver';
 import { getClassificationResolver, setClassificationResolver, getDynamicPropertiesResolver } from './classifyResolver';
-import { getConfigResolver, setConfigResolver, getAuditDataResolver } from './configResolver';
+import { getConfigResolver, setConfigResolver, getAuditDataResolver, searchPagesResolver } from './configResolver';
 import { getSpaceConfigResolver, setSpaceConfigResolver, resetSpaceConfigResolver } from './spaceConfigResolver';
 import { runSchemaMigrations } from '../storage/migrations/schema';
 
@@ -68,6 +68,7 @@ resolver.define('getDynamicProperties', wrapResolver(getDynamicPropertiesResolve
 resolver.define('getConfig', wrapResolver(getConfigResolver));
 resolver.define('setConfig', wrapResolver(setConfigResolver));
 resolver.define('getAuditData', wrapResolver(getAuditDataResolver));
+resolver.define('searchPages', wrapResolver(searchPagesResolver));
 
 // Space config operations (used by space settings frontend)
 resolver.define('getSpaceConfig', wrapResolver(getSpaceConfigResolver));

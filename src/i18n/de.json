@@ -35,7 +35,8 @@
       "levels": "Stufen",
       "contacts": "Kontakte",
       "links": "Links",
-      "audit": "Protokoll"
+      "audit": "Protokoll",
+      "languages": "Sprachen"
     },
     "levels": {
       "title": "Klassifizierungsstufen",
@@ -76,7 +77,11 @@
     "links": {
       "title": "Links",
       "add_button": "Link hinzufügen",
+      "type": "Typ",
+      "type_page": "Confluence-Seite",
+      "type_external": "Externer Link",
       "url": "URL",
+      "search_page": "Seite suchen...",
       "label": "Bezeichnung",
       "applies_to": "Gilt für",
       "applies_to_all": "Alle Stufen"
@@ -92,6 +97,15 @@
       "by": "Von",
       "date": "Datum",
       "recursive": "Rekursiv"
+    },
+    "languages": {
+      "title": "Inhaltssprachen",
+      "description": "Konfigurieren Sie, welche Sprachen für Klassifizierungsnamen, Beschreibungen und andere übersetzbare Inhalte verfügbar sind.",
+      "add_button": "Sprache hinzufügen",
+      "remove_button": "Entfernen",
+      "english_required": "Englisch ist immer als Fallback-Sprache erforderlich.",
+      "language": "Sprache",
+      "already_added": "Diese Sprache wurde bereits hinzugefügt."
     },
     "save_button": "Konfiguration speichern",
     "save_success": "Konfiguration erfolgreich gespeichert.",
