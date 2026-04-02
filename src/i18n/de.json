@@ -6,12 +6,17 @@
   },
   "byline": {
     "tooltip": "Klassifizierungsstufe der Seite",
+    "tab_classification": "Klassifizierung",
+    "tab_resources": "Ressourcen",
+    "tab_history": "Verlauf",
     "description": "Beschreibung",
     "contacts": "Kontakte",
     "links": "Weiterführende Links",
     "change_button": "Klassifizierung ändern",
     "no_contacts": "Keine Kontakte konfiguriert.",
-    "no_links": "Keine Links konfiguriert."
+    "no_links": "Keine Links konfiguriert.",
+    "no_resources": "Keine Kontakte oder Links konfiguriert.",
+    "no_history": "Keine Klassifizierungsänderungen erfasst."
   },
   "classify": {
     "title": "Klassifizierung ändern",
@@ -95,12 +100,20 @@
       "total_changes": "Änderungen gesamt",
       "changes_this_month": "Änderungen diesen Monat",
       "recent_changes": "Letzte Änderungen",
+      "distribution": "Klassifizierungsverteilung",
+      "trend": "Monatlicher Trend",
       "page": "Seite",
+      "space": "Bereich",
       "from": "Von",
       "to": "Nach",
       "by": "Von",
       "date": "Datum",
-      "recursive": "Rekursiv"
+      "recursive": "Rekursiv",
+      "filter_from": "Von Datum",
+      "filter_to": "Bis Datum",
+      "filter_apply": "Filter anwenden",
+      "filter_clear": "Zurücksetzen",
+      "empty": "Noch keine Einträge vorhanden."
     },
     "languages": {
       "title": "Inhaltssprachen",
@@ -118,6 +131,8 @@
   },
   "space_settings": {
     "title": "Einstellungen Informationsklassifizierung",
+    "tab_configuration": "Konfiguration",
+    "tab_statistics": "Statistiken",
     "description": "Konfigurieren Sie, welche Klassifizierungsstufen in diesem Bereich verfügbar sind.",
     "enabled_levels": "Aktivierte Stufen",
     "default_level": "Standardstufe",

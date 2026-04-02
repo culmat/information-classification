@@ -6,12 +6,17 @@
   },
   "byline": {
     "tooltip": "ページの分類レベル",
+    "tab_classification": "分類",
+    "tab_resources": "リソース",
+    "tab_history": "履歴",
     "description": "説明",
     "contacts": "連絡先",
     "links": "関連リンク",
     "change_button": "分類を変更",
     "no_contacts": "連絡先が設定されていません。",
-    "no_links": "リンクが設定されていません。"
+    "no_links": "リンクが設定されていません。",
+    "no_resources": "連絡先やリンクが設定されていません。",
+    "no_history": "分類変更の記録がありません。"
   },
   "classify": {
     "title": "分類を変更",
@@ -95,12 +100,20 @@
       "total_changes": "変更総数",
       "changes_this_month": "今月の変更",
       "recent_changes": "最近の変更",
+      "distribution": "分類の分布",
+      "trend": "月次トレンド",
       "page": "ページ",
+      "space": "スペース",
       "from": "変更前",
       "to": "変更後",
       "by": "変更者",
       "date": "日付",
-      "recursive": "再帰的"
+      "recursive": "再帰的",
+      "filter_from": "開始日",
+      "filter_to": "終了日",
+      "filter_apply": "フィルター適用",
+      "filter_clear": "クリア",
+      "empty": "監査エントリはまだありません。"
     },
     "languages": {
       "title": "コンテンツ言語",
@@ -118,6 +131,8 @@
   },
   "space_settings": {
     "title": "情報分類設定",
+    "tab_configuration": "設定",
+    "tab_statistics": "統計",
     "description": "このスペースで利用可能な分類レベルを設定します。",
     "enabled_levels": "有効なレベル",
     "default_level": "デフォルトレベル",

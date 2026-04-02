@@ -5,7 +5,13 @@
  */
 
 import { getGlobalConfig, setGlobalConfig } from '../storage/configStore';
-import { getAuditStatistics, getRecentAuditEntries } from '../storage/auditStore';
+import {
+  getAuditStatistics,
+  getRecentAuditEntries,
+  getClassificationDistribution,
+  getMonthlyTrend,
+  getFilteredAuditEntries,
+} from '../storage/auditStore';
 import { successResponse, errorResponse, validationError } from '../utils/responseHelper';
 import { VALID_COLORS } from '../shared/constants';
 
@@ -53,13 +59,18 @@ export async function setConfigResolver(req) {
  * Resolver: getAuditData
  * Returns audit statistics and recent entries for the admin dashboard.
  */
-export async function getAuditDataResolver(_req) {
+export async function getAuditDataResolver(req) {
   try {
-    const [statistics, recentEntries] = await Promise.all([
+    const { startDate, endDate, limit } = req.payload || {};
+    const [statistics, recentEntries, distribution, monthlyTrend] = await Promise.all([
       getAuditStatistics(),
-      getRecentAuditEntries(20),
+      startDate || endDate
+        ? getFilteredAuditEntries({ startDate, endDate, limit: limit || 100 })
+        : getRecentAuditEntries(limit || 100),
+      getClassificationDistribution(),
+      getMonthlyTrend(12),
     ]);
-    return successResponse({ statistics, recentEntries });
+    return successResponse({ statistics, recentEntries, distribution, monthlyTrend });
   } catch (error) {
     console.error('Error getting audit data:', error);
     return errorResponse('Failed to get audit data', 500);

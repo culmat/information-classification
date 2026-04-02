@@ -42,6 +42,9 @@ import ForgeReconciler, {
   User,
   Badge,
   Link,
+  DatePicker,
+  DonutChart,
+  BarChart,
   xcss,
 } from '@forge/react';
 import { invoke, requestConfluence, showFlag } from '@forge/bridge';
@@ -73,6 +76,9 @@ const App = () => {
   const [config, setConfig] = useState(null);
   const [savedConfig, setSavedConfig] = useState(null);
   const [auditData, setAuditData] = useState(null);
+  const [auditFilterFrom, setAuditFilterFrom] = useState('');
+  const [auditFilterTo, setAuditFilterTo] = useState('');
+  const [auditLoading, setAuditLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const isDirty = config && savedConfig && JSON.stringify(config) !== JSON.stringify(savedConfig);
 
@@ -113,6 +119,22 @@ const App = () => {
       setLoading(false);
     })();
   }, [t]);
+
+  // Reload audit data with optional date filters
+  const loadAuditData = useCallback(async (startDate, endDate) => {
+    setAuditLoading(true);
+    try {
+      const payload = {};
+      if (startDate) payload.startDate = startDate;
+      if (endDate) payload.endDate = endDate;
+      const result = await invoke('getAuditData', payload);
+      if (result.success) setAuditData(result);
+    } catch (error) {
+      console.error('Failed to load audit data:', error);
+    } finally {
+      setAuditLoading(false);
+    }
+  }, []);
 
   // Save configuration
   const handleSave = useCallback(async () => {
@@ -354,11 +376,12 @@ const App = () => {
     key: String(entry.id),
     cells: [
       { key: 'page', content: <Text>{entry.pageId}</Text> },
-      { key: 'from', content: <Text>{entry.previousLevel || '—'}</Text> },
-      { key: 'to', content: <Text>{entry.newLevel}</Text> },
+      { key: 'space', content: <Text>{entry.spaceKey}</Text> },
+      { key: 'from', content: entry.previousLevel ? <Lozenge>{entry.previousLevel}</Lozenge> : <Text>—</Text> },
+      { key: 'to', content: <Lozenge isBold>{entry.newLevel}</Lozenge> },
       { key: 'by', content: <User accountId={entry.classifiedBy} /> },
       { key: 'date', content: <Text>{new Date(entry.classifiedAt).toLocaleString()}</Text> },
-      { key: 'recursive', content: entry.recursive ? <Badge>Yes</Badge> : <Text>No</Text> },
+      { key: 'recursive', content: entry.isRecursive ? <Badge>Yes</Badge> : <Text>No</Text> },
     ],
   }));
 
@@ -478,11 +501,78 @@ const App = () => {
                 </Inline>
               )}
 
+              {/* Charts */}
+              {(auditData?.distribution?.length > 0 || auditData?.monthlyTrend?.length > 0) && (
+                <Inline space="space.400" alignBlock="start">
+                  {auditData.distribution?.length > 0 && (
+                    <Stack space="space.100">
+                      <Heading size="small">{t('admin.audit.distribution')}</Heading>
+                      <DonutChart
+                        data={auditData.distribution}
+                        colorAccessor="level"
+                        weightAccessor="count"
+                        labelAccessor="level"
+                      />
+                    </Stack>
+                  )}
+                  {auditData.monthlyTrend?.length > 0 && (
+                    <Stack space="space.100">
+                      <Heading size="small">{t('admin.audit.trend')}</Heading>
+                      <BarChart
+                        data={auditData.monthlyTrend}
+                        xAccessor="month"
+                        yAccessor="count"
+                      />
+                    </Stack>
+                  )}
+                </Inline>
+              )}
+
+              {/* Date filters */}
+              <Inline space="space.200" alignBlock="end">
+                <Stack space="space.050">
+                  <Label labelFor="audit-from">{t('admin.audit.filter_from')}</Label>
+                  <DatePicker
+                    id="audit-from"
+                    value={auditFilterFrom}
+                    onChange={(value) => setAuditFilterFrom(value)}
+                  />
+                </Stack>
+                <Stack space="space.050">
+                  <Label labelFor="audit-to">{t('admin.audit.filter_to')}</Label>
+                  <DatePicker
+                    id="audit-to"
+                    value={auditFilterTo}
+                    onChange={(value) => setAuditFilterTo(value)}
+                  />
+                </Stack>
+                <Button
+                  appearance="default"
+                  onClick={() => loadAuditData(auditFilterFrom, auditFilterTo)}
+                  isLoading={auditLoading}
+                >
+                  {t('admin.audit.filter_apply')}
+                </Button>
+                {(auditFilterFrom || auditFilterTo) && (
+                  <Button
+                    appearance="subtle"
+                    onClick={() => {
+                      setAuditFilterFrom('');
+                      setAuditFilterTo('');
+                      loadAuditData(null, null);
+                    }}
+                  >
+                    {t('admin.audit.filter_clear')}
+                  </Button>
+                )}
+              </Inline>
+
               <Heading size="small">{t('admin.audit.recent_changes')}</Heading>
               <DynamicTable
                 head={{
                   cells: [
                     { key: 'page', content: t('admin.audit.page') },
+                    { key: 'space', content: t('admin.audit.space') },
                     { key: 'from', content: t('admin.audit.from') },
                     { key: 'to', content: t('admin.audit.to') },
                     { key: 'by', content: t('admin.audit.by') },
@@ -491,7 +581,9 @@ const App = () => {
                   ],
                 }}
                 rows={auditRows}
-                emptyView={<Text>No audit entries yet.</Text>}
+                rowsPerPage={20}
+                emptyView={<Text>{t('admin.audit.empty')}</Text>}
+                isLoading={auditLoading}
               />
             </Stack>
           </TabPanel>

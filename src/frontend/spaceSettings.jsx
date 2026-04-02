@@ -25,6 +25,15 @@ import ForgeReconciler, {
   Spinner,
   SectionMessage,
   Label,
+  Tabs,
+  Tab,
+  TabList,
+  TabPanel,
+  DynamicTable,
+  DonutChart,
+  BarChart,
+  User,
+  Badge,
   xcss,
 } from '@forge/react';
 import { invoke } from '@forge/bridge';
@@ -51,6 +60,10 @@ const App = () => {
   // Track which levels are enabled in this space
   const [enabledLevelIds, setEnabledLevelIds] = useState([]);
   const [defaultLevelId, setDefaultLevelId] = useState(null);
+
+  // Statistics tab state (lazy-loaded)
+  const [statsData, setStatsData] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   const spaceKey = context?.extension?.space?.key;
 
@@ -138,6 +151,21 @@ const App = () => {
     }
   }, [spaceKey, globalConfig, t]);
 
+  // Load statistics on first Statistics tab switch
+  const loadStats = useCallback(async () => {
+    if (statsData || statsLoading || !spaceKey) return;
+    setStatsLoading(true);
+    try {
+      const result = await invoke('getSpaceAuditData', { spaceKey });
+      if (result.success) setStatsData(result);
+    } catch (error) {
+      console.error('Failed to load space statistics:', error);
+      setStatsData({ entries: [], statistics: { totalChanges: 0, changesThisMonth: 0 }, distribution: [], monthlyTrend: [] });
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [spaceKey, statsData, statsLoading]);
+
   if (loading) {
     return <Box xcss={containerStyle}><Spinner size="large" /></Box>;
   }
@@ -145,58 +173,150 @@ const App = () => {
   // Only show globally-allowed levels as toggleable options
   const globalAllowedLevels = (globalConfig?.levels || []).filter((l) => l.allowed);
 
+  // Build statistics table rows
+  const statsRows = (statsData?.entries || []).map((entry, index) => ({
+    key: String(entry.id || index),
+    cells: [
+      { key: 'page', content: <Text>{entry.pageId}</Text> },
+      { key: 'from', content: entry.previousLevel ? <Lozenge>{entry.previousLevel}</Lozenge> : <Text>—</Text> },
+      { key: 'to', content: <Lozenge isBold>{entry.newLevel}</Lozenge> },
+      { key: 'by', content: <User accountId={entry.classifiedBy} /> },
+      { key: 'date', content: <Text>{new Date(entry.classifiedAt).toLocaleString()}</Text> },
+      { key: 'recursive', content: entry.isRecursive ? <Badge>Yes</Badge> : <Text>No</Text> },
+    ],
+  }));
+
   return (
     <Box xcss={containerStyle}>
       <Stack space="space.300">
         <Heading size="large">{t('space_settings.title')}</Heading>
-        <Text>{t('space_settings.description')}</Text>
 
-        {/* Level enable/disable checkboxes */}
-        <Stack space="space.050">
-          <Heading size="small">{t('space_settings.enabled_levels')}</Heading>
-          {globalAllowedLevels.map((level) => (
-            <Inline key={level.id} space="space.100" alignBlock="center">
-              <Checkbox
-                isChecked={enabledLevelIds.includes(level.id)}
-                onChange={() => handleToggleLevel(level.id)}
-                label=""
+        <Tabs id="space-settings-tabs" onChange={(index) => { if (index === 1) loadStats(); }}>
+          <TabList>
+            <Tab>{t('space_settings.tab_configuration')}</Tab>
+            <Tab>{t('space_settings.tab_statistics')}</Tab>
+          </TabList>
+
+          {/* Configuration Tab */}
+          <TabPanel>
+            <Stack space="space.200">
+              <Text>{t('space_settings.description')}</Text>
+
+              {/* Level enable/disable checkboxes */}
+              <Stack space="space.050">
+                <Heading size="small">{t('space_settings.enabled_levels')}</Heading>
+                {globalAllowedLevels.map((level) => (
+                  <Inline key={level.id} space="space.100" alignBlock="center">
+                    <Checkbox
+                      isChecked={enabledLevelIds.includes(level.id)}
+                      onChange={() => handleToggleLevel(level.id)}
+                      label=""
+                    />
+                    <Lozenge isBold appearance={colorToLozenge(level.color)}>{localize(level.name, 'en')}</Lozenge>
+                  </Inline>
+                ))}
+              </Stack>
+
+              {/* Default level selector */}
+              <Stack space="space.050">
+                <Label labelFor="space-default-level">{t('space_settings.default_level')}</Label>
+                <Select
+                  inputId="space-default-level"
+                  value={globalAllowedLevels
+                    .filter((l) => l.id === defaultLevelId)
+                    .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
+                  options={globalAllowedLevels
+                    .filter((l) => enabledLevelIds.includes(l.id))
+                    .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
+                  onChange={(option) => setDefaultLevelId(option.value)}
+                />
+              </Stack>
+
+              {/* Status message */}
+              {message && (
+                <SectionMessage appearance={message.type === 'error' ? 'error' : 'confirmation'}>
+                  <Text>{message.text}</Text>
+                </SectionMessage>
+              )}
+
+              {/* Action buttons */}
+              <ButtonGroup>
+                <Button appearance="primary" onClick={handleSave} isLoading={saving}>
+                  {t('space_settings.save_button')}
+                </Button>
+                <Button appearance="subtle" onClick={handleReset} isDisabled={saving}>
+                  {t('space_settings.reset_button')}
+                </Button>
+              </ButtonGroup>
+            </Stack>
+          </TabPanel>
+
+          {/* Statistics Tab */}
+          <TabPanel>
+            <Stack space="space.200">
+              {statsLoading && <Spinner size="medium" />}
+
+              {statsData?.statistics && (
+                <Inline space="space.400">
+                  <Stack space="space.050">
+                    <Text>{t('admin.audit.total_changes')}</Text>
+                    <Heading size="medium">{statsData.statistics.totalChanges}</Heading>
+                  </Stack>
+                  <Stack space="space.050">
+                    <Text>{t('admin.audit.changes_this_month')}</Text>
+                    <Heading size="medium">{statsData.statistics.changesThisMonth}</Heading>
+                  </Stack>
+                </Inline>
+              )}
+
+              {/* Charts */}
+              {(statsData?.distribution?.length > 0 || statsData?.monthlyTrend?.length > 0) && (
+                <Inline space="space.400" alignBlock="start">
+                  {statsData.distribution?.length > 0 && (
+                    <Stack space="space.100">
+                      <Heading size="small">{t('admin.audit.distribution')}</Heading>
+                      <DonutChart
+                        data={statsData.distribution}
+                        colorAccessor="level"
+                        weightAccessor="count"
+                        labelAccessor="level"
+                      />
+                    </Stack>
+                  )}
+                  {statsData.monthlyTrend?.length > 0 && (
+                    <Stack space="space.100">
+                      <Heading size="small">{t('admin.audit.trend')}</Heading>
+                      <BarChart
+                        data={statsData.monthlyTrend}
+                        xAccessor="month"
+                        yAccessor="count"
+                      />
+                    </Stack>
+                  )}
+                </Inline>
+              )}
+
+              {/* Recent changes table */}
+              <Heading size="small">{t('admin.audit.recent_changes')}</Heading>
+              <DynamicTable
+                head={{
+                  cells: [
+                    { key: 'page', content: t('admin.audit.page') },
+                    { key: 'from', content: t('admin.audit.from') },
+                    { key: 'to', content: t('admin.audit.to') },
+                    { key: 'by', content: t('admin.audit.by') },
+                    { key: 'date', content: t('admin.audit.date') },
+                    { key: 'recursive', content: t('admin.audit.recursive') },
+                  ],
+                }}
+                rows={statsRows}
+                rowsPerPage={10}
+                emptyView={<Text>{t('admin.audit.empty')}</Text>}
+                isLoading={statsLoading}
               />
-              <Lozenge isBold appearance={colorToLozenge(level.color)}>{localize(level.name, 'en')}</Lozenge>
-            </Inline>
-          ))}
-        </Stack>
-
-        {/* Default level selector */}
-        <Stack space="space.050">
-          <Label labelFor="space-default-level">{t('space_settings.default_level')}</Label>
-          <Select
-            inputId="space-default-level"
-            value={globalAllowedLevels
-              .filter((l) => l.id === defaultLevelId)
-              .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
-            options={globalAllowedLevels
-              .filter((l) => enabledLevelIds.includes(l.id))
-              .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
-            onChange={(option) => setDefaultLevelId(option.value)}
-          />
-        </Stack>
-
-        {/* Status message */}
-        {message && (
-          <SectionMessage appearance={message.type === 'error' ? 'error' : 'confirmation'}>
-            <Text>{message.text}</Text>
-          </SectionMessage>
-        )}
-
-        {/* Action buttons */}
-        <ButtonGroup>
-          <Button appearance="primary" onClick={handleSave} isLoading={saving}>
-            {t('space_settings.save_button')}
-          </Button>
-          <Button appearance="subtle" onClick={handleReset} isDisabled={saving}>
-            {t('space_settings.reset_button')}
-          </Button>
-        </ButtonGroup>
+            </Stack>
+          </TabPanel>
+        </Tabs>
       </Stack>
     </Box>
   );

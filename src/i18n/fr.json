@@ -6,12 +6,17 @@
   },
   "byline": {
     "tooltip": "Niveau de classification de la page",
+    "tab_classification": "Classification",
+    "tab_resources": "Ressources",
+    "tab_history": "Historique",
     "description": "Description",
     "contacts": "Contacts",
     "links": "Liens associés",
     "change_button": "Modifier la classification",
     "no_contacts": "Aucun contact configuré.",
-    "no_links": "Aucun lien configuré."
+    "no_links": "Aucun lien configuré.",
+    "no_resources": "Aucun contact ou lien configuré.",
+    "no_history": "Aucune modification de classification enregistrée."
   },
   "classify": {
     "title": "Modifier la classification",
@@ -95,12 +100,20 @@
       "total_changes": "Total des modifications",
       "changes_this_month": "Modifications ce mois-ci",
       "recent_changes": "Modifications récentes",
+      "distribution": "Répartition des classifications",
+      "trend": "Tendance mensuelle",
       "page": "Page",
+      "space": "Espace",
       "from": "De",
       "to": "À",
       "by": "Par",
       "date": "Date",
-      "recursive": "Récursif"
+      "recursive": "Récursif",
+      "filter_from": "Date de début",
+      "filter_to": "Date de fin",
+      "filter_apply": "Appliquer le filtre",
+      "filter_clear": "Effacer",
+      "empty": "Aucune entrée d'audit."
     },
     "languages": {
       "title": "Langues du contenu",
@@ -118,6 +131,8 @@
   },
   "space_settings": {
     "title": "Paramètres de classification",
+    "tab_configuration": "Configuration",
+    "tab_statistics": "Statistiques",
     "description": "Configurez les niveaux de classification disponibles dans cet espace.",
     "enabled_levels": "Niveaux activés",
     "default_level": "Niveau par défaut",

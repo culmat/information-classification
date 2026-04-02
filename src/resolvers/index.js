@@ -8,6 +8,7 @@ import Resolver from '@forge/resolver';
 import { getClassificationResolver, setClassificationResolver, getDynamicPropertiesResolver } from './classifyResolver';
 import { getConfigResolver, setConfigResolver, getAuditDataResolver } from './configResolver';
 import { getSpaceConfigResolver, setSpaceConfigResolver, resetSpaceConfigResolver } from './spaceConfigResolver';
+import { getPageAuditHistoryResolver, getSpaceAuditDataResolver } from './auditResolver';
 import { runSchemaMigrations } from '../storage/migrations/schema';
 
 const resolver = new Resolver();
@@ -73,6 +74,10 @@ resolver.define('getAuditData', wrapResolver(getAuditDataResolver));
 resolver.define('getSpaceConfig', wrapResolver(getSpaceConfigResolver));
 resolver.define('setSpaceConfig', wrapResolver(setSpaceConfigResolver));
 resolver.define('resetSpaceConfig', wrapResolver(resetSpaceConfigResolver));
+
+// Audit operations (used by byline history tab and space statistics)
+resolver.define('getPageAuditHistory', wrapResolver(getPageAuditHistoryResolver));
+resolver.define('getSpaceAuditData', wrapResolver(getSpaceAuditDataResolver));
 
 // Manual migration trigger (admin utility)
 resolver.define('runMigrations', async () => {

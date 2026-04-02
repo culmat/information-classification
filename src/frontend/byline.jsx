@@ -36,6 +36,12 @@ import ForgeReconciler, {
   Label,
   Link,
   User,
+  Tabs,
+  Tab,
+  TabList,
+  TabPanel,
+  DynamicTable,
+  Badge,
   xcss,
 } from '@forge/react';
 import { invoke, view } from '@forge/bridge';
@@ -88,6 +94,9 @@ const App = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   const [restrictionWarning, setRestrictionWarning] = useState(null);
+  const [recentHistory, setRecentHistory] = useState([]);
+  const [fullHistory, setFullHistory] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Extract page and space info from context
   const pageId = context?.extension?.content?.id;
@@ -105,6 +114,7 @@ const App = () => {
         setClassification(result.classification);
         setConfig(result.config);
         setRestrictionWarning(result.restrictionWarning);
+        setRecentHistory(result.recentHistory || []);
       }
     } catch (error) {
       console.error('Failed to load classification:', error);
@@ -116,6 +126,23 @@ const App = () => {
   useEffect(() => {
     loadClassification();
   }, [loadClassification]);
+
+  // Load full audit history on first History tab switch
+  const loadFullHistory = useCallback(async () => {
+    if (fullHistory || historyLoading || !pageId) return;
+    setHistoryLoading(true);
+    try {
+      const result = await invoke('getPageAuditHistory', { pageId });
+      if (result.success) {
+        setFullHistory(result.entries || []);
+      }
+    } catch (error) {
+      console.error('Failed to load audit history:', error);
+      setFullHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [pageId, fullHistory, historyLoading]);
 
   // Find the current level definition from config
   const currentLevel = config?.levels?.find(
@@ -195,86 +222,140 @@ const App = () => {
     return <Spinner size="small" />;
   }
 
+  // Build history table rows from either full or recent data
+  const historyEntries = fullHistory || recentHistory;
+  const historyRows = historyEntries.map((entry, index) => ({
+    key: String(entry.id || index),
+    cells: [
+      { key: 'from', content: entry.previousLevel ? <Lozenge>{entry.previousLevel}</Lozenge> : <Text>—</Text> },
+      { key: 'to', content: <Lozenge isBold>{entry.newLevel}</Lozenge> },
+      { key: 'by', content: <User accountId={entry.classifiedBy} /> },
+      { key: 'date', content: <Text>{new Date(entry.classifiedAt).toLocaleString()}</Text> },
+      { key: 'recursive', content: entry.isRecursive ? <Badge>Yes</Badge> : <Text>No</Text> },
+    ],
+  }));
+
   return (
     <Box xcss={popupContentStyle}>
-      <Stack space="space.150">
-        {/* Current classification level with colored tag */}
-        {currentLevel && (
-          <Inline space="space.100" alignBlock="center">
-            <Lozenge isBold appearance={colorToLozenge(currentLevel.color)}>{localize(currentLevel.name, locale)}</Lozenge>
-          </Inline>
-        )}
+      <Tabs id="byline-tabs" onChange={(index) => { if (index === 2) loadFullHistory(); }}>
+        <TabList>
+          <Tab>{t('byline.tab_classification')}</Tab>
+          <Tab>{t('byline.tab_resources')}</Tab>
+          <Tab>{t('byline.tab_history')}</Tab>
+        </TabList>
 
-        {/* Level description */}
-        {currentLevel?.description && (
-          <Box xcss={sectionStyle}>
-            <Heading size="xsmall">{t('byline.description')}</Heading>
-            <Text>{localize(currentLevel.description, locale)}</Text>
-          </Box>
-        )}
+        {/* Classification Tab */}
+        <TabPanel>
+          <Stack space="space.150">
+            {/* Current classification level with colored tag */}
+            {currentLevel && (
+              <Inline space="space.100" alignBlock="center">
+                <Lozenge isBold appearance={colorToLozenge(currentLevel.color)}>{localize(currentLevel.name, locale)}</Lozenge>
+              </Inline>
+            )}
 
-        {/* Restriction mismatch warning */}
-        {restrictionWarning === 'requires_protection' && (
-          <SectionMessage appearance="warning">
-            <Text>{t('classify.requires_protection')}</Text>
-            <Text>{t('classify.requires_protection_share')}</Text>
-          </SectionMessage>
-        )}
-        {restrictionWarning === 'has_unnecessary_protection' && (
-          <SectionMessage appearance="warning">
-            <Text>{t('classify.has_unnecessary_protection')}</Text>
-          </SectionMessage>
-        )}
+            {/* Level description */}
+            {currentLevel?.description && (
+              <Box xcss={sectionStyle}>
+                <Text>{localize(currentLevel.description, locale)}</Text>
+              </Box>
+            )}
 
-        {/* Contacts section */}
-        {relevantContacts.length > 0 && (
-          <Box xcss={sectionStyle}>
-            <Heading size="xsmall">{t('byline.contacts')}</Heading>
-            <Stack space="space.050">
-              {relevantContacts.map((contact) => (
-                <ContactItem key={contact.id} contact={contact} locale={locale} />
-              ))}
-            </Stack>
-          </Box>
-        )}
-
-        {/* Links section */}
-        {relevantLinks.length > 0 && (
-          <Box xcss={sectionStyle}>
-            <Heading size="xsmall">{t('byline.links')}</Heading>
-            <Stack space="space.050">
-              {relevantLinks.map((link) => (
-                <Link key={link.id} href={link.url} openNewTab>
-                  {localize(link.label, locale)}
-                </Link>
-              ))}
-            </Stack>
-          </Box>
-        )}
-
-        {/* Change classification button (editors only) */}
-        {canEdit && (
-          <Box xcss={sectionStyle}>
-            <Button appearance="default" onClick={openModal}>
-              {t('byline.change_button')}
-            </Button>
-          </Box>
-        )}
-
-        {/* Status message */}
-        {message && (
-          <SectionMessage appearance={message.type === 'error' ? 'error' : message.type === 'warning' ? 'warning' : 'confirmation'}>
-            {message.key === 'requires_protection' ? (
-              <>
+            {/* Restriction mismatch warning */}
+            {restrictionWarning === 'requires_protection' && (
+              <SectionMessage appearance="warning">
                 <Text>{t('classify.requires_protection')}</Text>
                 <Text>{t('classify.requires_protection_share')}</Text>
-              </>
-            ) : (
-              <Text>{message.text}</Text>
+              </SectionMessage>
             )}
-          </SectionMessage>
-        )}
-      </Stack>
+            {restrictionWarning === 'has_unnecessary_protection' && (
+              <SectionMessage appearance="warning">
+                <Text>{t('classify.has_unnecessary_protection')}</Text>
+              </SectionMessage>
+            )}
+
+            {/* Change classification button (editors only) */}
+            {canEdit && (
+              <Box xcss={sectionStyle}>
+                <Button appearance="default" onClick={openModal}>
+                  {t('byline.change_button')}
+                </Button>
+              </Box>
+            )}
+
+            {/* Status message */}
+            {message && (
+              <SectionMessage appearance={message.type === 'error' ? 'error' : message.type === 'warning' ? 'warning' : 'confirmation'}>
+                {message.key === 'requires_protection' ? (
+                  <>
+                    <Text>{t('classify.requires_protection')}</Text>
+                    <Text>{t('classify.requires_protection_share')}</Text>
+                  </>
+                ) : (
+                  <Text>{message.text}</Text>
+                )}
+              </SectionMessage>
+            )}
+          </Stack>
+        </TabPanel>
+
+        {/* Resources Tab */}
+        <TabPanel>
+          <Stack space="space.150">
+            {/* Contacts section */}
+            {relevantContacts.length > 0 && (
+              <Box xcss={sectionStyle}>
+                <Heading size="xsmall">{t('byline.contacts')}</Heading>
+                <Stack space="space.050">
+                  {relevantContacts.map((contact) => (
+                    <ContactItem key={contact.id} contact={contact} locale={locale} />
+                  ))}
+                </Stack>
+              </Box>
+            )}
+
+            {/* Links section */}
+            {relevantLinks.length > 0 && (
+              <Box xcss={sectionStyle}>
+                <Heading size="xsmall">{t('byline.links')}</Heading>
+                <Stack space="space.050">
+                  {relevantLinks.map((link) => (
+                    <Link key={link.id} href={link.url} openNewTab>
+                      {localize(link.label, locale)}
+                    </Link>
+                  ))}
+                </Stack>
+              </Box>
+            )}
+
+            {relevantContacts.length === 0 && relevantLinks.length === 0 && (
+              <Text>{t('byline.no_resources')}</Text>
+            )}
+          </Stack>
+        </TabPanel>
+
+        {/* History Tab */}
+        <TabPanel>
+          <Stack space="space.100">
+            {historyLoading && <Spinner size="small" />}
+            <DynamicTable
+              head={{
+                cells: [
+                  { key: 'from', content: t('admin.audit.from') },
+                  { key: 'to', content: t('admin.audit.to') },
+                  { key: 'by', content: t('admin.audit.by') },
+                  { key: 'date', content: t('admin.audit.date') },
+                  { key: 'recursive', content: t('admin.audit.recursive') },
+                ],
+              }}
+              rows={historyRows}
+              rowsPerPage={5}
+              emptyView={<Text>{t('byline.no_history')}</Text>}
+              isLoading={historyLoading}
+            />
+          </Stack>
+        </TabPanel>
+      </Tabs>
 
       {/* Classification change modal */}
       <ModalTransition>

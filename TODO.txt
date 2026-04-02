@@ -1,3 +1,5 @@
-- improve admin UI layout: spacing / placement of buttons. modern look
 - rehaul audit trail: remove save button. It's empty. ensure it scales. Use filtering / paging? -- or remove feature?
-- admin : save configuration button should only be enabled when relevant 
+- what happens if I delete a classification that is used in a page? and recreate it?
+- backwards compat with labels ( sync labels?)
+- improve documentation for humans and  agent workflow / discverability regarding the topics of persistence, UI kit, testing with acli and shared browser
+- improve admin UI layout: spacing / placement of buttons. modern look. revamp everything applying UI kit as much as possible

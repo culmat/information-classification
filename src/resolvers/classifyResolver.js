@@ -7,6 +7,7 @@ import { getPageClassification, classifyPage } from '../services/classificationS
 import { getEffectiveConfig } from '../storage/configStore';
 import { getSpaceConfig } from '../storage/spaceConfigStore';
 import { getClassification } from '../services/contentPropertyService';
+import { getAuditLogForPage } from '../storage/auditStore';
 import { successResponse, errorResponse, validationError } from '../utils/responseHelper';
 
 /**
@@ -75,8 +76,11 @@ export async function getClassificationResolver(req) {
   }
 
   try {
-    const result = await getPageClassification(String(pageId), spaceKey);
-    return successResponse(result);
+    const [result, recentHistory] = await Promise.all([
+      getPageClassification(String(pageId), spaceKey),
+      getAuditLogForPage(pageId, 3).catch(() => []),
+    ]);
+    return successResponse({ ...result, recentHistory });
   } catch (error) {
     console.error('Error getting classification:', error);
     return errorResponse('Failed to get classification', 500);

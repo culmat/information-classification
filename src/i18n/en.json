@@ -6,12 +6,17 @@
   },
   "byline": {
     "tooltip": "Page classification level",
+    "tab_classification": "Classification",
+    "tab_resources": "Resources",
+    "tab_history": "History",
     "description": "Description",
     "contacts": "Contacts",
     "links": "Related Links",
     "change_button": "Change Classification",
     "no_contacts": "No contacts configured.",
-    "no_links": "No links configured."
+    "no_links": "No links configured.",
+    "no_resources": "No contacts or links configured.",
+    "no_history": "No classification changes recorded."
   },
   "classify": {
     "title": "Change Classification",
@@ -95,12 +100,20 @@
       "total_changes": "Total Changes",
       "changes_this_month": "Changes This Month",
       "recent_changes": "Recent Changes",
+      "distribution": "Classification Distribution",
+      "trend": "Monthly Trend",
       "page": "Page",
+      "space": "Space",
       "from": "From",
       "to": "To",
       "by": "By",
       "date": "Date",
-      "recursive": "Recursive"
+      "recursive": "Recursive",
+      "filter_from": "From Date",
+      "filter_to": "To Date",
+      "filter_apply": "Apply Filter",
+      "filter_clear": "Clear",
+      "empty": "No audit entries yet."
     },
     "languages": {
       "title": "Content Languages",
@@ -118,6 +131,8 @@
   },
   "space_settings": {
     "title": "Information Classification Settings",
+    "tab_configuration": "Configuration",
+    "tab_statistics": "Statistics",
     "description": "Configure which classification levels are available in this space.",
     "enabled_levels": "Enabled Levels",
     "default_level": "Default Level",
