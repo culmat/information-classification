@@ -4,7 +4,6 @@
  * to Confluence admins at the module level — no additional auth check needed here.
  */
 
-import api, { route } from '@forge/api';
 import { getGlobalConfig, setGlobalConfig } from '../storage/configStore';
 import { getAuditStatistics, getRecentAuditEntries } from '../storage/auditStore';
 import { successResponse, errorResponse, validationError } from '../utils/responseHelper';
@@ -75,14 +74,11 @@ export async function getAuditDataResolver(_req) {
  * @returns {{ valid: boolean, error?: string }}
  */
 function validateConfig(config) {
-  // Validate languages
+  // Validate languages — English is always hardcoded at position 0
   if (!Array.isArray(config.languages) || config.languages.length === 0) {
     return { valid: false, error: 'At least one content language is required.' };
   }
   const langCodes = config.languages.map((l) => l.code);
-  if (!langCodes.includes('en')) {
-    return { valid: false, error: 'English (en) must always be included as a content language.' };
-  }
   if (new Set(langCodes).size !== langCodes.length) {
     return { valid: false, error: 'Duplicate language codes are not allowed.' };
   }
@@ -145,44 +141,4 @@ function validateConfig(config) {
   }
 
   return { valid: true };
-}
-
-/**
- * Resolver: searchPages
- * Searches Confluence pages by title using CQL.
- * Used by the admin UI to pick a Confluence page for link configuration.
- */
-export async function searchPagesResolver(req) {
-  try {
-    const query = req.payload?.query?.trim();
-    if (!query || query.length < 2) {
-      return successResponse({ results: [] });
-    }
-
-    const cql = `type=page AND title~"${query.replace(/"/g, '\\"')}"`;
-    const response = await api.asUser().requestConfluence(
-      route`/wiki/rest/api/content/search?cql=${cql}&limit=10`,
-      { headers: { Accept: 'application/json' } }
-    );
-
-    if (!response.ok) {
-      console.error('Page search failed:', response.status);
-      return successResponse({ results: [] });
-    }
-
-    const data = await response.json();
-    const results = (data.results || []).map((page) => ({
-      id: page.id,
-      title: page.title,
-      url: page._links?.webui
-        ? `${data._links?.base || ''}${page._links.webui}`
-        : '',
-      space: page.space?.name || '',
-    }));
-
-    return successResponse({ results });
-  } catch (error) {
-    console.error('Error searching pages:', error);
-    return successResponse({ results: [] });
-  }
 }

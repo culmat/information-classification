@@ -26,7 +26,8 @@
     "success_recursive": "Klassifizierung für {classified} Seiten aktualisiert.",
     "success_recursive_partial": "Klassifizierung für {classified} Seiten aktualisiert ({failed} fehlgeschlagen, Zeitüberschreitung).",
     "error": "Klassifizierung konnte nicht aktualisiert werden.",
-    "requires_protection": "Diese Klassifizierungsstufe erfordert Seitenbeschränkungen. Verwenden Sie die Schaltfläche \"Teilen\" oder das Schloss-Symbol, um den Zugriff einzuschränken.",
+    "requires_protection": "Diese Stufe erfordert Seitenbeschränkungen.",
+    "requires_protection_share": "Zugriff über die Teilen-Schaltfläche einschränken.",
     "has_unnecessary_protection": "Diese Seite hat Zugriffsbeschränkungen, die Klassifizierungsstufe erfordert diese jedoch nicht. Erwägen Sie, die Beschränkungen zu entfernen oder die Klassifizierung zu ändern.",
     "restriction_link": "Seitenbeschränkungen verwalten"
   },
@@ -82,6 +83,9 @@
       "type_external": "Externer Link",
       "url": "URL",
       "search_page": "Seite suchen...",
+      "search_page_hint": "Mindestens 2 Zeichen eingeben",
+      "search_page_empty": "Keine Seiten gefunden",
+      "change_page": "Ändern",
       "label": "Bezeichnung",
       "applies_to": "Gilt für",
       "applies_to_all": "Alle Stufen"
@@ -109,7 +113,8 @@
     },
     "save_button": "Konfiguration speichern",
     "save_success": "Konfiguration erfolgreich gespeichert.",
-    "save_error": "Konfiguration konnte nicht gespeichert werden."
+    "save_error": "Konfiguration konnte nicht gespeichert werden.",
+    "unsaved_changes": "Es gibt ungespeicherte Änderungen. Klicken Sie auf Speichern."
   },
   "space_settings": {
     "title": "Einstellungen Informationsklassifizierung",
@@ -120,6 +125,28 @@
     "save_button": "Speichern",
     "save_success": "Bereichseinstellungen gespeichert.",
     "reset_success": "Auf globale Standardwerte zurückgesetzt."
+  },
+  "language_names": {
+    "en": "Englisch",
+    "de": "Deutsch",
+    "fr": "Französisch",
+    "it": "Italienisch",
+    "es": "Spanisch",
+    "pt": "Portugiesisch",
+    "nl": "Niederländisch",
+    "pl": "Polnisch",
+    "cs": "Tschechisch",
+    "da": "Dänisch",
+    "fi": "Finnisch",
+    "hu": "Ungarisch",
+    "no": "Norwegisch",
+    "ro": "Rumänisch",
+    "sv": "Schwedisch",
+    "ja": "Japanisch",
+    "ko": "Koreanisch",
+    "zh": "Chinesisch",
+    "ru": "Russisch",
+    "uk": "Ukrainisch"
   },
   "license": {
     "inactive_title": "Lizenz erforderlich",

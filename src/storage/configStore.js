@@ -29,6 +29,11 @@ export async function getGlobalConfig() {
     console.log('Initialized global config with defaults');
   }
 
+  // Ensure languages field exists (handles configs created before this feature)
+  if (!config.languages) {
+    config.languages = [{ code: 'en', label: 'English' }];
+  }
+
   return config;
 }
 

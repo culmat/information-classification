@@ -26,7 +26,8 @@
     "success_recursive": "Classification mise à jour pour {classified} pages.",
     "success_recursive_partial": "Classification mise à jour pour {classified} pages ({failed} échouées, délai dépassé).",
     "error": "Impossible de mettre à jour la classification.",
-    "requires_protection": "Ce niveau de classification nécessite des restrictions de page. Utilisez le bouton Partager ou l'icône de cadenas pour restreindre l'accès.",
+    "requires_protection": "Ce niveau nécessite des restrictions.",
+    "requires_protection_share": "Utilisez le bouton Partager pour restreindre l'accès.",
     "has_unnecessary_protection": "Cette page a des restrictions d'accès, mais le niveau de classification ne les nécessite pas. Envisagez de supprimer les restrictions ou de modifier la classification.",
     "restriction_link": "Gérer les restrictions de page"
   },
@@ -82,6 +83,9 @@
       "type_external": "URL externe",
       "url": "URL",
       "search_page": "Rechercher une page...",
+      "search_page_hint": "Saisissez au moins 2 caractères",
+      "search_page_empty": "Aucune page trouvée",
+      "change_page": "Modifier",
       "label": "Libellé",
       "applies_to": "S'applique à",
       "applies_to_all": "Tous les niveaux"
@@ -109,7 +113,8 @@
     },
     "save_button": "Enregistrer la configuration",
     "save_success": "Configuration enregistrée avec succès.",
-    "save_error": "Impossible d'enregistrer la configuration."
+    "save_error": "Impossible d'enregistrer la configuration.",
+    "unsaved_changes": "Vous avez des modifications non enregistrées. Cliquez sur Enregistrer."
   },
   "space_settings": {
     "title": "Paramètres de classification",
@@ -120,6 +125,28 @@
     "save_button": "Enregistrer",
     "save_success": "Paramètres d'espace enregistrés.",
     "reset_success": "Réinitialisé aux valeurs globales."
+  },
+  "language_names": {
+    "en": "Anglais",
+    "de": "Allemand",
+    "fr": "Français",
+    "it": "Italien",
+    "es": "Espagnol",
+    "pt": "Portugais",
+    "nl": "Néerlandais",
+    "pl": "Polonais",
+    "cs": "Tchèque",
+    "da": "Danois",
+    "fi": "Finnois",
+    "hu": "Hongrois",
+    "no": "Norvégien",
+    "ro": "Roumain",
+    "sv": "Suédois",
+    "ja": "Japonais",
+    "ko": "Coréen",
+    "zh": "Chinois",
+    "ru": "Russe",
+    "uk": "Ukrainien"
   },
   "license": {
     "inactive_title": "Licence requise",

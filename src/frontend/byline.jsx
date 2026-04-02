@@ -162,7 +162,7 @@ const App = () => {
         if (result.restrictionWarning === 'requires_protection') {
           setMessage({
             type: 'warning',
-            text: t('classify.requires_protection'),
+            key: 'requires_protection',
           });
         }
 
@@ -217,6 +217,7 @@ const App = () => {
         {restrictionWarning === 'requires_protection' && (
           <SectionMessage appearance="warning">
             <Text>{t('classify.requires_protection')}</Text>
+            <Text>{t('classify.requires_protection_share')}</Text>
           </SectionMessage>
         )}
         {restrictionWarning === 'has_unnecessary_protection' && (
@@ -263,7 +264,14 @@ const App = () => {
         {/* Status message */}
         {message && (
           <SectionMessage appearance={message.type === 'error' ? 'error' : message.type === 'warning' ? 'warning' : 'confirmation'}>
-            <Text>{message.text}</Text>
+            {message.key === 'requires_protection' ? (
+              <>
+                <Text>{t('classify.requires_protection')}</Text>
+                <Text>{t('classify.requires_protection_share')}</Text>
+              </>
+            ) : (
+              <Text>{message.text}</Text>
+            )}
           </SectionMessage>
         )}
       </Stack>

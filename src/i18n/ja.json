@@ -26,7 +26,8 @@
     "success_recursive": "{classified}ページの分類が更新されました。",
     "success_recursive_partial": "{classified}ページの分類が更新されました（{failed}件失敗、タイムアウト）。",
     "error": "分類の更新に失敗しました。",
-    "requires_protection": "この分類レベルにはページ制限が必要です。共有ボタンまたは南京錠アイコンを使用してアクセスを制限してください。",
+    "requires_protection": "このレベルにはページ制限が必要です。",
+    "requires_protection_share": "共有ボタンからアクセスを制限してください。",
     "has_unnecessary_protection": "このページにはアクセス制限がありますが、分類レベルでは必要ありません。制限を削除するか、分類を変更することを検討してください。",
     "restriction_link": "ページ制限を管理"
   },
@@ -82,6 +83,9 @@
       "type_external": "外部URL",
       "url": "URL",
       "search_page": "ページを検索...",
+      "search_page_hint": "2文字以上入力してください",
+      "search_page_empty": "ページが見つかりません",
+      "change_page": "変更",
       "label": "ラベル",
       "applies_to": "適用対象",
       "applies_to_all": "すべてのレベル"
@@ -109,7 +113,8 @@
     },
     "save_button": "設定を保存",
     "save_success": "設定が正常に保存されました。",
-    "save_error": "設定の保存に失敗しました。"
+    "save_error": "設定の保存に失敗しました。",
+    "unsaved_changes": "未保存の変更があります。保存をクリックしてください。"
   },
   "space_settings": {
     "title": "情報分類設定",
@@ -120,6 +125,28 @@
     "save_button": "保存",
     "save_success": "スペース設定が保存されました。",
     "reset_success": "グローバルデフォルトにリセットされました。"
+  },
+  "language_names": {
+    "en": "英語",
+    "de": "ドイツ語",
+    "fr": "フランス語",
+    "it": "イタリア語",
+    "es": "スペイン語",
+    "pt": "ポルトガル語",
+    "nl": "オランダ語",
+    "pl": "ポーランド語",
+    "cs": "チェコ語",
+    "da": "デンマーク語",
+    "fi": "フィンランド語",
+    "hu": "ハンガリー語",
+    "no": "ノルウェー語",
+    "ro": "ルーマニア語",
+    "sv": "スウェーデン語",
+    "ja": "日本語",
+    "ko": "韓国語",
+    "zh": "中国語",
+    "ru": "ロシア語",
+    "uk": "ウクライナ語"
   },
   "license": {
     "inactive_title": "ライセンスが必要",

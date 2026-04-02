@@ -44,7 +44,7 @@ import ForgeReconciler, {
   Link,
   xcss,
 } from '@forge/react';
-import { invoke } from '@forge/bridge';
+import { invoke, requestConfluence, showFlag } from '@forge/bridge';
 import { COLOR_OPTIONS, colorToLozenge } from '../shared/constants';
 import { SUPPORTED_LANGUAGES } from '../shared/defaults';
 
@@ -71,8 +71,10 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [config, setConfig] = useState(null);
+  const [savedConfig, setSavedConfig] = useState(null);
   const [auditData, setAuditData] = useState(null);
   const [message, setMessage] = useState(null);
+  const isDirty = config && savedConfig && JSON.stringify(config) !== JSON.stringify(savedConfig);
 
   // Editing state for level modal
   const [editingLevel, setEditingLevel] = useState(null);
@@ -92,7 +94,10 @@ const App = () => {
     (async () => {
       try {
         const configResult = await invoke('getConfig');
-        if (configResult.success) setConfig(configResult.config);
+        if (configResult.success) {
+          setConfig(configResult.config);
+          setSavedConfig(configResult.config);
+        }
       } catch (error) {
         console.error('Failed to load config:', error);
         setMessage({ type: 'error', text: t('admin.save_error') });
@@ -116,7 +121,14 @@ const App = () => {
     try {
       const result = await invoke('setConfig', { config });
       if (result.success) {
-        setMessage({ type: 'success', text: t('admin.save_success') });
+        setSavedConfig(config);
+        setMessage(null);
+        showFlag({
+          id: 'config-saved',
+          title: t('admin.save_success'),
+          type: 'success',
+          isAutoDismiss: true,
+        });
       } else {
         setMessage({ type: 'error', text: result.error || t('admin.save_error') });
       }
@@ -490,71 +502,80 @@ const App = () => {
               <Heading size="medium">{t('admin.languages.title')}</Heading>
               <Text>{t('admin.languages.description')}</Text>
 
-              <DynamicTable
-                head={{
-                  cells: [
-                    { key: 'code', content: t('admin.languages.language') },
-                    { key: 'actions', content: '' },
-                  ],
-                }}
-                rows={(config?.languages || []).map((lang, index) => ({
-                  key: lang.code,
-                  cells: [
-                    { key: 'code', content: <Text>{lang.label} ({lang.code})</Text> },
-                    {
-                      key: 'actions',
-                      content: (
-                        <ButtonGroup>
-                          <Button
-                            appearance="subtle"
-                            onClick={() => {
-                              setConfig((prev) => {
-                                const langs = [...(prev?.languages || [])];
-                                if (index <= 0) return prev;
-                                const [moved] = langs.splice(index, 1);
-                                langs.splice(index - 1, 0, moved);
-                                return { ...prev, languages: langs };
-                              });
-                            }}
-                            isDisabled={index === 0}
-                          >
-                            {t('admin.levels.move_up')}
-                          </Button>
-                          <Button
-                            appearance="subtle"
-                            onClick={() => {
-                              setConfig((prev) => {
-                                const langs = [...(prev?.languages || [])];
-                                if (index >= langs.length - 1) return prev;
-                                const [moved] = langs.splice(index, 1);
-                                langs.splice(index + 1, 0, moved);
-                                return { ...prev, languages: langs };
-                              });
-                            }}
-                            isDisabled={index === (config?.languages || []).length - 1}
-                          >
-                            {t('admin.levels.move_down')}
-                          </Button>
-                          <Button
-                            appearance="danger"
-                            onClick={() => {
-                              const langs = (config?.languages || []).filter((l) => l.code !== lang.code);
-                              setConfig({ ...config, languages: langs });
-                            }}
-                            isDisabled={lang.code === 'en'}
-                          >
-                            {t('admin.languages.remove_button')}
-                          </Button>
-                        </ButtonGroup>
-                      ),
-                    },
-                  ],
-                }))}
-              />
-
-              <SectionMessage>
+              {/* English is always first and cannot be removed */}
+              <Inline space="space.100" alignBlock="center">
+                <Lozenge appearance="success" isBold>{t('language_names.en')} (en)</Lozenge>
                 <Text>{t('admin.languages.english_required')}</Text>
-              </SectionMessage>
+              </Inline>
+
+              {/* Additional languages */}
+              {(() => {
+                const extraLangs = (config?.languages || []).filter((l) => l.code !== 'en');
+                return extraLangs.length > 0 ? (
+                  <DynamicTable
+                    head={{
+                      cells: [
+                        { key: 'code', content: t('admin.languages.language') },
+                        { key: 'actions', content: '' },
+                      ],
+                    }}
+                    rows={extraLangs.map((lang, index) => ({
+                      key: lang.code,
+                      cells: [
+                        { key: 'code', content: <Text>{t(`language_names.${lang.code}`)} ({lang.code})</Text> },
+                        {
+                          key: 'actions',
+                          content: (
+                            <ButtonGroup>
+                              <Button
+                                appearance="subtle"
+                                onClick={() => {
+                                  setConfig((prev) => {
+                                    const langs = [...(prev?.languages || [])];
+                                    const realIndex = index + 1;
+                                    if (realIndex <= 1) return prev;
+                                    const [moved] = langs.splice(realIndex, 1);
+                                    langs.splice(realIndex - 1, 0, moved);
+                                    return { ...prev, languages: langs };
+                                  });
+                                }}
+                                isDisabled={index === 0}
+                              >
+                                {t('admin.levels.move_up')}
+                              </Button>
+                              <Button
+                                appearance="subtle"
+                                onClick={() => {
+                                  setConfig((prev) => {
+                                    const langs = [...(prev?.languages || [])];
+                                    const realIndex = index + 1;
+                                    if (realIndex >= langs.length - 1) return prev;
+                                    const [moved] = langs.splice(realIndex, 1);
+                                    langs.splice(realIndex + 1, 0, moved);
+                                    return { ...prev, languages: langs };
+                                  });
+                                }}
+                                isDisabled={index === extraLangs.length - 1}
+                              >
+                                {t('admin.levels.move_down')}
+                              </Button>
+                              <Button
+                                appearance="danger"
+                                onClick={() => {
+                                  const langs = (config?.languages || []).filter((l) => l.code !== lang.code);
+                                  setConfig({ ...config, languages: langs });
+                                }}
+                              >
+                                {t('admin.languages.remove_button')}
+                              </Button>
+                            </ButtonGroup>
+                          ),
+                        },
+                      ],
+                    }))}
+                  />
+                ) : null;
+              })()}
 
               {/* Add language dropdown */}
               <Inline space="space.100" alignBlock="center">
@@ -563,7 +584,7 @@ const App = () => {
                   placeholder={t('admin.languages.add_button')}
                   options={Object.entries(SUPPORTED_LANGUAGES)
                     .filter(([code]) => !(config?.languages || []).some((l) => l.code === code))
-                    .map(([code, label]) => ({ label: `${label} (${code})`, value: code }))}
+                    .map(([code]) => ({ label: `${t(`language_names.${code}`)} (${code})`, value: code }))}
                   onChange={(option) => {
                     if (!option) return;
                     const existing = (config?.languages || []).some((l) => l.code === option.value);
@@ -587,7 +608,13 @@ const App = () => {
           </SectionMessage>
         )}
 
-        <Button appearance="primary" onClick={handleSave} isLoading={saving}>
+        {isDirty && (
+          <SectionMessage appearance="warning">
+            <Text>{t('admin.unsaved_changes')}</Text>
+          </SectionMessage>
+        )}
+
+        <Button appearance="primary" onClick={handleSave} isLoading={saving} isDisabled={!isDirty}>
           {t('admin.save_button')}
         </Button>
       </Stack>
@@ -639,11 +666,11 @@ const App = () => {
 /**
  * Renders a translatable field (Textfield or TextArea) for each configured language.
  */
-const TranslatableField = ({ languages, label, obj, onChange, multiline }) => (
+const TranslatableField = ({ languages, label, obj, onChange, multiline, t }) => (
   <>
-    {languages.map(({ code, label: langLabel }) => (
+    {languages.map(({ code }) => (
       <Stack space="space.050" key={code}>
-        <Label labelFor={`${label}-${code}`}>{label} ({langLabel}){code === 'en' ? ' *' : ''}</Label>
+        <Label labelFor={`${label}-${code}`}>{label} ({t(`language_names.${code}`)}){code === 'en' ? ' *' : ''}</Label>
         {multiline ? (
           <TextArea id={`${label}-${code}`} value={obj?.[code] || ''} onChange={(e) => onChange(code, e.target.value)} />
         ) : (
@@ -673,6 +700,7 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
             label={t('admin.levels.name')}
             obj={data.name}
             onChange={(code, value) => update('name', { ...data.name, [code]: value })}
+            t={t}
           />
           <Stack space="space.050">
             <Label labelFor="level-color">{t('admin.levels.color')}</Label>
@@ -695,6 +723,7 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
             obj={data.description}
             onChange={(code, value) => update('description', { ...data.description, [code]: value })}
             multiline
+            t={t}
           />
           <Inline space="space.100" alignBlock="center">
             <Toggle id="level-allowed" isChecked={data.allowed} onChange={() => update('allowed', !data.allowed)} />
@@ -711,6 +740,7 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
               obj={data.errorMessage}
               onChange={(code, value) => update('errorMessage', { ...(data.errorMessage || {}), [code]: value })}
               multiline
+              t={t}
             />
           )}
         </Stack>
@@ -775,6 +805,7 @@ const ContactModal = ({ contact, levels, languages, onSave, onClose, t }) => {
             label={t('admin.contacts.role')}
             obj={data.role}
             onChange={(code, value) => update('role', { ...data.role, [code]: value })}
+            t={t}
           />
           <Stack space="space.050">
             <Label labelFor="contact-levels">{t('admin.contacts.applies_to')}</Label>
@@ -812,10 +843,12 @@ const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
   // Page search state
   const [pageOptions, setPageOptions] = useState([]);
   const [pageSearchLoading, setPageSearchLoading] = useState(false);
+  const [pageSearchQuery, setPageSearchQuery] = useState('');
   const debounceRef = useRef(null);
 
   const searchPages = (inputValue) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    setPageSearchQuery(inputValue || '');
     if (!inputValue || inputValue.length < 2) {
       setPageOptions([]);
       return;
@@ -823,12 +856,16 @@ const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
     debounceRef.current = setTimeout(async () => {
       setPageSearchLoading(true);
       try {
-        const res = await invoke('searchPages', { query: inputValue });
-        if (res?.success) {
+        const cql = `type=page AND title~"${inputValue.replace(/"/g, '\\"')}*"`;
+        const response = await requestConfluence(
+          `/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&limit=10&expand=space`
+        );
+        if (response.ok) {
+          const json = await response.json();
           setPageOptions(
-            (res.data?.results || []).map((p) => ({
-              label: `${p.title}${p.space ? ` — ${p.space}` : ''}`,
-              value: p.url,
+            (json.results || []).map((p) => ({
+              label: `${p.title}${p.space?.name ? ` — ${p.space.name}` : ''}`,
+              value: `${json._links?.base || ''}${p._links?.webui || ''}`,
               pageTitle: p.title,
             }))
           );
@@ -869,33 +906,65 @@ const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
             label={t('admin.links.label')}
             obj={data.label}
             onChange={(code, value) => update('label', { ...data.label, [code]: value })}
+            t={t}
           />
           <Stack space="space.050">
             <Label labelFor="link-url">{t('admin.links.url')}</Label>
             {(data.type || 'external') === 'page' ? (
               <>
-                <Select
-                  inputId="link-url"
-                  options={pageOptions}
-                  value={data.url ? { label: data.pageTitle || data.url, value: data.url } : null}
-                  onInputChange={(value) => searchPages(value)}
-                  onChange={(option) => {
-                    setData((prev) => ({
-                      ...prev,
-                      url: option?.value || '',
-                      pageTitle: option?.pageTitle || '',
-                      label: {
-                        ...prev.label,
-                        en: prev.label?.en || option?.pageTitle || '',
-                      },
-                    }));
-                  }}
-                  placeholder={t('admin.links.search_page')}
-                  isLoading={pageSearchLoading}
-                  isClearable
-                />
-                {data.url && (
-                  <Text>{data.url}</Text>
+                {data.url ? (
+                  <Inline space="space.100" alignBlock="center" spread="space-between">
+                    <Text>{data.pageTitle || data.url}</Text>
+                    <Button
+                      appearance="subtle"
+                      onClick={() => {
+                        setData((prev) => ({ ...prev, url: '', pageTitle: '' }));
+                        setPageOptions([]);
+                        setPageSearchQuery('');
+                      }}
+                    >
+                      {t('admin.links.change_page')}
+                    </Button>
+                  </Inline>
+                ) : (
+                  <>
+                    <Textfield
+                      id="link-url"
+                      value={pageSearchQuery}
+                      onChange={(e) => searchPages(e.target.value)}
+                      placeholder={t('admin.links.search_page')}
+                    />
+                    {pageSearchLoading && <Spinner size="small" />}
+                    {pageOptions.length > 0 && (
+                      <Stack space="space.050">
+                        {pageOptions.map((p) => (
+                          <Button
+                            key={p.value}
+                            appearance="subtle"
+                            shouldFitContainer
+                            onClick={() => {
+                              setData((prev) => ({
+                                ...prev,
+                                url: p.value,
+                                pageTitle: p.pageTitle,
+                                label: {
+                                  ...prev.label,
+                                  en: prev.label?.en || p.pageTitle || '',
+                                },
+                              }));
+                              setPageOptions([]);
+                              setPageSearchQuery('');
+                            }}
+                          >
+                            {p.label}
+                          </Button>
+                        ))}
+                      </Stack>
+                    )}
+                    {pageSearchQuery.length >= 2 && !pageSearchLoading && pageOptions.length === 0 && (
+                      <Text>{t('admin.links.search_page_empty')}</Text>
+                    )}
+                  </>
                 )}
               </>
             ) : (

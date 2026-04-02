@@ -89,6 +89,7 @@ permissions:
     - read:space:confluence
     - read:content.property:confluence
     - write:content.property:confluence
+    - read:content.metadata:confluence
     - read:content.restriction:confluence
     - read:content.permission:confluence
     - read:user:confluence
