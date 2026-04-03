@@ -54,13 +54,15 @@ Instead, you MUST ONLY use components exported by UI Kit: Badge, BarChart, Box, 
 
 Note that THERE IS NO UI KIT COMPONENT NAMED "Table" - always use "DynamicTable" instead!
 
+For project-specific UI patterns (Tabs, charts, Lozenge styling, known issues), see [docs/ui-kit.md](docs/ui-kit.md).
+
 # Storing Data
 
-Entity properties allow apps to store key-value data against Confluence content.
-Entity property CRUD is performed by calling the relevant REST API (Confluence Content Properties API).
-You MUST use the REST API to access or update entity properties as there is NO dedicated client-side API exposed to Forge apps.
+Three tiers: Content Properties (page-level), Forge KVS (config), Forge SQL (audit). Details and Forge SQL gotchas in [docs/persistence.md](docs/persistence.md).
 
-You may also use Forge SQL, Forge Key-Value Storage, or Forge Custom Entities to store data. Storage APIs must be called using .asApp() SDK methods from backend resolvers.
+# Testing
+
+Unit tests: `npx vitest run`. E2E: shared browser MCP + acli. Details in [docs/testing.md](docs/testing.md).
 
 # Forge CLI
 
