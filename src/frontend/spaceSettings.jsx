@@ -174,12 +174,18 @@ const App = () => {
   const globalAllowedLevels = (globalConfig?.levels || []).filter((l) => l.allowed);
 
   // Build statistics table rows
+  // Helper: look up a level's lozenge appearance from config
+  const levelAppearance = (levelId) => {
+    const level = globalConfig?.levels?.find((l) => l.id === levelId);
+    return level ? colorToLozenge(level.color) : 'default';
+  };
+
   const statsRows = (statsData?.entries || []).map((entry, index) => ({
     key: String(entry.id || index),
     cells: [
       { key: 'page', content: <Text>{entry.pageId}</Text> },
-      { key: 'from', content: entry.previousLevel ? <Lozenge>{entry.previousLevel}</Lozenge> : <Text>—</Text> },
-      { key: 'to', content: <Lozenge isBold>{entry.newLevel}</Lozenge> },
+      { key: 'from', content: entry.previousLevel ? <Lozenge isBold appearance={levelAppearance(entry.previousLevel)}>{entry.previousLevel}</Lozenge> : <Text>—</Text> },
+      { key: 'to', content: <Lozenge isBold appearance={levelAppearance(entry.newLevel)}>{entry.newLevel}</Lozenge> },
       { key: 'by', content: <User accountId={entry.classifiedBy} /> },
       { key: 'date', content: <Text>{new Date(entry.classifiedAt).toLocaleString()}</Text> },
       { key: 'recursive', content: entry.isRecursive ? <Badge>Yes</Badge> : <Text>No</Text> },

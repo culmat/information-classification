@@ -46,6 +46,10 @@ modules:
         - path: classifiedBy
           type: string
           searchAlias: culmat_classified_by
+  consumer:
+    - key: recursive-classification-consumer
+      queue: classification-queue
+      function: recursive-consumer
   trigger:
     - key: page-lifecycle-trigger
       function: pageLifecycleHandler
@@ -58,6 +62,9 @@ modules:
       handler: dynamicProperties.handler
     - key: pageLifecycleHandler
       handler: pageLifecycleHandler.handler
+    - key: recursive-consumer
+      handler: recursiveConsumer.handler
+      timeoutSeconds: 600
   sql:
     - key: db
       engine: mysql

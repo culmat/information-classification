@@ -76,8 +76,8 @@ const App = () => {
   const [config, setConfig] = useState(null);
   const [savedConfig, setSavedConfig] = useState(null);
   const [auditData, setAuditData] = useState(null);
-  const [auditFilterFrom, setAuditFilterFrom] = useState('');
-  const [auditFilterTo, setAuditFilterTo] = useState('');
+  const [auditFilterFrom, setAuditFilterFrom] = useState(undefined);
+  const [auditFilterTo, setAuditFilterTo] = useState(undefined);
   const [auditLoading, setAuditLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const isDirty = config && savedConfig && JSON.stringify(config) !== JSON.stringify(savedConfig);
@@ -372,13 +372,19 @@ const App = () => {
     ],
   }));
 
+  // Helper: look up a level's lozenge appearance from config
+  const levelAppearance = (levelId) => {
+    const level = config?.levels?.find((l) => l.id === levelId);
+    return level ? colorToLozenge(level.color) : 'default';
+  };
+
   const auditRows = (auditData?.recentEntries || []).map((entry) => ({
     key: String(entry.id),
     cells: [
       { key: 'page', content: <Text>{entry.pageId}</Text> },
       { key: 'space', content: <Text>{entry.spaceKey}</Text> },
-      { key: 'from', content: entry.previousLevel ? <Lozenge>{entry.previousLevel}</Lozenge> : <Text>—</Text> },
-      { key: 'to', content: <Lozenge isBold>{entry.newLevel}</Lozenge> },
+      { key: 'from', content: entry.previousLevel ? <Lozenge isBold appearance={levelAppearance(entry.previousLevel)}>{entry.previousLevel}</Lozenge> : <Text>—</Text> },
+      { key: 'to', content: <Lozenge isBold appearance={levelAppearance(entry.newLevel)}>{entry.newLevel}</Lozenge> },
       { key: 'by', content: <User accountId={entry.classifiedBy} /> },
       { key: 'date', content: <Text>{new Date(entry.classifiedAt).toLocaleString()}</Text> },
       { key: 'recursive', content: entry.isRecursive ? <Badge>Yes</Badge> : <Text>No</Text> },
@@ -534,16 +540,18 @@ const App = () => {
                   <Label labelFor="audit-from">{t('admin.audit.filter_from')}</Label>
                   <DatePicker
                     id="audit-from"
-                    value={auditFilterFrom}
+                    value={auditFilterFrom || ''}
                     onChange={(value) => setAuditFilterFrom(value)}
+                    placeholder={t('admin.audit.filter_from')}
                   />
                 </Stack>
                 <Stack space="space.050">
                   <Label labelFor="audit-to">{t('admin.audit.filter_to')}</Label>
                   <DatePicker
                     id="audit-to"
-                    value={auditFilterTo}
+                    value={auditFilterTo || ''}
                     onChange={(value) => setAuditFilterTo(value)}
+                    placeholder={t('admin.audit.filter_to')}
                   />
                 </Stack>
                 <Button
@@ -557,8 +565,8 @@ const App = () => {
                   <Button
                     appearance="subtle"
                     onClick={() => {
-                      setAuditFilterFrom('');
-                      setAuditFilterTo('');
+                      setAuditFilterFrom(undefined);
+                      setAuditFilterTo(undefined);
                       loadAuditData(null, null);
                     }}
                   >

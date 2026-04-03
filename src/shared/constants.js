@@ -16,6 +16,9 @@ export const SPACE_CONFIG_KEY_PREFIX = 'config:space:';
 export const spaceConfigKey = (spaceKey) =>
   `${SPACE_CONFIG_KEY_PREFIX}${spaceKey}`;
 
+// Async classification threshold — above this count, use background processing
+export const ASYNC_THRESHOLD = 50;
+
 // Lozenge color mapping — maps our level color names to Forge Lozenge appearances.
 // Forge Lozenge renders with solid colored fill (green/blue/orange/red/grey backgrounds),
 // compared to Tag which renders with colored outlines only.

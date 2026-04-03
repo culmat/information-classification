@@ -41,8 +41,8 @@ export async function logClassificationChange({
  */
 export async function getAuditLogForPage(pageId, limit = 50) {
   const result = await sql.prepare(
-    'SELECT id, pageId, spaceKey, previousLevel, newLevel, classifiedBy, classifiedAt, isRecursive FROM classification_audit WHERE pageId = ? ORDER BY classifiedAt DESC LIMIT ?'
-  ).bindParams(pageId, limit).execute();
+    `SELECT id, pageId, spaceKey, previousLevel, newLevel, classifiedBy, classifiedAt, isRecursive FROM classification_audit WHERE pageId = ? ORDER BY classifiedAt DESC LIMIT ${Number(limit)}`
+  ).bindParams(pageId).execute();
   return result.rows;
 }
 
@@ -56,8 +56,8 @@ export async function getAuditLogForPage(pageId, limit = 50) {
  */
 export async function getAuditLogForSpace(spaceKey, limit = 50, offset = 0) {
   const result = await sql.prepare(
-    'SELECT id, pageId, spaceKey, previousLevel, newLevel, classifiedBy, classifiedAt, isRecursive FROM classification_audit WHERE spaceKey = ? ORDER BY classifiedAt DESC LIMIT ? OFFSET ?'
-  ).bindParams(spaceKey, limit, offset).execute();
+    `SELECT id, pageId, spaceKey, previousLevel, newLevel, classifiedBy, classifiedAt, isRecursive FROM classification_audit WHERE spaceKey = ? ORDER BY classifiedAt DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`
+  ).bindParams(spaceKey).execute();
   return result.rows;
 }
 
@@ -95,10 +95,10 @@ export async function getSpaceMonthlyTrend(spaceKey, months = 12) {
   const result = await sql.prepare(
     `SELECT DATE_FORMAT(classifiedAt, '%Y-%m') AS month, COUNT(*) AS count
      FROM classification_audit
-     WHERE spaceKey = ? AND classifiedAt >= DATE_SUB(DATE_FORMAT(NOW(), '%Y-%m-01'), INTERVAL ? MONTH)
+     WHERE spaceKey = ? AND classifiedAt >= DATE_SUB(DATE_FORMAT(NOW(), '%Y-%m-01'), INTERVAL ${Number(months)} MONTH)
      GROUP BY month
      ORDER BY month ASC`
-  ).bindParams(spaceKey, months).execute();
+  ).bindParams(spaceKey).execute();
   return result.rows;
 }
 
@@ -149,8 +149,8 @@ export async function getAuditStatistics() {
  */
 export async function getRecentAuditEntries(limit = 20) {
   const result = await sql.prepare(
-    'SELECT id, pageId, spaceKey, previousLevel, newLevel, classifiedBy, classifiedAt, isRecursive FROM classification_audit ORDER BY classifiedAt DESC LIMIT ?'
-  ).bindParams(limit).execute();
+    `SELECT id, pageId, spaceKey, previousLevel, newLevel, classifiedBy, classifiedAt, isRecursive FROM classification_audit ORDER BY classifiedAt DESC LIMIT ${Number(limit)}`
+  ).execute();
   return result.rows;
 }
 
@@ -188,10 +188,10 @@ export async function getMonthlyTrend(months = 12) {
   const result = await sql.prepare(
     `SELECT DATE_FORMAT(classifiedAt, '%Y-%m') AS month, COUNT(*) AS count
      FROM classification_audit
-     WHERE classifiedAt >= DATE_SUB(DATE_FORMAT(NOW(), '%Y-%m-01'), INTERVAL ? MONTH)
+     WHERE classifiedAt >= DATE_SUB(DATE_FORMAT(NOW(), '%Y-%m-01'), INTERVAL ${Number(months)} MONTH)
      GROUP BY month
      ORDER BY month ASC`
-  ).bindParams(months).execute();
+  ).execute();
   return result.rows;
 }
 
@@ -220,8 +220,7 @@ export async function getFilteredAuditEntries({ startDate, endDate, limit = 100 
   if (conditions.length > 0) {
     query += ' WHERE ' + conditions.join(' AND ');
   }
-  query += ' ORDER BY classifiedAt DESC LIMIT ?';
-  params.push(limit);
+  query += ` ORDER BY classifiedAt DESC LIMIT ${Number(limit)}`;
 
   const stmt = sql.prepare(query);
   if (params.length > 0) stmt.bindParams(...params);

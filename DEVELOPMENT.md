@@ -29,6 +29,32 @@ test/                Unit tests mirroring src/ structure
 docs/                Architecture and topic documentation
 ```
 
+## Dev loop: forge tunnel + worktree
+
+`forge tunnel` hot-reloads code changes instantly (no deploy needed). To avoid partial file states during multi-file edits, tunnel runs in a separate git worktree. Changes are synced atomically.
+
+**One-time setup:**
+```sh
+git worktree add ../ic-tunnel HEAD --detach
+cd ../ic-tunnel && npm install
+```
+
+**Start tunnel (in a separate terminal):**
+```sh
+cd ../ic-tunnel && forge tunnel
+```
+
+**Sync after editing (from main worktree):**
+```sh
+./tunnel-sync.sh           # sync once
+./tunnel-sync.sh --watch   # auto-sync on file changes (requires fswatch)
+```
+
+**When to deploy instead of tunnel:**
+- Manifest changes (new modules, scopes, functions) — tunnel requires `forge deploy` + restart
+- New npm dependencies — need `npm install` in the worktree too
+- Final verification before commit
+
 ## Deploy
 
 ```sh

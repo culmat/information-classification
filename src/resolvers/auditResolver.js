@@ -26,7 +26,7 @@ export async function getPageAuditHistoryResolver(req) {
   }
 
   try {
-    const entries = await getAuditLogForPage(pageId, 50);
+    const entries = await getAuditLogForPage(Number(pageId), 50);
     return successResponse({ entries });
   } catch (error) {
     console.error('Error getting page audit history:', error);

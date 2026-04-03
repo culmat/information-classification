@@ -74,6 +74,19 @@ Use the `lint` command to test for problems before deploying.
 After running the linter use the option `--no-verify` when running forge deploy or forge tunnel.
 Use the `--verbose` command to troubleshoot a failing command.
 
+# Dev Loop
+
+Prefer `forge tunnel` over `forge deploy` for faster iteration. Tunnel runs in a separate git worktree (`../ic-tunnel`) to avoid hot-reloading partial edits.
+
+**After editing code:** run `./tunnel-sync.sh` to sync to the worktree. Tunnel auto-reloads.
+
+**When to use `forge deploy` instead:**
+- Manifest changes (new modules, scopes, functions)
+- New npm dependencies
+- Final verification
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for setup instructions.
+
 # Deployments
 
 To deploy the app, use `deploy --non-interactive -e <environment-name>`

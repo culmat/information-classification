@@ -3,7 +3,9 @@
  * Handles reading and writing page classifications.
  */
 
-import { getPageClassification, classifyPage } from '../services/classificationService';
+import { Queue } from '@forge/events';
+import { getPageClassification, classifyPage, findDescendantsToClassify } from '../services/classificationService';
+import { ASYNC_THRESHOLD } from '../shared/constants';
 import { getEffectiveConfig } from '../storage/configStore';
 import { getSpaceConfig } from '../storage/spaceConfigStore';
 import { getClassification } from '../services/contentPropertyService';
@@ -78,7 +80,7 @@ export async function getClassificationResolver(req) {
   try {
     const [result, recentHistory] = await Promise.all([
       getPageClassification(String(pageId), spaceKey),
-      getAuditLogForPage(pageId, 3).catch(() => []),
+      getAuditLogForPage(Number(pageId), 3).catch(() => []),
     ]);
     return successResponse({ ...result, recentHistory });
   } catch (error) {
@@ -94,7 +96,7 @@ export async function getClassificationResolver(req) {
  * Expected payload: { pageId, spaceKey, levelId, recursive, locale }
  */
 export async function setClassificationResolver(req) {
-  const { pageId, spaceKey, levelId, recursive, locale } = req.payload;
+  const { pageId, spaceKey, levelId, recursive, locale, descendantsToClassify } = req.payload;
   const accountId = req.context.accountId;
 
   if (!pageId || !spaceKey || !levelId) {
@@ -106,6 +108,39 @@ export async function setClassificationResolver(req) {
   }
 
   try {
+    // Check if this should be processed asynchronously
+    const toClassify = recursive ? (descendantsToClassify ?? 0) : 0;
+
+    if (recursive && toClassify > ASYNC_THRESHOLD) {
+      // Classify the parent page synchronously (fast, single page)
+      const result = await classifyPage({
+        pageId: String(pageId),
+        spaceKey,
+        levelId,
+        accountId,
+        recursive: false, // parent only — descendants go to async queue
+        locale: locale || 'en',
+      });
+
+      if (!result.success) {
+        return errorResponse(result.message, 400);
+      }
+
+      // Push descendant classification to async queue
+      const queue = new Queue({ key: 'classification-queue' });
+      const { jobId } = await queue.push({
+        body: { pageId: String(pageId), spaceKey, levelId, accountId, locale: locale || 'en', totalToClassify: toClassify },
+        concurrency: { key: `classify-${pageId}`, limit: 1 },
+      });
+
+      return successResponse({
+        ...result,
+        asyncJobId: jobId,
+        totalToClassify: toClassify,
+      });
+    }
+
+    // Small tree or single page — classify synchronously
     const result = await classifyPage({
       pageId: String(pageId),
       spaceKey,
@@ -123,5 +158,55 @@ export async function setClassificationResolver(req) {
   } catch (error) {
     console.error('Error setting classification:', error);
     return errorResponse('Failed to set classification', 500);
+  }
+}
+
+/**
+ * Resolver: countDescendants
+ * Returns the count of descendant pages that need reclassification.
+ * Called when the recursive toggle is activated in the UI.
+ *
+ * Expected payload: { pageId, levelId }
+ */
+export async function countDescendantsResolver(req) {
+  const { pageId, levelId } = req.payload;
+
+  if (!pageId || !levelId) {
+    return validationError('pageId and levelId are required');
+  }
+
+  try {
+    // Two cheap CQL queries: total descendants + those needing changes
+    const [filtered, all] = await Promise.all([
+      findDescendantsToClassify(pageId, levelId, 0),
+      findDescendantsToClassify(pageId, '__none__', 0), // __none__ matches no level, so != returns all pages
+    ]);
+    return successResponse({ toClassify: filtered.totalSize, totalDescendants: all.totalSize });
+  } catch (error) {
+    console.error('Error counting descendants:', error);
+    return errorResponse('Failed to count descendants', 500);
+  }
+}
+
+/**
+ * Resolver: getClassificationProgress
+ * Returns the status of an async classification job (poll fallback).
+ *
+ * Expected payload: { jobId }
+ */
+export async function getClassificationProgressResolver(req) {
+  const { jobId } = req.payload;
+
+  if (!jobId) {
+    return validationError('jobId is required');
+  }
+
+  try {
+    const queue = new Queue({ key: 'classification-queue' });
+    const stats = await queue.getJob(jobId).getStats();
+    return successResponse(stats);
+  } catch (error) {
+    console.error('Error getting classification progress:', error);
+    return errorResponse('Failed to get progress', 500);
   }
 }

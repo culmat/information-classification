@@ -27,4 +27,7 @@ Thumbs.db
 CLAUDE.md
 package-lock.json
 test-results
-/.playwright-mcp
+tunnel-sync.sh
+
+# Shared browser MCP artifacts
+/.playwright-mcp/

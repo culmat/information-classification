@@ -101,7 +101,7 @@ export async function classifyPage({
   const currentClassification = await getClassification(pageId);
   const previousLevel = currentClassification?.level || null;
 
-  // Skip if already at this level and not recursive
+  // Skip entirely if already at this level and not recursive
   if (previousLevel === levelId && !recursive) {
     return { success: true, unchanged: true };
   }
@@ -122,21 +122,22 @@ export async function classifyPage({
     tooltip: levelName,
   };
 
-  // Write classification to the page
-  const writeSuccess = await setClassification(pageId, classificationData, bylineData);
-  if (!writeSuccess) {
-    return { success: false, error: 'write_failed', message: 'Failed to save classification.' };
-  }
+  // Only write + log the parent page if the level actually changed
+  if (previousLevel !== levelId) {
+    const writeSuccess = await setClassification(pageId, classificationData, bylineData);
+    if (!writeSuccess) {
+      return { success: false, error: 'write_failed', message: 'Failed to save classification.' };
+    }
 
-  // Log to audit trail
-  await logClassificationChange({
-    pageId: Number(pageId),
-    spaceKey,
-    previousLevel,
-    newLevel: levelId,
-    classifiedBy: accountId,
-    recursive,
-  });
+    await logClassificationChange({
+      pageId: Number(pageId),
+      spaceKey,
+      previousLevel,
+      newLevel: levelId,
+      classifiedBy: accountId,
+      recursive,
+    });
+  }
 
   // Check restriction mismatch warning
   let restrictionWarning = null;
@@ -172,8 +173,69 @@ export async function classifyPage({
 }
 
 /**
- * Recursively classifies ALL descendants of a page (children, grandchildren, etc.).
- * Uses a queue-based breadth-first traversal to process the full page tree.
+ * Finds descendant pages that need reclassification using CQL.
+ * Uses the indexed culmat_classification_level search alias to filter server-side.
+ *
+ * @param {string} pageId - ancestor page ID
+ * @param {string} levelId - target level (pages already at this level are excluded)
+ * @param {number} limit - 0 for count only, >0 for paginated results
+ * @param {number} startIndex - pagination offset
+ * @returns {Promise<{results: Array, totalSize: number}>}
+ */
+export async function findDescendantsToClassify(pageId, levelId, limit = 0, startIndex = 0) {
+  const cql = `ancestor=${pageId} AND type=page AND culmat_classification_level != "${levelId}"`;
+  const response = await api.asUser().requestConfluence(
+    route`/wiki/rest/api/search?cql=${cql}&limit=${limit}&start=${startIndex}`,
+    { headers: { Accept: 'application/json' } }
+  );
+  if (!response.ok) return { results: [], totalSize: 0 };
+  const data = await response.json();
+  return {
+    results: (data.results || []).map((r) => ({ id: String(r.content.id), title: r.content.title })),
+    totalSize: data.totalSize || 0,
+  };
+}
+
+/**
+ * Classifies a single page — writes content property + byline + audit log.
+ * Used by both sync classifyDescendants and the async consumer.
+ *
+ * @param {Object} params
+ * @returns {Promise<boolean>} true if successful
+ */
+export async function classifySinglePage({ childPageId, spaceKey, levelId, accountId, locale, level }) {
+  const lang = (locale || 'en').substring(0, 2);
+  const levelName = level.name?.[lang] || level.name?.en || levelId;
+  const now = new Date().toISOString();
+
+  // Read current level for audit trail (CQL confirmed it differs, but we need the previous value)
+  const currentClassification = await getClassification(childPageId);
+  const previousLevel = currentClassification?.level || null;
+
+  const classificationData = {
+    level: levelId,
+    classifiedBy: accountId,
+    classifiedAt: now,
+  };
+  const bylineData = { title: levelName, tooltip: levelName };
+
+  const success = await setClassification(childPageId, classificationData, bylineData);
+  if (!success) return false;
+
+  await logClassificationChange({
+    pageId: Number(childPageId),
+    spaceKey,
+    previousLevel,
+    newLevel: levelId,
+    classifiedBy: accountId,
+    recursive: true,
+  });
+
+  return true;
+}
+
+/**
+ * Classifies descendants of a page using CQL to find only pages that need changes.
  * Stops if approaching the Forge function timeout (25s).
  *
  * @param {Object} params
@@ -185,88 +247,34 @@ async function classifyDescendants({ pageId, spaceKey, levelId, accountId, local
   let classified = 0;
   let failed = 0;
 
-  const lang = locale.substring(0, 2);
-  const levelName = level.name?.[lang] || level.name?.en || levelId;
-  const now = new Date().toISOString();
+  // Always fetch from startIndex=0 because classified pages drop out of the CQL result set.
+  // Each batch returns the next N unclassified pages.
+  while (true) {
+    if (Date.now() - startTime > MAX_DURATION_MS) {
+      console.warn(`Recursive classification timed out after ${classified} descendants`);
+      return { classified, failed, timedOut: true };
+    }
 
-  // Breadth-first queue of page IDs whose children need processing
-  const queue = [pageId];
+    const { results } = await findDescendantsToClassify(pageId, levelId, 25, 0);
+    if (results.length === 0) break;
 
-  while (queue.length > 0) {
-    const currentPageId = queue.shift();
-    let cursor = null;
-
-    // Paginate through all direct children of the current page
-    do {
+    for (const page of results) {
       if (Date.now() - startTime > MAX_DURATION_MS) {
-        console.warn(`Recursive classification timed out after ${classified} descendants`);
         return { classified, failed, timedOut: true };
       }
 
-      const url = cursor
-        ? route`/wiki/api/v2/pages/${currentPageId}/children?limit=25&cursor=${cursor}`
-        : route`/wiki/api/v2/pages/${currentPageId}/children?limit=25`;
-
-      const response = await api.asUser().requestConfluence(url, {
-        headers: { Accept: 'application/json' },
-      });
-
-      if (!response.ok) {
-        console.error('Failed to fetch child pages:', response.status);
-        break;
-      }
-
-      const data = await response.json();
-      const children = data.results || [];
-
-      for (const child of children) {
-        if (Date.now() - startTime > MAX_DURATION_MS) {
-          return { classified, failed, timedOut: true };
-        }
-
-        // Add this child to the queue so its children get processed too
-        queue.push(String(child.id));
-
-        try {
-          const childClassification = await getClassification(String(child.id));
-          const childPreviousLevel = childClassification?.level || null;
-
-          const classificationData = {
-            level: levelId,
-            classifiedBy: accountId,
-            classifiedAt: now,
-          };
-          const bylineData = { title: levelName, tooltip: levelName };
-
-          const success = await setClassification(
-            String(child.id),
-            classificationData,
-            bylineData
-          );
-
-          if (success) {
-            await logClassificationChange({
-              pageId: Number(child.id),
-              spaceKey,
-              previousLevel: childPreviousLevel,
-              newLevel: levelId,
-              classifiedBy: accountId,
-              recursive: true,
-            });
-            classified++;
-          } else {
-            failed++;
-          }
-        } catch (error) {
-          console.error(`Failed to classify descendant page ${child.id}:`, error);
+      try {
+        const success = await classifySinglePage({ childPageId: page.id, spaceKey, levelId, accountId, locale, level });
+        if (success) {
+          classified++;
+        } else {
           failed++;
         }
+      } catch (error) {
+        console.error(`Failed to classify descendant page ${page.id}:`, error);
+        failed++;
       }
-
-      cursor = data._links?.next
-        ? new URL(data._links.next, 'https://placeholder').searchParams.get('cursor')
-        : null;
-    } while (cursor);
+    }
   }
 
   return { classified, failed, timedOut: false };
