@@ -1,0 +1,71 @@
+name: Forge Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run
+      - run: npx @forge/cli@12 lint
+
+  deploy-development:
+    if: github.event_name == 'push'
+    needs: test
+    runs-on: ubuntu-latest
+    environment: development
+    env:
+      FORGE_EMAIL: ${{ secrets.FORGE_EMAIL }}
+      FORGE_API_TOKEN: ${{ secrets.FORGE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx @forge/cli@12 settings set usage-analytics true
+      - run: npx @forge/cli@12 deploy --non-interactive -e development
+      - run: npx @forge/cli@12 install --non-interactive --upgrade --site dev-cul.atlassian.net --product confluence -e development
+
+  deploy-manual:
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      FORGE_EMAIL: ${{ secrets.FORGE_EMAIL }}
+      FORGE_API_TOKEN: ${{ secrets.FORGE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx @forge/cli@12 settings set usage-analytics true
+      - run: npx @forge/cli@12 deploy --non-interactive -e ${{ inputs.environment }}
+      - name: Install to site
+        run: |
+          case "${{ inputs.environment }}" in
+            staging)    SITE="sta-cul.atlassian.net" ;;
+            production) SITE="cul.atlassian.net" ;;
+          esac
+          npx @forge/cli@12 install --non-interactive --upgrade --site "$SITE" --product confluence -e ${{ inputs.environment }}
