@@ -55,13 +55,39 @@ cd ../ic-tunnel && forge tunnel
 - New npm dependencies — need `npm install` in the worktree too
 - Final verification before commit
 
+## Environments
+
+| Forge Environment | Site | Purpose |
+|-------------------|------|---------|
+| development | dev-cul.atlassian.net | Active dev, tunnel, testing |
+| staging | sta-cul.atlassian.net | Pre-production validation |
+| production | cul.atlassian.net | Production (pending Marketplace listing) |
+
+Legacy: devds.atlassian.net is still installed on the development environment.
+
+**Restrictions by environment:**
+- **Staging:** No `forge tunnel` — must use `forge deploy` for every change.
+- **Production:** No `forge tunnel` or `forge logs` — debug via development or staging.
+
 ## Deploy
 
 ```sh
 forge lint                                    # validate manifest
 forge deploy --non-interactive -e development # deploy to dev
-forge install --non-interactive --upgrade ... # upgrade if manifest changed
+forge install --non-interactive --upgrade --site dev-cul.atlassian.net --product confluence --environment development
 ```
+
+To deploy to staging or production:
+```sh
+forge deploy --non-interactive -e staging
+forge install --non-interactive --upgrade --site sta-cul.atlassian.net --product confluence --environment staging
+```
+
+## CI/CD
+
+GitHub Actions auto-deploys to development on push to `main`. Manual dispatch deploys to staging or production. See [.github/workflows/forge-deploy.yml](.github/workflows/forge-deploy.yml).
+
+Secrets (`FORGE_EMAIL`, `FORGE_API_TOKEN`) are set in the GitHub repo.
 
 ## Test
 
