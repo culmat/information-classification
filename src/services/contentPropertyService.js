@@ -8,7 +8,7 @@
  */
 
 import api, { route } from '@forge/api';
-import { CONTENT_PROPERTY_KEY, BYLINE_PROPERTY_KEY } from '../shared/constants';
+import { CONTENT_PROPERTY_KEY, BYLINE_PROPERTY_KEY, HISTORY_PROPERTY_KEY, MAX_HISTORY_ENTRIES } from '../shared/constants';
 
 /**
  * Reads the classification content property from a page.
@@ -36,6 +36,40 @@ export async function setClassification(pageId, classificationData, bylineData) 
   ]);
 
   return results.every((r) => r === true);
+}
+
+/**
+ * Reads the classification history for a page.
+ *
+ * @param {string} pageId - Confluence page ID
+ * @returns {Promise<Object>} { truncated: boolean, entries: Array }
+ */
+export async function getHistory(pageId) {
+  const data = await getProperty(pageId, HISTORY_PROPERTY_KEY);
+  if (!data) return { truncated: false, entries: [] };
+  return { truncated: data.truncated || false, entries: data.entries || [] };
+}
+
+/**
+ * Appends an entry to the classification history for a page.
+ * Uses FIFO when the history exceeds MAX_HISTORY_ENTRIES.
+ *
+ * @param {string} pageId - Confluence page ID
+ * @param {Object} entry - { from, to, by, at }
+ * @returns {Promise<boolean>} true if successful
+ */
+export async function appendHistory(pageId, entry) {
+  const current = await getHistory(pageId);
+  const entries = [...current.entries, entry];
+  let truncated = current.truncated;
+
+  // FIFO: drop oldest entries if over limit
+  if (entries.length > MAX_HISTORY_ENTRIES) {
+    entries.splice(0, entries.length - MAX_HISTORY_ENTRIES);
+    truncated = true;
+  }
+
+  return await upsertProperty(pageId, HISTORY_PROPERTY_KEY, { truncated, entries });
 }
 
 /**

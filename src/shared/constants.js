@@ -7,6 +7,10 @@
 // Content property keys — stored on each Confluence page
 export const CONTENT_PROPERTY_KEY = 'culmat_page_classification';
 export const BYLINE_PROPERTY_KEY = 'culmat_page_classification_byline';
+export const HISTORY_PROPERTY_KEY = 'culmat_page_classification_history';
+
+// Maximum history entries per page before FIFO kicks in (~32KB limit / ~100 bytes per entry)
+export const MAX_HISTORY_ENTRIES = 300;
 
 // KVS keys — stored in Forge app-level storage
 export const GLOBAL_CONFIG_KEY = 'config:global';

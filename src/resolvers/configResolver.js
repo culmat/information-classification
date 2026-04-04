@@ -4,14 +4,8 @@
  * to Confluence admins at the module level — no additional auth check needed here.
  */
 
+import api, { route } from '@forge/api';
 import { getGlobalConfig, setGlobalConfig } from '../storage/configStore';
-import {
-  getAuditStatistics,
-  getRecentAuditEntries,
-  getClassificationDistribution,
-  getMonthlyTrend,
-  getFilteredAuditEntries,
-} from '../storage/auditStore';
 import { successResponse, errorResponse, validationError } from '../utils/responseHelper';
 import { VALID_COLORS } from '../shared/constants';
 
@@ -56,21 +50,59 @@ export async function setConfigResolver(req) {
 }
 
 /**
+ * Runs a CQL search and returns { totalSize, results }.
+ */
+async function cqlSearch(cql, limit = 0) {
+  const response = await api.asUser().requestConfluence(
+    route`/wiki/rest/api/search?cql=${cql}&limit=${limit}`,
+    { headers: { Accept: 'application/json' } }
+  );
+  if (!response.ok) return { totalSize: 0, results: [] };
+  const data = await response.json();
+  return {
+    totalSize: data.totalSize || 0,
+    results: (data.results || []).map((r) => ({
+      id: String(r.content?.id),
+      title: r.content?.title,
+      spaceKey: r.content?.space?.key,
+    })),
+  };
+}
+
+/**
  * Resolver: getAuditData
- * Returns audit statistics and recent entries for the admin dashboard.
+ * Returns CQL-based classification statistics for the admin dashboard.
+ * Distribution per level, total pages, coverage, and recently classified pages.
  */
 export async function getAuditDataResolver(req) {
   try {
-    const { startDate, endDate, limit } = req.payload || {};
-    const [statistics, recentEntries, distribution, monthlyTrend] = await Promise.all([
-      getAuditStatistics(),
-      startDate || endDate
-        ? getFilteredAuditEntries({ startDate, endDate, limit: limit || 100 })
-        : getRecentAuditEntries(limit || 100),
-      getClassificationDistribution(),
-      getMonthlyTrend(12),
+    const { spaceKey } = req.payload || {};
+    const config = await getGlobalConfig();
+    const levels = config.levels || [];
+    const spaceFilter = spaceKey ? ` AND space="${spaceKey}"` : '';
+
+    // Count pages per level + total pages in parallel
+    const countPromises = levels.map((l) =>
+      cqlSearch(`type=page${spaceFilter} AND culmat_classification_level="${l.id}"`)
+        .then(({ totalSize }) => ({ level: l.id, count: totalSize }))
+    );
+    const totalPagesPromise = cqlSearch(`type=page${spaceFilter}`);
+    const recentPromise = cqlSearch(`type=page${spaceFilter} AND culmat_classification_level is not null`, 20);
+
+    const [distribution, totalPagesResult, recentResult] = await Promise.all([
+      Promise.all(countPromises),
+      totalPagesPromise,
+      recentPromise,
     ]);
-    return successResponse({ statistics, recentEntries, distribution, monthlyTrend });
+
+    const classifiedPages = distribution.reduce((sum, d) => sum + d.count, 0);
+
+    return successResponse({
+      distribution,
+      totalPages: totalPagesResult.totalSize,
+      classifiedPages,
+      recentPages: recentResult.results,
+    });
   } catch (error) {
     console.error('Error getting audit data:', error);
     return errorResponse('Failed to get audit data', 500);

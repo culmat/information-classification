@@ -13,10 +13,10 @@
 import api, { route } from '@forge/api';
 import { getEffectiveConfig } from '../storage/configStore';
 import { getSpaceConfig } from '../storage/spaceConfigStore';
-import { logClassificationChange } from '../storage/auditStore';
 import {
   getClassification,
   setClassification,
+  appendHistory,
 } from './contentPropertyService';
 import { hasViewRestrictions } from './restrictionService';
 
@@ -129,13 +129,11 @@ export async function classifyPage({
       return { success: false, error: 'write_failed', message: 'Failed to save classification.' };
     }
 
-    await logClassificationChange({
-      pageId: Number(pageId),
-      spaceKey,
-      previousLevel,
-      newLevel: levelId,
-      classifiedBy: accountId,
-      recursive,
+    await appendHistory(pageId, {
+      from: previousLevel,
+      to: levelId,
+      by: accountId,
+      at: now,
     });
   }
 
@@ -208,7 +206,7 @@ export async function classifySinglePage({ childPageId, spaceKey, levelId, accou
   const levelName = level.name?.[lang] || level.name?.en || levelId;
   const now = new Date().toISOString();
 
-  // Read current level for audit trail (CQL confirmed it differs, but we need the previous value)
+  // Read current level for history (CQL confirmed it differs, but we need the previous value)
   const currentClassification = await getClassification(childPageId);
   const previousLevel = currentClassification?.level || null;
 
@@ -222,13 +220,11 @@ export async function classifySinglePage({ childPageId, spaceKey, levelId, accou
   const success = await setClassification(childPageId, classificationData, bylineData);
   if (!success) return false;
 
-  await logClassificationChange({
-    pageId: Number(childPageId),
-    spaceKey,
-    previousLevel,
-    newLevel: levelId,
-    classifiedBy: accountId,
-    recursive: true,
+  await appendHistory(childPageId, {
+    from: previousLevel,
+    to: levelId,
+    by: accountId,
+    at: now,
   });
 
   return true;

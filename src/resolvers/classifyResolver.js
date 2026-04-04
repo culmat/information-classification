@@ -8,8 +8,7 @@ import { getPageClassification, classifyPage, findDescendantsToClassify } from '
 import { ASYNC_THRESHOLD } from '../shared/constants';
 import { getEffectiveConfig } from '../storage/configStore';
 import { getSpaceConfig } from '../storage/spaceConfigStore';
-import { getClassification } from '../services/contentPropertyService';
-import { getAuditLogForPage } from '../storage/auditStore';
+import { getClassification, getHistory } from '../services/contentPropertyService';
 import { successResponse, errorResponse, validationError } from '../utils/responseHelper';
 
 /**
@@ -78,11 +77,11 @@ export async function getClassificationResolver(req) {
   }
 
   try {
-    const [result, recentHistory] = await Promise.all([
+    const [result, history] = await Promise.all([
       getPageClassification(String(pageId), spaceKey),
-      getAuditLogForPage(Number(pageId), 3).catch(() => []),
+      getHistory(String(pageId)),
     ]);
-    return successResponse({ ...result, recentHistory });
+    return successResponse({ ...result, history });
   } catch (error) {
     console.error('Error getting classification:', error);
     return errorResponse('Failed to get classification', 500);

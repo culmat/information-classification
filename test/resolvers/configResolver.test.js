@@ -3,22 +3,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock dependencies
 const mockGetGlobalConfig = vi.fn();
 const mockSetGlobalConfig = vi.fn();
-const mockIsConfluenceAdmin = vi.fn();
-const mockGetAuditStatistics = vi.fn();
-const mockGetRecentAuditEntries = vi.fn();
-
 vi.mock('../../src/storage/configStore', () => ({
   getGlobalConfig: (...args) => mockGetGlobalConfig(...args),
   setGlobalConfig: (...args) => mockSetGlobalConfig(...args),
 }));
 
-vi.mock('../../src/utils/adminAuth', () => ({
-  isConfluenceAdmin: (...args) => mockIsConfluenceAdmin(...args),
-}));
-
-vi.mock('../../src/storage/auditStore', () => ({
-  getAuditStatistics: (...args) => mockGetAuditStatistics(...args),
-  getRecentAuditEntries: (...args) => mockGetRecentAuditEntries(...args),
+vi.mock('@forge/api', () => ({
+  default: { asUser: () => ({ requestConfluence: vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ totalSize: 0, results: [] }) }) }) },
+  route: (strings, ...values) => strings.reduce((acc, str, i) => acc + str + (values[i] || ''), ''),
 }));
 
 const { getConfigResolver, setConfigResolver } = await import(
@@ -34,21 +26,8 @@ const adminReq = (payload = {}) => ({
   payload,
 });
 
-const nonAdminReq = (payload = {}) => ({
-  context: { accountId: 'user-456' },
-  payload,
-});
-
 describe('getConfigResolver', () => {
-  it('should reject non-admin users', async () => {
-    mockIsConfluenceAdmin.mockResolvedValue(false);
-    const result = await getConfigResolver(nonAdminReq());
-    expect(result.success).toBe(false);
-    expect(result.status).toBe(403);
-  });
-
-  it('should return config for admin users', async () => {
-    mockIsConfluenceAdmin.mockResolvedValue(true);
+  it('should return config', async () => {
     const config = { levels: [], defaultLevelId: 'internal' };
     mockGetGlobalConfig.mockResolvedValue(config);
 
@@ -58,11 +37,9 @@ describe('getConfigResolver', () => {
   });
 });
 
-describe('setConfigResolver — validation', () => {
-  beforeEach(() => {
-    mockIsConfluenceAdmin.mockResolvedValue(true);
-  });
+const langs = [{ code: 'en', label: 'English' }];
 
+describe('setConfigResolver — validation', () => {
   it('should reject missing config', async () => {
     const result = await setConfigResolver(adminReq({}));
     expect(result.success).toBe(false);
@@ -70,7 +47,7 @@ describe('setConfigResolver — validation', () => {
 
   it('should reject empty levels array', async () => {
     const result = await setConfigResolver(
-      adminReq({ config: { levels: [], defaultLevelId: 'x' } })
+      adminReq({ config: { languages: langs, levels: [], defaultLevelId: 'x' } })
     );
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/at least one/i);
@@ -80,6 +57,7 @@ describe('setConfigResolver — validation', () => {
     const result = await setConfigResolver(
       adminReq({
         config: {
+          languages: langs,
           levels: [
             { id: 'secret', name: { en: 'Secret' }, color: 'red', allowed: false },
           ],
@@ -95,6 +73,7 @@ describe('setConfigResolver — validation', () => {
     const result = await setConfigResolver(
       adminReq({
         config: {
+          languages: langs,
           levels: [
             { id: 'public', name: { en: 'Public' }, color: 'green', allowed: true },
             { id: 'secret', name: { en: 'Secret' }, color: 'red', allowed: false },
@@ -111,6 +90,7 @@ describe('setConfigResolver — validation', () => {
     const result = await setConfigResolver(
       adminReq({
         config: {
+          languages: langs,
           levels: [
             { id: 'public', name: { en: 'Public' }, color: 'green', allowed: true },
             { id: 'public', name: { en: 'Public 2' }, color: 'blue', allowed: true },
@@ -127,6 +107,7 @@ describe('setConfigResolver — validation', () => {
     const result = await setConfigResolver(
       adminReq({
         config: {
+          languages: langs,
           levels: [
             { id: 'custom', name: { en: 'Custom' }, color: 'pink', allowed: true },
           ],
@@ -142,6 +123,7 @@ describe('setConfigResolver — validation', () => {
     const result = await setConfigResolver(
       adminReq({
         config: {
+          languages: langs,
           levels: [
             { id: 'custom', name: { de: 'Benutzerdefiniert' }, color: 'green', allowed: true },
           ],
@@ -157,6 +139,7 @@ describe('setConfigResolver — validation', () => {
     mockSetGlobalConfig.mockResolvedValue(undefined);
 
     const config = {
+      languages: langs,
       levels: [
         { id: 'public', name: { en: 'Public' }, color: 'green', allowed: true },
         { id: 'internal', name: { en: 'Internal' }, color: 'yellow', allowed: true },
@@ -173,6 +156,7 @@ describe('setConfigResolver — validation', () => {
 
   it('should reject non-array contacts', async () => {
     const config = {
+      languages: langs,
       levels: [{ id: 'pub', name: { en: 'Public' }, color: 'green', allowed: true }],
       defaultLevelId: 'pub',
       contacts: 'not-an-array',
@@ -184,6 +168,7 @@ describe('setConfigResolver — validation', () => {
 
   it('should reject non-array links', async () => {
     const config = {
+      languages: langs,
       levels: [{ id: 'pub', name: { en: 'Public' }, color: 'green', allowed: true }],
       defaultLevelId: 'pub',
       links: 'not-an-array',
@@ -191,14 +176,5 @@ describe('setConfigResolver — validation', () => {
     const result = await setConfigResolver(adminReq({ config }));
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/links.*array/i);
-  });
-
-  it('should reject non-admin users for setConfig', async () => {
-    mockIsConfluenceAdmin.mockResolvedValue(false);
-    const result = await setConfigResolver(
-      nonAdminReq({ config: { levels: [], defaultLevelId: 'x' } })
-    );
-    expect(result.success).toBe(false);
-    expect(result.status).toBe(403);
   });
 });

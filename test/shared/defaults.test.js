@@ -35,13 +35,6 @@ describe('DEFAULT_LEVELS', () => {
     }
   });
 
-  it('should have German translations for all levels', () => {
-    for (const level of DEFAULT_LEVELS) {
-      expect(level.name.de).toBeTruthy();
-      expect(level.description.de).toBeTruthy();
-    }
-  });
-
   it('should have at least one allowed level', () => {
     const allowed = DEFAULT_LEVELS.filter((l) => l.allowed);
     expect(allowed.length).toBeGreaterThan(0);

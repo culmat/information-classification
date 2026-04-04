@@ -5,7 +5,7 @@ const mockGetEffectiveConfig = vi.fn();
 const mockGetSpaceConfig = vi.fn();
 const mockGetClassification = vi.fn();
 const mockSetClassification = vi.fn();
-const mockLogClassificationChange = vi.fn();
+const mockAppendHistory = vi.fn();
 const mockHasViewRestrictions = vi.fn();
 
 vi.mock('../../src/storage/configStore', () => ({
@@ -19,10 +19,7 @@ vi.mock('../../src/storage/spaceConfigStore', () => ({
 vi.mock('../../src/services/contentPropertyService', () => ({
   getClassification: (...args) => mockGetClassification(...args),
   setClassification: (...args) => mockSetClassification(...args),
-}));
-
-vi.mock('../../src/storage/auditStore', () => ({
-  logClassificationChange: (...args) => mockLogClassificationChange(...args),
+  appendHistory: (...args) => mockAppendHistory(...args),
 }));
 
 vi.mock('../../src/services/restrictionService', () => ({
@@ -99,7 +96,7 @@ beforeEach(() => {
   mockGetSpaceConfig.mockResolvedValue(null);
   mockGetEffectiveConfig.mockResolvedValue(effectiveConfig);
   mockSetClassification.mockResolvedValue(true);
-  mockLogClassificationChange.mockResolvedValue(undefined);
+  mockAppendHistory.mockResolvedValue(undefined);
 });
 
 describe('getPageClassification', () => {
@@ -135,7 +132,7 @@ describe('classifyPage', () => {
     expect(result.success).toBe(true);
     expect(result.classification.level).toBe('public');
     expect(mockSetClassification).toHaveBeenCalledOnce();
-    expect(mockLogClassificationChange).toHaveBeenCalledOnce();
+    expect(mockAppendHistory).toHaveBeenCalledOnce();
   });
 
   it('should reject a disallowed level with configured error message', async () => {
@@ -234,7 +231,7 @@ describe('classifyPage', () => {
       accountId: 'user-1',
     });
 
-    expect(mockLogClassificationChange).toHaveBeenCalledWith(
+    expect(mockAppendHistory).toHaveBeenCalledWith(
       expect.objectContaining({
         previousLevel: 'internal',
         newLevel: 'confidential',
@@ -253,7 +250,7 @@ describe('classifyPage', () => {
       accountId: 'user-1',
     });
 
-    expect(mockLogClassificationChange).toHaveBeenCalledWith(
+    expect(mockAppendHistory).toHaveBeenCalledWith(
       expect.objectContaining({
         previousLevel: null,
         newLevel: 'public',
@@ -304,7 +301,7 @@ describe('classifyPage', () => {
       recursive: true,
     });
 
-    expect(mockLogClassificationChange).toHaveBeenCalledWith(
+    expect(mockAppendHistory).toHaveBeenCalledWith(
       expect.objectContaining({ recursive: true })
     );
   });
