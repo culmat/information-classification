@@ -50,24 +50,14 @@ modules:
     - key: recursive-classification-consumer
       queue: classification-queue
       function: recursive-consumer
-  trigger:
-    - key: page-lifecycle-trigger
-      function: pageLifecycleHandler
-      events:
-        - avi:confluence:deleted:page
   function:
     - key: resolver
       handler: index.handler
     - key: dynamic-props
       handler: dynamicProperties.handler
-    - key: pageLifecycleHandler
-      handler: pageLifecycleHandler.handler
     - key: recursive-consumer
       handler: recursiveConsumer.handler
       timeoutSeconds: 600
-  sql:
-    - key: db
-      engine: mysql
 resources:
   - key: byline-ui
     path: src/frontend/byline.jsx
