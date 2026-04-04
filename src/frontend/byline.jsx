@@ -119,9 +119,12 @@ const App = () => {
   const canEdit = context?.extension?.content?.type === 'page'; // editors see the change button
 
   // Load classification data when the popup opens
-  const loadClassification = useCallback(async () => {
+  // Load (or reload) classification data from the server.
+  // When showLoading is false (e.g. after a classify action inside the modal)
+  // we skip the loading spinner to avoid a re-mount that flickers the modal.
+  const loadClassification = useCallback(async (showLoading = true) => {
     if (!pageId || !spaceKey) return;
-    setLoading(true);
+    if (showLoading) setLoading(true);
     try {
       const result = await invoke('getClassification', { pageId, spaceKey });
       if (result.success) {
@@ -133,7 +136,7 @@ const App = () => {
     } catch (error) {
       console.error('Failed to load classification:', error);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, [pageId, spaceKey]);
 
@@ -173,8 +176,7 @@ const App = () => {
       if (data.done) {
         setAsyncJob(null);
         setSaving(false);
-        loadClassification();
-        view.refresh();
+        loadClassification(false);
       }
     }).then((sub) => { subscription = sub; });
     return () => { if (subscription) subscription.unsubscribe(); };
@@ -230,15 +232,16 @@ const App = () => {
           }
         }
 
-        // Show restriction warning OR success — not both
-        if (result.restrictionWarning === 'requires_protection') {
-          setMessage({ type: 'warning', key: 'requires_protection' });
-        } else {
+        // Show restriction warning OR success — not both.
+        // restrictionWarning is rendered separately (lines below the radio group),
+        // so we only set `message` for the success case.
+        if (result.restrictionWarning !== 'requires_protection') {
           setMessage({ type: 'success', text: msg });
         }
 
-        // Reload classification data (updates currentLevelId so Apply disables)
-        await loadClassification();
+        // Reload classification data (updates currentLevelId so Apply disables).
+        // Skip loading spinner to avoid modal flicker.
+        await loadClassification(false);
       } else {
         setMessage({ type: 'error', text: result.error || t('classify.error') });
       }
@@ -263,14 +266,12 @@ const App = () => {
     setShowModal(true);
   }, [currentLevelId]);
 
-  // Close modal and refresh byline badge if classification changed
+  // Close modal and refresh the byline badge so it reflects any classification change.
   const closeModal = useCallback(() => {
     setShowModal(false);
     setAsyncJob(null);
-    if (message?.type === 'success' || message?.key === 'requires_protection') {
-      view.refresh();
-    }
-  }, [message]);
+    view.refresh();
+  }, []);
 
   if (loading) {
     return <Spinner size="small" />;
@@ -391,21 +392,23 @@ const App = () => {
             {historyEntries.length === 0 && (
               <Text>{t('byline.no_history')}</Text>
             )}
+            {/* History entries use short property names: { from, to, by, at }.
+               Keep in sync with appendHistory() calls in classificationService.js. */}
             {historyEntries.map((entry, index) => (
               <Box key={entry.id || index} xcss={historyCardStyle}>
                 <Stack space="space.050">
                   <Inline space="space.050" alignBlock="center">
-                    {entry.previousLevel && (
+                    {entry.from && (
                       <>
-                        <Lozenge isBold appearance={levelAppearance(entry.previousLevel)}>{entry.previousLevel}</Lozenge>
+                        <Lozenge isBold appearance={levelAppearance(entry.from)}>{entry.from}</Lozenge>
                         <Text> → </Text>
                       </>
                     )}
-                    <Lozenge isBold appearance={levelAppearance(entry.newLevel)}>{entry.newLevel}</Lozenge>
+                    <Lozenge isBold appearance={levelAppearance(entry.to)}>{entry.to}</Lozenge>
                   </Inline>
                   <Inline space="space.100" alignBlock="center">
-                    <User accountId={entry.classifiedBy} />
-                    <Text>{formatDate(entry.classifiedAt)}</Text>
+                    <User accountId={entry.by} />
+                    <Text>{formatDate(entry.at)}</Text>
                   </Inline>
                 </Stack>
               </Box>

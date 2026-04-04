@@ -124,7 +124,7 @@
       "filter_to": "To Date",
       "filter_apply": "Apply Filter",
       "filter_clear": "Clear",
-      "empty": "No audit entries yet."
+      "empty": "No classifications yet."
     },
     "languages": {
       "title": "Content Languages",

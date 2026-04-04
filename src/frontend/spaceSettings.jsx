@@ -31,6 +31,7 @@ import ForgeReconciler, {
   TabPanel,
   DonutChart,
   DynamicTable,
+  Link,
   Toggle,
   xcss,
 } from '@forge/react';
@@ -301,25 +302,30 @@ const App = () => {
                 ) : null;
               })()}
 
-              {/* Recently classified pages — same table as admin.jsx (Audit tab),
-                 scoped to this space. Keep in sync with admin.jsx. */}
-              <Heading size="small">{t('admin.audit.recent_changes')}</Heading>
-              <DynamicTable
-                head={{
-                  cells: [
-                    { key: 'title', content: t('admin.audit.page') },
-                  ],
-                }}
-                rows={(statsData?.recentPages || []).map((page, index) => ({
-                  key: page.id || String(index),
-                  cells: [
-                    { key: 'title', content: <Text>{page.title}</Text> },
-                  ],
-                }))}
-                rowsPerPage={20}
-                emptyView={<Text>{t('admin.audit.empty')}</Text>}
-                isLoading={statsLoading}
-              />
+              {/* Recently classified pages — same table as admin.jsx (Statistics tab),
+                 scoped to this space. Keep in sync with admin.jsx.
+                 Only show heading + table when there are entries to display. */}
+              {(statsData?.recentPages || []).length > 0 && (
+                <>
+                  <Heading size="small">{t('admin.audit.recent_changes')}</Heading>
+                  <DynamicTable
+                    head={{
+                      cells: [
+                        { key: 'title', content: t('admin.audit.page') },
+                      ],
+                    }}
+                    rows={statsData.recentPages.map((page, index) => ({
+                      key: page.id || String(index),
+                      cells: [
+                        { key: 'title', content: page.url
+                          ? <Link href={`/wiki${page.url}`}>{page.title}</Link>
+                          : <Text>{page.title}</Text> },
+                      ],
+                    }))}
+                    rowsPerPage={20}
+                  />
+                </>
+              )}
             </Stack>
             </Box>
           </TabPanel>

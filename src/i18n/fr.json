@@ -124,7 +124,7 @@
       "filter_to": "Date de fin",
       "filter_apply": "Appliquer le filtre",
       "filter_clear": "Effacer",
-      "empty": "Aucune entrée d'audit."
+      "empty": "Aucune classification pour le moment."
     },
     "languages": {
       "title": "Langues du contenu",

@@ -124,7 +124,7 @@
       "filter_to": "終了日",
       "filter_apply": "フィルター適用",
       "filter_clear": "クリア",
-      "empty": "監査エントリはまだありません。"
+      "empty": "分類はまだありません。"
     },
     "languages": {
       "title": "コンテンツ言語",

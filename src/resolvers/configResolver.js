@@ -54,7 +54,7 @@ export async function setConfigResolver(req) {
  */
 async function cqlSearch(cql, limit = 0) {
   const response = await api.asUser().requestConfluence(
-    route`/wiki/rest/api/search?cql=${cql}&limit=${limit}`,
+    route`/wiki/rest/api/search?cql=${cql}&limit=${limit}&expand=content.space`,
     { headers: { Accept: 'application/json' } }
   );
   if (!response.ok) return { totalSize: 0, results: [] };
@@ -64,7 +64,8 @@ async function cqlSearch(cql, limit = 0) {
     results: (data.results || []).map((r) => ({
       id: String(r.content?.id),
       title: r.content?.title,
-      spaceKey: r.content?.space?.key,
+      spaceKey: r.content?.space?.key || r.resultGlobalContainer?.title,
+      url: r.url || r.content?._links?.webui,
     })),
   };
 }
@@ -87,7 +88,13 @@ export async function getAuditDataResolver(req) {
         .then(({ totalSize }) => ({ level: l.id, count: totalSize }))
     );
     const totalPagesPromise = cqlSearch(`type=page${spaceFilter}`);
-    const recentPromise = cqlSearch(`type=page${spaceFilter} AND culmat_classification_level is not null`, 20);
+    // Build an OR query for all configured levels instead of "is not null",
+    // which is not reliably supported by content property search aliases.
+    const levelFilter = levels.map((l) => `culmat_classification_level="${l.id}"`).join(' OR ');
+    const recentCql = levelFilter
+      ? `type=page${spaceFilter} AND (${levelFilter}) ORDER BY lastModified DESC`
+      : `type=page${spaceFilter}`;
+    const recentPromise = cqlSearch(recentCql, 20);
 
     const [distribution, totalPagesResult, recentResult] = await Promise.all([
       Promise.all(countPromises),
