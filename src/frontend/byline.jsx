@@ -101,7 +101,7 @@ const App = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   const [restrictionWarning, setRestrictionWarning] = useState(null);
-  const [recentHistory, setRecentHistory] = useState([]);
+  const [history, setHistory] = useState({ truncated: false, entries: [] });
 
   // Recursive descendant count (fetched when toggle is activated)
   const [descendantCount, setDescendantCount] = useState(null); // pages needing changes
@@ -111,8 +111,6 @@ const App = () => {
   // Async classification progress
   const [asyncJob, setAsyncJob] = useState(null); // { jobId, total }
   const [asyncProgress, setAsyncProgress] = useState(null); // { classified, failed, total, done, ... }
-  const [fullHistory, setFullHistory] = useState(null);
-  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Extract page and space info from context
   const pageId = context?.extension?.content?.id;
@@ -130,7 +128,7 @@ const App = () => {
         setClassification(result.classification);
         setConfig(result.config);
         setRestrictionWarning(result.restrictionWarning);
-        setRecentHistory(result.recentHistory || []);
+        setHistory(result.history || { truncated: false, entries: [] });
       }
     } catch (error) {
       console.error('Failed to load classification:', error);
@@ -143,22 +141,6 @@ const App = () => {
     loadClassification();
   }, [loadClassification]);
 
-  // Load full audit history on first History tab switch
-  const loadFullHistory = useCallback(async () => {
-    if (fullHistory || historyLoading || !pageId) return;
-    setHistoryLoading(true);
-    try {
-      const result = await invoke('getPageAuditHistory', { pageId });
-      if (result.success) {
-        setFullHistory(result.entries || []);
-      }
-    } catch (error) {
-      console.error('Failed to load audit history:', error);
-      setFullHistory([]);
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, [pageId, fullHistory, historyLoading]);
 
   // Fetch descendant count when recursive toggle is on and level changes
   const selectedLevelAllowed = config?.levels?.find((l) => l.id === selectedLevel)?.allowed;
@@ -306,12 +288,12 @@ const App = () => {
     return d.toLocaleDateString(undefined, { year: '2-digit', month: 'short', day: 'numeric' });
   };
 
-  // Build history entries from either full or recent data
-  const historyEntries = fullHistory || recentHistory;
+  // History entries from content property (newest last → reverse for display)
+  const historyEntries = [...(history.entries || [])].reverse();
 
   return (
     <Box xcss={popupContentStyle}>
-      <Tabs id="byline-tabs" onChange={(index) => { if (index === 2) loadFullHistory(); }}>
+      <Tabs id="byline-tabs">
         <TabList>
           <Tab>{t('byline.tab_classification')}</Tab>
           <Tab>{t('byline.tab_resources')}</Tab>
@@ -403,8 +385,10 @@ const App = () => {
         <TabPanel>
           <Box xcss={sectionStyle}>
           <Stack space="space.100">
-            {historyLoading && <Spinner size="small" />}
-            {historyEntries.length === 0 && !historyLoading && (
+            {history.truncated && (
+              <Text>{t('byline.history_truncated')}</Text>
+            )}
+            {historyEntries.length === 0 && (
               <Text>{t('byline.no_history')}</Text>
             )}
             {historyEntries.map((entry, index) => (

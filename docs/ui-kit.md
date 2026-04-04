@@ -60,6 +60,7 @@ const cardStyle = xcss({
 
 ## Known issues
 
+- **TabPanel no top padding:** `TabPanel` renders content flush against the tab divider. Wrap content in `<Box xcss={xcss({ paddingTop: 'space.100' })}>` to add the gap. Applied in byline.jsx, admin.jsx, and spaceSettings.jsx.
 - **DatePicker empty state:** Passing `value=""` or `value={undefined}` renders "2/18/1993" instead of blank. This is a Forge UI Kit bug.
 
 ## See also

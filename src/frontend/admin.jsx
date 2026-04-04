@@ -42,9 +42,7 @@ import ForgeReconciler, {
   User,
   Badge,
   Link,
-  DatePicker,
   DonutChart,
-  BarChart,
   xcss,
 } from '@forge/react';
 import { invoke, requestConfluence, showFlag } from '@forge/bridge';
@@ -68,6 +66,8 @@ function generateId() {
 }
 
 const containerStyle = xcss({ padding: 'space.400', maxWidth: '960px' });
+/* TabPanel renders no top padding — add it manually (same workaround as byline.jsx). */
+const tabPanelStyle = xcss({ paddingTop: 'space.100' });
 
 const App = () => {
   const { t } = useTranslation();
@@ -76,9 +76,9 @@ const App = () => {
   const [config, setConfig] = useState(null);
   const [savedConfig, setSavedConfig] = useState(null);
   const [auditData, setAuditData] = useState(null);
-  const [auditFilterFrom, setAuditFilterFrom] = useState(undefined);
-  const [auditFilterTo, setAuditFilterTo] = useState(undefined);
   const [auditLoading, setAuditLoading] = useState(false);
+  const [showUnclassified, setShowUnclassified] = useState(true); // coverage toggle
+  const [activeTab, setActiveTab] = useState(0);
   const [message, setMessage] = useState(null);
   const isDirty = config && savedConfig && JSON.stringify(config) !== JSON.stringify(savedConfig);
 
@@ -120,21 +120,6 @@ const App = () => {
     })();
   }, [t]);
 
-  // Reload audit data with optional date filters
-  const loadAuditData = useCallback(async (startDate, endDate) => {
-    setAuditLoading(true);
-    try {
-      const payload = {};
-      if (startDate) payload.startDate = startDate;
-      if (endDate) payload.endDate = endDate;
-      const result = await invoke('getAuditData', payload);
-      if (result.success) setAuditData(result);
-    } catch (error) {
-      console.error('Failed to load audit data:', error);
-    } finally {
-      setAuditLoading(false);
-    }
-  }, []);
 
   // Save configuration
   const handleSave = useCallback(async () => {
@@ -372,41 +357,24 @@ const App = () => {
     ],
   }));
 
-  // Helper: look up a level's lozenge appearance from config
-  const levelAppearance = (levelId) => {
-    const level = config?.levels?.find((l) => l.id === levelId);
-    return level ? colorToLozenge(level.color) : 'default';
-  };
-
-  const auditRows = (auditData?.recentEntries || []).map((entry) => ({
-    key: String(entry.id),
-    cells: [
-      { key: 'page', content: <Text>{entry.pageId}</Text> },
-      { key: 'space', content: <Text>{entry.spaceKey}</Text> },
-      { key: 'from', content: entry.previousLevel ? <Lozenge isBold appearance={levelAppearance(entry.previousLevel)}>{entry.previousLevel}</Lozenge> : <Text>—</Text> },
-      { key: 'to', content: <Lozenge isBold appearance={levelAppearance(entry.newLevel)}>{entry.newLevel}</Lozenge> },
-      { key: 'by', content: <User accountId={entry.classifiedBy} /> },
-      { key: 'date', content: <Text>{new Date(entry.classifiedAt).toLocaleString()}</Text> },
-      { key: 'recursive', content: entry.isRecursive ? <Badge>Yes</Badge> : <Text>No</Text> },
-    ],
-  }));
 
   return (
     <Box xcss={containerStyle}>
       <Stack space="space.300">
         <Heading size="large">{t('app.admin_title')}</Heading>
 
-        <Tabs id="admin-tabs">
+        <Tabs id="admin-tabs" onChange={(index) => setActiveTab(index)}>
           <TabList>
             <Tab>{t('admin.tabs.levels')}</Tab>
             <Tab>{t('admin.tabs.contacts')}</Tab>
             <Tab>{t('admin.tabs.links')}</Tab>
-            <Tab>{t('admin.tabs.audit')}</Tab>
+            <Tab>{t('admin.tabs.statistics')}</Tab>
             <Tab>{t('admin.tabs.languages')}</Tab>
           </TabList>
 
           {/* Levels Tab */}
           <TabPanel>
+            <Box xcss={tabPanelStyle}>
             <Stack space="space.200">
               <Inline space="space.200" alignBlock="center" spread="space-between">
                 <Heading size="medium">{t('admin.levels.title')}</Heading>
@@ -439,10 +407,12 @@ const App = () => {
                 />
               </Inline>
             </Stack>
+            </Box>
           </TabPanel>
 
           {/* Contacts Tab */}
           <TabPanel>
+            <Box xcss={tabPanelStyle}>
             <Stack space="space.200">
               <Inline space="space.200" alignBlock="center" spread="space-between">
                 <Heading size="medium">{t('admin.contacts.title')}</Heading>
@@ -463,10 +433,12 @@ const App = () => {
                 emptyView={<Text>{t('byline.no_contacts')}</Text>}
               />
             </Stack>
+            </Box>
           </TabPanel>
 
           {/* Links Tab */}
           <TabPanel>
+            <Box xcss={tabPanelStyle}>
             <Stack space="space.200">
               <Inline space="space.200" alignBlock="center" spread="space-between">
                 <Heading size="medium">{t('admin.links.title')}</Heading>
@@ -487,117 +459,96 @@ const App = () => {
                 emptyView={<Text>{t('byline.no_links')}</Text>}
               />
             </Stack>
+            </Box>
           </TabPanel>
 
           {/* Audit Tab */}
           <TabPanel>
+            <Box xcss={tabPanelStyle}>
             <Stack space="space.200">
               <Heading size="medium">{t('admin.audit.title')}</Heading>
 
-              {auditData?.statistics && (
+              {/* Coverage stats */}
+              {auditData && (
                 <Inline space="space.400">
                   <Stack space="space.050">
-                    <Text>{t('admin.audit.total_changes')}</Text>
-                    <Heading size="medium">{auditData.statistics.totalChanges}</Heading>
-                  </Stack>
-                  <Stack space="space.050">
-                    <Text>{t('admin.audit.changes_this_month')}</Text>
-                    <Heading size="medium">{auditData.statistics.changesThisMonth}</Heading>
+                    <Text>{t('admin.audit.classified_pages')}</Text>
+                    <Heading size="medium">{auditData.classifiedPages} / {auditData.totalPages}</Heading>
                   </Stack>
                 </Inline>
               )}
 
-              {/* Charts */}
-              {(auditData?.distribution?.length > 0 || auditData?.monthlyTrend?.length > 0) && (
-                <Inline space="space.400" alignBlock="start">
-                  {auditData.distribution?.length > 0 && (
-                    <Stack space="space.100">
-                      <Heading size="small">{t('admin.audit.distribution')}</Heading>
-                      <DonutChart
-                        data={auditData.distribution}
-                        colorAccessor="level"
-                        weightAccessor="count"
-                        labelAccessor="level"
-                      />
-                    </Stack>
-                  )}
-                  {auditData.monthlyTrend?.length > 0 && (
-                    <Stack space="space.100">
-                      <Heading size="small">{t('admin.audit.trend')}</Heading>
-                      <BarChart
-                        data={auditData.monthlyTrend}
-                        xAccessor="month"
-                        yAccessor="count"
-                      />
-                    </Stack>
-                  )}
-                </Inline>
-              )}
-
-              {/* Date filters */}
-              <Inline space="space.200" alignBlock="end">
-                <Stack space="space.050">
-                  <Label labelFor="audit-from">{t('admin.audit.filter_from')}</Label>
-                  <DatePicker
-                    id="audit-from"
-                    value={auditFilterFrom || ''}
-                    onChange={(value) => setAuditFilterFrom(value)}
-                    placeholder={t('admin.audit.filter_from')}
-                  />
-                </Stack>
-                <Stack space="space.050">
-                  <Label labelFor="audit-to">{t('admin.audit.filter_to')}</Label>
-                  <DatePicker
-                    id="audit-to"
-                    value={auditFilterTo || ''}
-                    onChange={(value) => setAuditFilterTo(value)}
-                    placeholder={t('admin.audit.filter_to')}
-                  />
-                </Stack>
-                <Button
-                  appearance="default"
-                  onClick={() => loadAuditData(auditFilterFrom, auditFilterTo)}
-                  isLoading={auditLoading}
-                >
-                  {t('admin.audit.filter_apply')}
-                </Button>
-                {(auditFilterFrom || auditFilterTo) && (
-                  <Button
-                    appearance="subtle"
-                    onClick={() => {
-                      setAuditFilterFrom(undefined);
-                      setAuditFilterTo(undefined);
-                      loadAuditData(null, null);
-                    }}
-                  >
-                    {t('admin.audit.filter_clear')}
-                  </Button>
-                )}
+              {/* Coverage toggle — keep in sync with the identical toggle
+                 in spaceSettings.jsx (Statistics tab). */}
+              <Inline space="space.100" alignBlock="center">
+                <Toggle
+                  id="coverage-toggle"
+                  isChecked={showUnclassified}
+                  onChange={() => setShowUnclassified(!showUnclassified)}
+                />
+                <Label labelFor="coverage-toggle">{t('admin.audit.show_unclassified')}</Label>
               </Inline>
 
+              {/* Distribution chart — when "show unclassified" is OFF, unclassified
+                 pages are rolled into the default level so the chart always reflects
+                 the effective classification of every page.
+                 Keep chart logic in sync with spaceSettings.jsx (Statistics tab). */}
+              {auditData && auditData.totalPages > 0 && (() => {
+                const unclassified = auditData.totalPages - auditData.classifiedPages;
+                const chartData = (auditData.distribution || []).map((l) => ({ ...l }));
+                if (showUnclassified) {
+                  // Show unclassified as a separate slice
+                  if (unclassified > 0) {
+                    chartData.push({ level: t('admin.audit.unclassified'), count: unclassified });
+                  }
+                } else if (unclassified > 0 && config?.defaultLevelId) {
+                  // Roll unclassified pages into the default level
+                  const defaultEntry = chartData.find((d) => d.level === config.defaultLevelId);
+                  if (defaultEntry) {
+                    defaultEntry.count += unclassified;
+                  }
+                }
+                const filtered = chartData.filter((l) => l.count > 0);
+                return filtered.length > 0 ? (
+                  <Stack space="space.100">
+                    <Heading size="small">{t('admin.audit.distribution')}</Heading>
+                    <DonutChart
+                      data={filtered}
+                      colorAccessor="level"
+                      valueAccessor="count"
+                      labelAccessor="level"
+                    />
+                  </Stack>
+                ) : null;
+              })()}
+
+              {/* Recently classified pages */}
               <Heading size="small">{t('admin.audit.recent_changes')}</Heading>
               <DynamicTable
                 head={{
                   cells: [
-                    { key: 'page', content: t('admin.audit.page') },
+                    { key: 'title', content: t('admin.audit.page') },
                     { key: 'space', content: t('admin.audit.space') },
-                    { key: 'from', content: t('admin.audit.from') },
-                    { key: 'to', content: t('admin.audit.to') },
-                    { key: 'by', content: t('admin.audit.by') },
-                    { key: 'date', content: t('admin.audit.date') },
-                    { key: 'recursive', content: t('admin.audit.recursive') },
                   ],
                 }}
-                rows={auditRows}
+                rows={(auditData?.recentPages || []).map((page, index) => ({
+                  key: page.id || String(index),
+                  cells: [
+                    { key: 'title', content: <Text>{page.title}</Text> },
+                    { key: 'space', content: <Text>{page.spaceKey}</Text> },
+                  ],
+                }))}
                 rowsPerPage={20}
                 emptyView={<Text>{t('admin.audit.empty')}</Text>}
                 isLoading={auditLoading}
               />
             </Stack>
+            </Box>
           </TabPanel>
 
           {/* Languages Tab */}
           <TabPanel>
+            <Box xcss={tabPanelStyle}>
             <Stack space="space.200">
               <Heading size="medium">{t('admin.languages.title')}</Heading>
               <Text>{t('admin.languages.description')}</Text>
@@ -698,25 +649,30 @@ const App = () => {
                 />
               </Inline>
             </Stack>
+            </Box>
           </TabPanel>
         </Tabs>
 
-        {/* Save button and messages */}
-        {message && (
-          <SectionMessage appearance={message.type === 'error' ? 'error' : 'confirmation'}>
-            <Text>{message.text}</Text>
-          </SectionMessage>
-        )}
+        {/* Save button and messages — hidden on the read-only Statistics tab (index 3) */}
+        {activeTab !== 3 && (
+          <>
+            {message && (
+              <SectionMessage appearance={message.type === 'error' ? 'error' : 'confirmation'}>
+                <Text>{message.text}</Text>
+              </SectionMessage>
+            )}
 
-        {isDirty && (
-          <SectionMessage appearance="warning">
-            <Text>{t('admin.unsaved_changes')}</Text>
-          </SectionMessage>
-        )}
+            {isDirty && (
+              <SectionMessage appearance="warning">
+                <Text>{t('admin.unsaved_changes')}</Text>
+              </SectionMessage>
+            )}
 
-        <Button appearance="primary" onClick={handleSave} isLoading={saving} isDisabled={!isDirty}>
-          {t('admin.save_button')}
-        </Button>
+            <Button appearance="primary" onClick={handleSave} isLoading={saving} isDisabled={!isDirty}>
+              {t('admin.save_button')}
+            </Button>
+          </>
+        )}
       </Stack>
 
       {/* Level edit modal */}

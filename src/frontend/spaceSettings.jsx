@@ -29,11 +29,9 @@ import ForgeReconciler, {
   Tab,
   TabList,
   TabPanel,
-  DynamicTable,
   DonutChart,
-  BarChart,
-  User,
-  Badge,
+  DynamicTable,
+  Toggle,
   xcss,
 } from '@forge/react';
 import { invoke } from '@forge/bridge';
@@ -46,6 +44,8 @@ function localize(obj, locale) {
 }
 
 const containerStyle = xcss({ padding: 'space.400', maxWidth: '640px' });
+/* TabPanel renders no top padding — add it manually (same workaround as byline.jsx). */
+const tabPanelStyle = xcss({ paddingTop: 'space.100' });
 
 const App = () => {
   const context = useProductContext();
@@ -60,6 +60,7 @@ const App = () => {
   // Track which levels are enabled in this space
   const [enabledLevelIds, setEnabledLevelIds] = useState([]);
   const [defaultLevelId, setDefaultLevelId] = useState(null);
+  const [showUnclassified, setShowUnclassified] = useState(true); // coverage toggle
 
   // Statistics tab state (lazy-loaded)
   const [statsData, setStatsData] = useState(null);
@@ -156,11 +157,11 @@ const App = () => {
     if (statsData || statsLoading || !spaceKey) return;
     setStatsLoading(true);
     try {
-      const result = await invoke('getSpaceAuditData', { spaceKey });
+      const result = await invoke('getAuditData', { spaceKey });
       if (result.success) setStatsData(result);
     } catch (error) {
       console.error('Failed to load space statistics:', error);
-      setStatsData({ entries: [], statistics: { totalChanges: 0, changesThisMonth: 0 }, distribution: [], monthlyTrend: [] });
+      setStatsData({ distribution: [], totalPages: 0, classifiedPages: 0, recentPages: [] });
     } finally {
       setStatsLoading(false);
     }
@@ -173,24 +174,6 @@ const App = () => {
   // Only show globally-allowed levels as toggleable options
   const globalAllowedLevels = (globalConfig?.levels || []).filter((l) => l.allowed);
 
-  // Build statistics table rows
-  // Helper: look up a level's lozenge appearance from config
-  const levelAppearance = (levelId) => {
-    const level = globalConfig?.levels?.find((l) => l.id === levelId);
-    return level ? colorToLozenge(level.color) : 'default';
-  };
-
-  const statsRows = (statsData?.entries || []).map((entry, index) => ({
-    key: String(entry.id || index),
-    cells: [
-      { key: 'page', content: <Text>{entry.pageId}</Text> },
-      { key: 'from', content: entry.previousLevel ? <Lozenge isBold appearance={levelAppearance(entry.previousLevel)}>{entry.previousLevel}</Lozenge> : <Text>—</Text> },
-      { key: 'to', content: <Lozenge isBold appearance={levelAppearance(entry.newLevel)}>{entry.newLevel}</Lozenge> },
-      { key: 'by', content: <User accountId={entry.classifiedBy} /> },
-      { key: 'date', content: <Text>{new Date(entry.classifiedAt).toLocaleString()}</Text> },
-      { key: 'recursive', content: entry.isRecursive ? <Badge>Yes</Badge> : <Text>No</Text> },
-    ],
-  }));
 
   return (
     <Box xcss={containerStyle}>
@@ -199,12 +182,13 @@ const App = () => {
 
         <Tabs id="space-settings-tabs" onChange={(index) => { if (index === 1) loadStats(); }}>
           <TabList>
-            <Tab>{t('space_settings.tab_configuration')}</Tab>
-            <Tab>{t('space_settings.tab_statistics')}</Tab>
+            <Tab>{t('admin.tabs.levels')}</Tab>
+            <Tab>{t('admin.tabs.statistics')}</Tab>
           </TabList>
 
           {/* Configuration Tab */}
           <TabPanel>
+            <Box xcss={tabPanelStyle}>
             <Stack space="space.200">
               <Text>{t('space_settings.description')}</Text>
 
@@ -255,72 +239,89 @@ const App = () => {
                 </Button>
               </ButtonGroup>
             </Stack>
+            </Box>
           </TabPanel>
 
           {/* Statistics Tab */}
           <TabPanel>
+            <Box xcss={tabPanelStyle}>
             <Stack space="space.200">
               {statsLoading && <Spinner size="medium" />}
 
-              {statsData?.statistics && (
+              {statsData && (
                 <Inline space="space.400">
                   <Stack space="space.050">
-                    <Text>{t('admin.audit.total_changes')}</Text>
-                    <Heading size="medium">{statsData.statistics.totalChanges}</Heading>
-                  </Stack>
-                  <Stack space="space.050">
-                    <Text>{t('admin.audit.changes_this_month')}</Text>
-                    <Heading size="medium">{statsData.statistics.changesThisMonth}</Heading>
+                    <Text>{t('admin.audit.classified_pages')}</Text>
+                    <Heading size="medium">{statsData.classifiedPages} / {statsData.totalPages}</Heading>
                   </Stack>
                 </Inline>
               )}
 
-              {/* Charts */}
-              {(statsData?.distribution?.length > 0 || statsData?.monthlyTrend?.length > 0) && (
-                <Inline space="space.400" alignBlock="start">
-                  {statsData.distribution?.length > 0 && (
-                    <Stack space="space.100">
-                      <Heading size="small">{t('admin.audit.distribution')}</Heading>
-                      <DonutChart
-                        data={statsData.distribution}
-                        colorAccessor="level"
-                        weightAccessor="count"
-                        labelAccessor="level"
-                      />
-                    </Stack>
-                  )}
-                  {statsData.monthlyTrend?.length > 0 && (
-                    <Stack space="space.100">
-                      <Heading size="small">{t('admin.audit.trend')}</Heading>
-                      <BarChart
-                        data={statsData.monthlyTrend}
-                        xAccessor="month"
-                        yAccessor="count"
-                      />
-                    </Stack>
-                  )}
-                </Inline>
-              )}
+              {/* Coverage toggle — keep in sync with the identical toggle
+                 in admin.jsx (Audit tab). */}
+              <Inline space="space.100" alignBlock="center">
+                <Toggle
+                  id="coverage-toggle"
+                  isChecked={showUnclassified}
+                  onChange={() => setShowUnclassified(!showUnclassified)}
+                />
+                <Label labelFor="coverage-toggle">{t('admin.audit.show_unclassified')}</Label>
+              </Inline>
 
-              {/* Recent changes table */}
+              {/* Distribution chart — when "show unclassified" is OFF, unclassified
+                 pages are rolled into the default level so the chart always reflects
+                 the effective classification of every page.
+                 Keep chart logic in sync with admin.jsx (Audit tab). */}
+              {statsData && statsData.totalPages > 0 && (() => {
+                const unclassified = statsData.totalPages - statsData.classifiedPages;
+                const chartData = (statsData.distribution || []).map((l) => ({ ...l }));
+                if (showUnclassified) {
+                  // Show unclassified as a separate slice
+                  if (unclassified > 0) {
+                    chartData.push({ level: t('admin.audit.unclassified'), count: unclassified });
+                  }
+                } else if (unclassified > 0 && defaultLevelId) {
+                  // Roll unclassified pages into the default level
+                  const defaultEntry = chartData.find((d) => d.level === defaultLevelId);
+                  if (defaultEntry) {
+                    defaultEntry.count += unclassified;
+                  }
+                }
+                const filtered = chartData.filter((l) => l.count > 0);
+                return filtered.length > 0 ? (
+                  <Stack space="space.100">
+                    <Heading size="small">{t('admin.audit.distribution')}</Heading>
+                    <DonutChart
+                      data={filtered}
+                      colorAccessor="level"
+                      valueAccessor="count"
+                      labelAccessor="level"
+                    />
+                  </Stack>
+                ) : null;
+              })()}
+
+              {/* Recently classified pages — same table as admin.jsx (Audit tab),
+                 scoped to this space. Keep in sync with admin.jsx. */}
               <Heading size="small">{t('admin.audit.recent_changes')}</Heading>
               <DynamicTable
                 head={{
                   cells: [
-                    { key: 'page', content: t('admin.audit.page') },
-                    { key: 'from', content: t('admin.audit.from') },
-                    { key: 'to', content: t('admin.audit.to') },
-                    { key: 'by', content: t('admin.audit.by') },
-                    { key: 'date', content: t('admin.audit.date') },
-                    { key: 'recursive', content: t('admin.audit.recursive') },
+                    { key: 'title', content: t('admin.audit.page') },
                   ],
                 }}
-                rows={statsRows}
-                rowsPerPage={10}
+                rows={(statsData?.recentPages || []).map((page, index) => ({
+                  key: page.id || String(index),
+                  cells: [
+                    { key: 'title', content: <Text>{page.title}</Text> },
+                  ],
+                }))}
+                rowsPerPage={20}
                 emptyView={<Text>{t('admin.audit.empty')}</Text>}
                 isLoading={statsLoading}
               />
             </Stack>
+            </Box>
           </TabPanel>
         </Tabs>
       </Stack>

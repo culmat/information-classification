@@ -16,7 +16,8 @@
     "no_contacts": "Keine Kontakte konfiguriert.",
     "no_links": "Keine Links konfiguriert.",
     "no_resources": "Keine Kontakte oder Links konfiguriert.",
-    "no_history": "Keine Klassifizierungsänderungen erfasst."
+    "no_history": "Keine Klassifizierungsänderungen erfasst.",
+    "history_truncated": "Nur die neuesten Änderungen werden angezeigt."
   },
   "classify": {
     "title": "Klassifizierung ändern",
@@ -51,7 +52,7 @@
       "levels": "Stufen",
       "contacts": "Kontakte",
       "links": "Links",
-      "audit": "Protokoll",
+      "statistics": "Statistiken",
       "languages": "Sprachen"
     },
     "levels": {
@@ -106,12 +107,12 @@
       "applies_to_all": "Alle Stufen"
     },
     "audit": {
-      "title": "Änderungsprotokoll",
-      "total_changes": "Änderungen gesamt",
-      "changes_this_month": "Änderungen diesen Monat",
-      "recent_changes": "Letzte Änderungen",
+      "title": "Klassifizierungsübersicht",
+      "classified_pages": "Klassifizierte Seiten",
+      "show_unclassified": "Nicht klassifizierte Seiten separat anzeigen",
+      "unclassified": "Nicht klassifiziert",
+      "recent_changes": "Kürzlich klassifiziert",
       "distribution": "Klassifizierungsverteilung",
-      "trend": "Monatlicher Trend",
       "page": "Seite",
       "space": "Bereich",
       "from": "Von",
@@ -141,8 +142,6 @@
   },
   "space_settings": {
     "title": "Einstellungen Informationsklassifizierung",
-    "tab_configuration": "Konfiguration",
-    "tab_statistics": "Statistiken",
     "description": "Konfigurieren Sie, welche Klassifizierungsstufen in diesem Bereich verfügbar sind.",
     "enabled_levels": "Aktivierte Stufen",
     "default_level": "Standardstufe",

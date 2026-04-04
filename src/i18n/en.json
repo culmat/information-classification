@@ -16,7 +16,8 @@
     "no_contacts": "No contacts configured.",
     "no_links": "No links configured.",
     "no_resources": "No contacts or links configured.",
-    "no_history": "No classification changes recorded."
+    "no_history": "No classification changes recorded.",
+    "history_truncated": "Showing most recent changes only."
   },
   "classify": {
     "title": "Change Classification",
@@ -51,7 +52,7 @@
       "levels": "Levels",
       "contacts": "Contacts",
       "links": "Links",
-      "audit": "Audit",
+      "statistics": "Statistics",
       "languages": "Languages"
     },
     "levels": {
@@ -106,12 +107,12 @@
       "applies_to_all": "All Levels"
     },
     "audit": {
-      "title": "Audit Trail",
-      "total_changes": "Total Changes",
-      "changes_this_month": "Changes This Month",
-      "recent_changes": "Recent Changes",
+      "title": "Classification Overview",
+      "classified_pages": "Classified Pages",
+      "show_unclassified": "Show unclassified pages separately",
+      "unclassified": "Unclassified",
+      "recent_changes": "Recently Classified",
       "distribution": "Classification Distribution",
-      "trend": "Monthly Trend",
       "page": "Page",
       "space": "Space",
       "from": "From",
@@ -141,8 +142,6 @@
   },
   "space_settings": {
     "title": "Information Classification Settings",
-    "tab_configuration": "Configuration",
-    "tab_statistics": "Statistics",
     "description": "Configure which classification levels are available in this space.",
     "enabled_levels": "Enabled Levels",
     "default_level": "Default Level",

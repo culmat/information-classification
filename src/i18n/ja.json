@@ -16,7 +16,8 @@
     "no_contacts": "連絡先が設定されていません。",
     "no_links": "リンクが設定されていません。",
     "no_resources": "連絡先やリンクが設定されていません。",
-    "no_history": "分類変更の記録がありません。"
+    "no_history": "分類変更の記録がありません。",
+    "history_truncated": "最新の変更のみ表示しています。"
   },
   "classify": {
     "title": "分類を変更",
@@ -51,7 +52,7 @@
       "levels": "レベル",
       "contacts": "連絡先",
       "links": "リンク",
-      "audit": "監査",
+      "statistics": "統計",
       "languages": "言語"
     },
     "levels": {
@@ -106,12 +107,12 @@
       "applies_to_all": "すべてのレベル"
     },
     "audit": {
-      "title": "監査証跡",
-      "total_changes": "変更総数",
-      "changes_this_month": "今月の変更",
-      "recent_changes": "最近の変更",
+      "title": "分類の概要",
+      "classified_pages": "分類済みページ",
+      "show_unclassified": "未分類ページを別に表示",
+      "unclassified": "未分類",
+      "recent_changes": "最近の分類",
       "distribution": "分類の分布",
-      "trend": "月次トレンド",
       "page": "ページ",
       "space": "スペース",
       "from": "変更前",
@@ -141,8 +142,6 @@
   },
   "space_settings": {
     "title": "情報分類設定",
-    "tab_configuration": "設定",
-    "tab_statistics": "統計",
     "description": "このスペースで利用可能な分類レベルを設定します。",
     "enabled_levels": "有効なレベル",
     "default_level": "デフォルトレベル",

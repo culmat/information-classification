@@ -16,7 +16,8 @@
     "no_contacts": "Aucun contact configuré.",
     "no_links": "Aucun lien configuré.",
     "no_resources": "Aucun contact ou lien configuré.",
-    "no_history": "Aucune modification de classification enregistrée."
+    "no_history": "Aucune modification de classification enregistrée.",
+    "history_truncated": "Seules les modifications les plus récentes sont affichées."
   },
   "classify": {
     "title": "Modifier la classification",
@@ -51,7 +52,7 @@
       "levels": "Niveaux",
       "contacts": "Contacts",
       "links": "Liens",
-      "audit": "Audit",
+      "statistics": "Statistiques",
       "languages": "Langues"
     },
     "levels": {
@@ -106,12 +107,12 @@
       "applies_to_all": "Tous les niveaux"
     },
     "audit": {
-      "title": "Journal d'audit",
-      "total_changes": "Total des modifications",
-      "changes_this_month": "Modifications ce mois-ci",
-      "recent_changes": "Modifications récentes",
+      "title": "Aperçu des classifications",
+      "classified_pages": "Pages classifiées",
+      "show_unclassified": "Afficher les pages non classifiées séparément",
+      "unclassified": "Non classifié",
+      "recent_changes": "Récemment classifiées",
       "distribution": "Répartition des classifications",
-      "trend": "Tendance mensuelle",
       "page": "Page",
       "space": "Espace",
       "from": "De",
@@ -141,8 +142,6 @@
   },
   "space_settings": {
     "title": "Paramètres de classification",
-    "tab_configuration": "Configuration",
-    "tab_statistics": "Statistiques",
     "description": "Configurez les niveaux de classification disponibles dans cet espace.",
     "enabled_levels": "Niveaux activés",
     "default_level": "Niveau par défaut",
