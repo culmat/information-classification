@@ -31,3 +31,4 @@ tunnel-sync.sh
 
 # Shared browser MCP artifacts
 /.playwright-mcp/
+TODO.txt
