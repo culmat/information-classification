@@ -5,9 +5,12 @@
  */
 
 import api, { route } from '@forge/api';
-import { getGlobalConfig, setGlobalConfig } from '../storage/configStore';
+import { Queue } from '@forge/events';
+import { kvs } from '@forge/kvs';
+import { getGlobalConfig, setGlobalConfig, getEffectiveConfig } from '../storage/configStore';
+import { findPagesByLevel, classifySinglePage } from '../services/classificationService';
 import { successResponse, errorResponse, validationError } from '../utils/responseHelper';
-import { VALID_COLORS } from '../shared/constants';
+import { VALID_COLORS, asyncJobKey } from '../shared/constants';
 
 /**
  * Resolver: getConfig
@@ -191,4 +194,59 @@ function validateConfig(config) {
   }
 
   return { valid: true };
+}
+
+/**
+ * Resolver: countLevelUsage
+ * Returns the number of pages classified with a given level.
+ */
+export async function countLevelUsageResolver(req) {
+  const { levelId } = req.payload || {};
+  if (!levelId) return validationError('levelId is required');
+
+  try {
+    const { totalSize } = await findPagesByLevel(levelId, 0);
+    return successResponse({ count: totalSize });
+  } catch (error) {
+    console.error('Error counting level usage:', error);
+    return errorResponse('Failed to count pages', 500);
+  }
+}
+
+/**
+ * Resolver: reclassifyLevel
+ * Reclassifies all pages from one level to another via the async queue.
+ */
+export async function reclassifyLevelResolver(req) {
+  const { fromLevelId, toLevelId } = req.payload || {};
+  const accountId = req.context.accountId;
+  const locale = req.context.locale || 'en';
+
+  if (!fromLevelId || !toLevelId) return validationError('fromLevelId and toLevelId are required');
+  if (fromLevelId === toLevelId) return validationError('fromLevelId and toLevelId must differ');
+
+  try {
+    const { totalSize } = await findPagesByLevel(fromLevelId, 0);
+    if (totalSize === 0) return successResponse({ count: 0 });
+
+    const queue = new Queue({ key: 'classification-queue' });
+    const { jobId } = await queue.push({
+      body: { fromLevelId, toLevelId, accountId, locale, totalToClassify: totalSize },
+      concurrency: { key: `reclassify-${fromLevelId}`, limit: 1 },
+    });
+
+    await kvs.set(asyncJobKey(`reclassify-${fromLevelId}`), {
+      jobId,
+      levelId: toLevelId,
+      total: totalSize,
+      startedAt: Date.now(),
+      classified: 0,
+      failed: 0,
+    });
+
+    return successResponse({ count: totalSize, asyncJobId: jobId });
+  } catch (error) {
+    console.error('Error reclassifying level:', error);
+    return errorResponse('Failed to start reclassification', 500);
+  }
 }

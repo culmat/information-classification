@@ -182,7 +182,21 @@ export async function classifyPage({
  */
 export async function findDescendantsToClassify(pageId, levelId, limit = 0, startIndex = 0, { asApp: useApp = false } = {}) {
   const cql = `ancestor=${pageId} AND type=page AND culmat_classification_level != "${levelId}"`;
-  // Queue consumers have no user context — use asApp() when called from the async consumer.
+  return cqlPageSearch(cql, limit, startIndex, useApp);
+}
+
+/**
+ * Finds all pages classified with a specific level (for reclassification / deletion warning).
+ */
+export async function findPagesByLevel(levelId, limit = 0, startIndex = 0, { asApp: useApp = false } = {}) {
+  const cql = `type=page AND culmat_classification_level = "${levelId}"`;
+  return cqlPageSearch(cql, limit, startIndex, useApp);
+}
+
+/**
+ * Shared CQL page search helper.
+ */
+async function cqlPageSearch(cql, limit, startIndex, useApp) {
   const requester = useApp ? api.asApp() : api.asUser();
   const response = await requester.requestConfluence(
     route`/wiki/rest/api/search?cql=${cql}&limit=${limit}&start=${startIndex}`,

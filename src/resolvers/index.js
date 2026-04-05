@@ -4,7 +4,7 @@
 
 import Resolver from '@forge/resolver';
 import { getClassificationResolver, setClassificationResolver, getDynamicPropertiesResolver, countDescendantsResolver, getClassificationProgressResolver } from './classifyResolver';
-import { getConfigResolver, setConfigResolver, getAuditDataResolver } from './configResolver';
+import { getConfigResolver, setConfigResolver, getAuditDataResolver, countLevelUsageResolver, reclassifyLevelResolver } from './configResolver';
 import { getSpaceConfigResolver, setSpaceConfigResolver, resetSpaceConfigResolver } from './spaceConfigResolver';
 
 const resolver = new Resolver();
@@ -43,6 +43,8 @@ resolver.define('getDynamicProperties', wrapResolver(getDynamicPropertiesResolve
 resolver.define('getConfig', wrapResolver(getConfigResolver));
 resolver.define('setConfig', wrapResolver(setConfigResolver));
 resolver.define('getAuditData', wrapResolver(getAuditDataResolver));
+resolver.define('countLevelUsage', wrapResolver(countLevelUsageResolver));
+resolver.define('reclassifyLevel', wrapResolver(reclassifyLevelResolver));
 
 // Space config operations (used by space settings frontend)
 resolver.define('getSpaceConfig', wrapResolver(getSpaceConfigResolver));

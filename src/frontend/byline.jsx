@@ -514,7 +514,7 @@ const App = () => {
                       id="recursive-toggle"
                       isChecked={recursive}
                       onChange={() => setRecursive(!recursive)}
-                      isDisabled={!!asyncJob || !selectedLevelAllowed}
+                      isDisabled={!!asyncJob || saving || !selectedLevelAllowed}
                     />
                     <Label labelFor="recursive-toggle">
                       {t('classify.apply_recursive')}

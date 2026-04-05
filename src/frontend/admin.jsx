@@ -52,6 +52,11 @@ import { SUPPORTED_LANGUAGES } from '../shared/defaults';
 /**
  * Helper to resolve a localized string from a { lang: text } object.
  */
+function interpolate(template, values) {
+  if (!template) return '';
+  return template.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? `{${key}}`);
+}
+
 function localize(obj, locale) {
   if (!obj || typeof obj === 'string') return obj || '';
   const lang = (locale || 'en').substring(0, 2);
@@ -85,6 +90,10 @@ const App = () => {
   // Editing state for level modal
   const [editingLevel, setEditingLevel] = useState(null);
   const [showLevelModal, setShowLevelModal] = useState(false);
+
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // { levelId, levelName, pageCount, reclassifyTo }
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Editing state for contact modal
   const [editingContact, setEditingContact] = useState(null);
@@ -183,15 +192,46 @@ const App = () => {
     setShowLevelModal(false);
   };
 
-  const deleteLevel = (levelId) => {
+  const deleteLevel = async (levelId) => {
+    const level = (config?.levels || []).find((l) => l.id === levelId);
+    const levelName = level ? localize(level.name, 'en') : levelId;
+
+    // Check if any pages use this level
+    try {
+      const result = await invoke('countLevelUsage', { levelId });
+      if (result.success && result.count > 0) {
+        setDeleteConfirm({ levelId, levelName, pageCount: result.count, reclassifyTo: null });
+        return;
+      }
+    } catch (_) { /* CQL failed — allow delete without warning */ }
+
+    // No pages use this level — delete immediately
+    removeLevelFromConfig(levelId);
+  };
+
+  const removeLevelFromConfig = (levelId) => {
     const levels = (config?.levels || []).filter((l) => l.id !== levelId);
     const updated = { ...config, levels };
-    // If default was deleted, pick first allowed
     if (config.defaultLevelId === levelId) {
       const firstAllowed = levels.find((l) => l.allowed);
       updated.defaultLevelId = firstAllowed?.id || levels[0]?.id;
     }
     setConfig(updated);
+    setDeleteConfirm(null);
+  };
+
+  const handleReclassifyAndDelete = async () => {
+    if (!deleteConfirm?.reclassifyTo) return;
+    setDeleteLoading(true);
+    try {
+      await invoke('reclassifyLevel', { fromLevelId: deleteConfirm.levelId, toLevelId: deleteConfirm.reclassifyTo });
+      removeLevelFromConfig(deleteConfirm.levelId);
+      showFlag({ id: 'reclassify-started', title: t('admin.levels.delete_reclassifying'), type: 'info', isAutoDismiss: true });
+    } catch (error) {
+      console.error('Failed to reclassify:', error);
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const moveLevel = (levelId, direction) => {
@@ -690,6 +730,57 @@ const App = () => {
             onClose={() => setShowLevelModal(false)}
             t={t}
           />
+        )}
+      </ModalTransition>
+
+      {/* Delete level confirmation modal */}
+      <ModalTransition>
+        {deleteConfirm && (
+          <Modal onClose={() => setDeleteConfirm(null)}>
+            <ModalHeader>
+              <ModalTitle>{t('admin.levels.delete_confirm_title')}</ModalTitle>
+              <Button appearance="subtle" onClick={() => setDeleteConfirm(null)}>✕</Button>
+            </ModalHeader>
+            <ModalBody>
+              <Stack space="space.200">
+                <SectionMessage appearance="warning">
+                  <Text>{interpolate(t('admin.levels.delete_confirm_message'), { count: deleteConfirm.pageCount, level: deleteConfirm.levelName })}</Text>
+                </SectionMessage>
+                <Stack space="space.050">
+                  <Label labelFor="reclassify-select">{t('admin.levels.delete_reclassify_label')}</Label>
+                  <Select
+                    inputId="reclassify-select"
+                    options={(config?.levels || [])
+                      .filter((l) => l.id !== deleteConfirm.levelId)
+                      .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
+                    onChange={(option) => setDeleteConfirm((prev) => ({ ...prev, reclassifyTo: option?.value || null }))}
+                  />
+                </Stack>
+              </Stack>
+            </ModalBody>
+            <ModalFooter>
+              <ButtonGroup>
+                <Button appearance="subtle" onClick={() => setDeleteConfirm(null)}>
+                  {t('classify.cancel_button')}
+                </Button>
+                <Button
+                  appearance="warning"
+                  onClick={() => removeLevelFromConfig(deleteConfirm.levelId)}
+                  isDisabled={deleteLoading}
+                >
+                  {t('admin.levels.delete_anyway_button')}
+                </Button>
+                <Button
+                  appearance="primary"
+                  onClick={handleReclassifyAndDelete}
+                  isDisabled={!deleteConfirm.reclassifyTo || deleteLoading}
+                  isLoading={deleteLoading}
+                >
+                  {t('admin.levels.delete_reclassify_button')}
+                </Button>
+              </ButtonGroup>
+            </ModalFooter>
+          </Modal>
         )}
       </ModalTransition>
 
