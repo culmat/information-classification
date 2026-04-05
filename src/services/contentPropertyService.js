@@ -11,13 +11,22 @@ import api, { route } from '@forge/api';
 import { CONTENT_PROPERTY_KEY, BYLINE_PROPERTY_KEY, HISTORY_PROPERTY_KEY, MAX_HISTORY_ENTRIES } from '../shared/constants';
 
 /**
+ * Returns the appropriate API requester.
+ * Queue consumers have no user context — pass { asApp: true } to use app permissions.
+ */
+function getRequester(useApp) {
+  return useApp ? api.asApp() : api.asUser();
+}
+
+/**
  * Reads the classification content property from a page.
  *
  * @param {string} pageId - Confluence page ID
+ * @param {Object} [options] - { asApp: boolean }
  * @returns {Promise<Object|null>} { level, classifiedBy, classifiedAt } or null if not set
  */
-export async function getClassification(pageId) {
-  return await getProperty(pageId, CONTENT_PROPERTY_KEY);
+export async function getClassification(pageId, { asApp: useApp = false } = {}) {
+  return await getProperty(pageId, CONTENT_PROPERTY_KEY, useApp);
 }
 
 /**
@@ -29,10 +38,10 @@ export async function getClassification(pageId) {
  * @param {Object} bylineData - { title, tooltip }
  * @returns {Promise<boolean>} true if successful
  */
-export async function setClassification(pageId, classificationData, bylineData) {
+export async function setClassification(pageId, classificationData, bylineData, { asApp: useApp = false } = {}) {
   const results = await Promise.all([
-    upsertProperty(pageId, CONTENT_PROPERTY_KEY, classificationData),
-    upsertProperty(pageId, BYLINE_PROPERTY_KEY, bylineData),
+    upsertProperty(pageId, CONTENT_PROPERTY_KEY, classificationData, useApp),
+    upsertProperty(pageId, BYLINE_PROPERTY_KEY, bylineData, useApp),
   ]);
 
   return results.every((r) => r === true);
@@ -44,8 +53,8 @@ export async function setClassification(pageId, classificationData, bylineData) 
  * @param {string} pageId - Confluence page ID
  * @returns {Promise<Object>} { truncated: boolean, entries: Array }
  */
-export async function getHistory(pageId) {
-  const data = await getProperty(pageId, HISTORY_PROPERTY_KEY);
+export async function getHistory(pageId, { asApp: useApp = false } = {}) {
+  const data = await getProperty(pageId, HISTORY_PROPERTY_KEY, useApp);
   if (!data) return { truncated: false, entries: [] };
   return { truncated: data.truncated || false, entries: data.entries || [] };
 }
@@ -58,8 +67,8 @@ export async function getHistory(pageId) {
  * @param {Object} entry - { from, to, by, at }
  * @returns {Promise<boolean>} true if successful
  */
-export async function appendHistory(pageId, entry) {
-  const current = await getHistory(pageId);
+export async function appendHistory(pageId, entry, { asApp: useApp = false } = {}) {
+  const current = await getHistory(pageId, { asApp: useApp });
   const entries = [...current.entries, entry];
   let truncated = current.truncated;
 
@@ -69,7 +78,7 @@ export async function appendHistory(pageId, entry) {
     truncated = true;
   }
 
-  return await upsertProperty(pageId, HISTORY_PROPERTY_KEY, { truncated, entries });
+  return await upsertProperty(pageId, HISTORY_PROPERTY_KEY, { truncated, entries }, useApp);
 }
 
 /**
@@ -77,11 +86,10 @@ export async function appendHistory(pageId, entry) {
  * The v2 API uses granular scopes (read:content.property:confluence).
  * Returns the property value or null if not found.
  */
-async function getProperty(pageId, key) {
+async function getProperty(pageId, key, useApp = false) {
   try {
     // v2 API: list all properties, then find by key
-    const response = await api
-      .asUser()
+    const response = await getRequester(useApp)
       .requestConfluence(
         route`/wiki/api/v2/pages/${pageId}/properties?key=${key}`,
         { headers: { Accept: 'application/json' } }
@@ -107,11 +115,10 @@ async function getProperty(pageId, key) {
 /**
  * Creates or updates a content property on a page using the v2 REST API.
  */
-async function upsertProperty(pageId, key, value) {
+async function upsertProperty(pageId, key, value, useApp = false) {
   try {
     // First check if property exists
-    const listResponse = await api
-      .asUser()
+    const listResponse = await getRequester(useApp)
       .requestConfluence(
         route`/wiki/api/v2/pages/${pageId}/properties?key=${key}`,
         { headers: { Accept: 'application/json' } }
@@ -128,8 +135,7 @@ async function upsertProperty(pageId, key, value) {
 
     if (!existing) {
       // Property doesn't exist — create it
-      const createResponse = await api
-        .asUser()
+      const createResponse = await getRequester(useApp)
         .requestConfluence(route`/wiki/api/v2/pages/${pageId}/properties`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -148,8 +154,7 @@ async function upsertProperty(pageId, key, value) {
     const propId = existing.id;
     const version = existing.version?.number || 1;
 
-    const updateResponse = await api
-      .asUser()
+    const updateResponse = await getRequester(useApp)
       .requestConfluence(
         route`/wiki/api/v2/pages/${pageId}/properties/${propId}`,
         {

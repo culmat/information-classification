@@ -43,7 +43,7 @@ import ForgeReconciler, {
   ProgressBar,
   xcss,
 } from '@forge/react';
-import { invoke, view, realtime } from '@forge/bridge';
+import { invoke, view, realtime, showFlag } from '@forge/bridge';
 import { colorToLozenge } from '../shared/constants';
 
 /**
@@ -132,6 +132,14 @@ const App = () => {
         setConfig(result.config);
         setRestrictionWarning(result.restrictionWarning);
         setHistory(result.history || { truncated: false, entries: [] });
+
+        // Resume active async job if one exists (e.g. after page reload)
+        if (result.activeJob) {
+          setAsyncJob({ jobId: result.activeJob.jobId, total: result.activeJob.total, startedAt: result.activeJob.startedAt });
+          setAsyncProgress({ classified: result.activeJob.classified || 0, failed: result.activeJob.failed || 0, total: result.activeJob.total, done: false });
+          setSaving(true);
+          setShowModal(true);
+        }
       }
     } catch (error) {
       console.error('Failed to load classification:', error);
@@ -177,6 +185,14 @@ const App = () => {
         setAsyncJob(null);
         setSaving(false);
         loadClassification(false);
+        setDescendantCount(0);
+        setShowModal(false);
+        showFlag({
+          id: 'classify-success',
+          title: interpolate(t('classify.async_complete'), { classified: data.classified }),
+          type: 'success',
+          isAutoDismiss: true,
+        });
       }
     }).then((sub) => { subscription = sub; });
     return () => { if (subscription) subscription.unsubscribe(); };
@@ -214,7 +230,7 @@ const App = () => {
       if (result.success) {
         // Async path — large tree pushed to background queue
         if (result.asyncJobId) {
-          setAsyncJob({ jobId: result.asyncJobId, total: result.totalToClassify });
+          setAsyncJob({ jobId: result.asyncJobId, total: result.totalToClassify, startedAt: Date.now() });
           setAsyncProgress({ classified: 0, failed: 0, total: result.totalToClassify, done: false });
           setMessage({ type: 'info', text: interpolate(t('classify.async_started'), { total: result.totalToClassify }) });
           // Don't close modal or stop saving — Realtime subscription handles completion
@@ -232,16 +248,21 @@ const App = () => {
           }
         }
 
-        // Show restriction warning OR success — not both.
-        // restrictionWarning is rendered separately (lines below the radio group),
-        // so we only set `message` for the success case.
-        if (result.restrictionWarning !== 'requires_protection') {
-          setMessage({ type: 'success', text: msg });
-        }
-
-        // Reload classification data (updates currentLevelId so Apply disables).
-        // Skip loading spinner to avoid modal flicker.
+        // Close modal and show an ephemeral toast flag instead of a persistent
+        // in-modal message. The flag auto-dismisses after 8 seconds.
+        setShowModal(false);
+        showFlag({
+          id: 'classify-success',
+          title: msg,
+          type: 'success',
+          isAutoDismiss: true,
+        });
+        // Reload classification data so the byline badge updates.
         await loadClassification(false);
+        // Reset descendant count locally — CQL indexing is async so a server
+        // re-fetch would return stale data.
+        setDescendantCount(0);
+        view.refresh();
       } else {
         setMessage({ type: 'error', text: result.error || t('classify.error') });
       }
@@ -268,10 +289,18 @@ const App = () => {
 
   // Close modal and refresh the byline badge so it reflects any classification change.
   const closeModal = useCallback(() => {
+    if (asyncJob) {
+      showFlag({
+        id: 'classify-background',
+        title: t('classify.async_background'),
+        type: 'info',
+        isAutoDismiss: true,
+      });
+    }
     setShowModal(false);
     setAsyncJob(null);
     view.refresh();
-  }, []);
+  }, [asyncJob, t]);
 
   if (loading) {
     return <Spinner size="small" />;
@@ -424,6 +453,7 @@ const App = () => {
           <Modal onClose={closeModal}>
             <ModalHeader>
               <ModalTitle>{t('classify.title')}</ModalTitle>
+              <Button appearance="subtle" onClick={closeModal}>✕</Button>
             </ModalHeader>
             <ModalBody>
               <Stack space="space.200">
@@ -439,6 +469,7 @@ const App = () => {
                       <Radio
                         value={level.id}
                         isChecked={selectedLevel === level.id}
+                        isDisabled={!!asyncJob || saving}
                         onChange={() => setSelectedLevel(level.id)}
                         label=""
                       />
@@ -490,8 +521,13 @@ const App = () => {
                   {recursive && !countLoading && totalDescendants > 0 && descendantCount === 0 && (
                     <Text>{t('classify.all_subpages_classified')}</Text>
                   )}
-                  {recursive && !countLoading && descendantCount > 0 && (
-                    <Text>{interpolate(t('classify.apply_recursive_count'), { count: descendantCount })}</Text>
+                  {recursive && !countLoading && descendantCount > 0 && !asyncJob && (
+                    saving
+                      ? <Inline space="space.100" alignBlock="center">
+                          <Spinner size="small" />
+                          <Text>{t('classify.sync_progress')}</Text>
+                        </Inline>
+                      : <Text>{interpolate(t('classify.apply_recursive_count'), { count: descendantCount })}</Text>
                   )}
                 </Stack>
 
@@ -500,33 +536,23 @@ const App = () => {
                   <Stack space="space.100">
                     <Text>{interpolate(t('classify.async_progress'), { classified: asyncProgress.classified || 0, total: asyncJob.total })}</Text>
                     <ProgressBar value={asyncJob.total > 0 ? (asyncProgress.classified || 0) / asyncJob.total : 0} />
-                    {asyncProgress.done && asyncProgress.remainingCount > 0 && (
-                      <SectionMessage appearance="warning">
-                        <Text>{interpolate(t('classify.async_remaining'), { count: asyncProgress.remainingCount })}</Text>
-                        {asyncProgress.reviewUrl && (
-                          <Link href={asyncProgress.reviewUrl} openNewTab>{t('classify.async_review_link')}</Link>
-                        )}
-                      </SectionMessage>
-                    )}
-                    {asyncProgress.done && asyncProgress.remainingCount === 0 && (
-                      <SectionMessage appearance="confirmation">
-                        <Text>{interpolate(t('classify.async_complete'), { classified: asyncProgress.classified })}</Text>
-                      </SectionMessage>
-                    )}
+                    {(asyncProgress.classified || 0) > 0 && asyncJob.startedAt && (() => {
+                      const elapsed = Date.now() - asyncJob.startedAt;
+                      const classified = asyncProgress.classified || 0;
+                      const remaining = Math.round(elapsed / classified * (asyncJob.total - classified) / 1000);
+                      const eta = remaining >= 60
+                        ? interpolate(t('classify.async_eta_min'), { minutes: Math.ceil(remaining / 60) })
+                        : interpolate(t('classify.async_eta_sec'), { seconds: remaining });
+                      return <Text>{eta}</Text>;
+                    })()}
+                    <Text>{t('classify.async_close_hint')}</Text>
                   </Stack>
                 )}
 
-                {/* Activity indicator during save */}
-                {saving && !asyncJob && (
-                  <Inline space="space.100" alignBlock="center">
-                    <Spinner size="small" />
-                    <Text>{t('classify.sync_progress')}</Text>
-                  </Inline>
-                )}
-
-                {/* Status message inside modal */}
-                {message && (
-                  <SectionMessage appearance={message.type === 'error' ? 'error' : 'confirmation'}>
+                {/* Error and info messages stay inside the modal.
+                   Success uses showFlag toast. Info is hidden when async progress bar is visible. */}
+                {message && message.type !== 'success' && !(message.type === 'info' && asyncJob) && (
+                  <SectionMessage appearance={message.type === 'error' ? 'error' : 'information'}>
                     <Text>{message.text}</Text>
                   </SectionMessage>
                 )}
@@ -547,7 +573,7 @@ const App = () => {
                     saving ||
                     !selectedLevelAllowed ||
                     (selectedLevel === currentLevelId && !recursive) ||
-                    (recursive && !countLoading && (descendantCount === 0 || totalDescendants === 0))
+                    (recursive && !countLoading && (descendantCount === 0 || totalDescendants === 0) && selectedLevel === currentLevelId)
                   }
                 >
                   {t('classify.apply_button')}

@@ -4,8 +4,9 @@
  */
 
 import { Queue } from '@forge/events';
+import { kvs } from '@forge/kvs';
 import { getPageClassification, classifyPage, findDescendantsToClassify } from '../services/classificationService';
-import { ASYNC_THRESHOLD } from '../shared/constants';
+import { ASYNC_THRESHOLD, asyncJobKey } from '../shared/constants';
 import { getEffectiveConfig } from '../storage/configStore';
 import { getSpaceConfig } from '../storage/spaceConfigStore';
 import { getClassification, getHistory } from '../services/contentPropertyService';
@@ -77,11 +78,12 @@ export async function getClassificationResolver(req) {
   }
 
   try {
-    const [result, history] = await Promise.all([
+    const [result, history, activeJob] = await Promise.all([
       getPageClassification(String(pageId), spaceKey),
       getHistory(String(pageId)),
+      kvs.get(asyncJobKey(String(pageId))),
     ]);
-    return successResponse({ ...result, history });
+    return successResponse({ ...result, history, activeJob: activeJob || null });
   } catch (error) {
     console.error('Error getting classification:', error);
     return errorResponse('Failed to get classification', 500);
@@ -107,8 +109,14 @@ export async function setClassificationResolver(req) {
   }
 
   try {
-    // Check if this should be processed asynchronously
-    const toClassify = recursive ? (descendantsToClassify ?? 0) : 0;
+    // Check if this should be processed asynchronously.
+    // Don't trust the frontend count — CQL index lag can make it stale.
+    // Do a fresh server-side count for the threshold decision.
+    let toClassify = 0;
+    if (recursive) {
+      const { totalSize } = await findDescendantsToClassify(String(pageId), levelId, 0);
+      toClassify = totalSize;
+    }
 
     if (recursive && toClassify > ASYNC_THRESHOLD) {
       // Classify the parent page synchronously (fast, single page)
@@ -130,6 +138,16 @@ export async function setClassificationResolver(req) {
       const { jobId } = await queue.push({
         body: { pageId: String(pageId), spaceKey, levelId, accountId, locale: locale || 'en', totalToClassify: toClassify },
         concurrency: { key: `classify-${pageId}`, limit: 1 },
+      });
+
+      // Persist active job state so the frontend can resume after reload
+      await kvs.set(asyncJobKey(String(pageId)), {
+        jobId,
+        levelId,
+        total: toClassify,
+        startedAt: Date.now(),
+        classified: 0,
+        failed: 0,
       });
 
       return successResponse({

@@ -5,7 +5,9 @@
  */
 
 import { publishGlobal } from '@forge/realtime';
+import { kvs } from '@forge/kvs';
 import { findDescendantsToClassify, classifySinglePage } from './services/classificationService';
+import { asyncJobKey } from './shared/constants';
 import { getEffectiveConfig } from './storage/configStore';
 import { getSpaceConfig } from './storage/spaceConfigStore';
 
@@ -23,6 +25,10 @@ export async function handler(event) {
 
   console.log(`Async classification started: pageId=${pageId}, levelId=${levelId}, total=${totalToClassify}`);
 
+  // Read startedAt from the KVS entry written by the resolver
+  const jobState = await kvs.get(asyncJobKey(pageId));
+  const startedAt = jobState?.startedAt || Date.now();
+
   // Load the level definition for classifySinglePage
   const spConfig = await getSpaceConfig(spaceKey);
   const effectiveConfig = await getEffectiveConfig(spaceKey, spConfig);
@@ -30,21 +36,29 @@ export async function handler(event) {
 
   if (!level) {
     console.error(`Level ${levelId} not found in config`);
-    await publishGlobal(channel, { classified: 0, failed: 0, total: totalToClassify, done: true, error: 'Level not found' });
+    await Promise.all([
+      publishGlobal(channel, { classified: 0, failed: 0, total: totalToClassify, done: true, error: 'Level not found' }),
+      kvs.delete(asyncJobKey(pageId)),
+    ]);
     return;
   }
 
   let classified = 0;
   let failed = 0;
+  const processed = new Set();
 
   while (true) {
     // Always fetch from startIndex=0 — classified pages drop out of the CQL result set
-    const { results } = await findDescendantsToClassify(pageId, levelId, BATCH_SIZE, 0);
+    const { results } = await findDescendantsToClassify(pageId, levelId, BATCH_SIZE, 0, { asApp: true });
     if (results.length === 0) break;
 
-    for (const page of results) {
+    // If every result was already processed, CQL index is lagging — stop to avoid infinite loop
+    const unprocessed = results.filter((p) => !processed.has(p.id));
+    if (unprocessed.length === 0) break;
+
+    for (const page of unprocessed) {
       try {
-        const success = await classifySinglePage({ childPageId: page.id, spaceKey, levelId, accountId, locale, level });
+        const success = await classifySinglePage({ childPageId: page.id, spaceKey, levelId, accountId, locale, level, asApp: true });
         if (success) {
           classified++;
         } else {
@@ -54,31 +68,24 @@ export async function handler(event) {
         console.error(`Failed to classify page ${page.id}:`, error);
         failed++;
       }
+      processed.add(page.id);
 
-      // Publish progress periodically
+      // Publish progress periodically and update KVS for resume-on-reload
       if ((classified + failed) % PROGRESS_INTERVAL === 0) {
-        await publishGlobal(channel, { classified, failed, total: totalToClassify, done: false });
+        await Promise.all([
+          publishGlobal(channel, { classified, failed, total: totalToClassify, done: false }),
+          kvs.set(asyncJobKey(pageId), { levelId, total: totalToClassify, startedAt, classified, failed }),
+        ]);
       }
     }
 
-    startIndex += results.length;
   }
 
-  // Recheck: are there still pages not at the target level? (concurrent modifications)
-  const { totalSize: remainingCount } = await findDescendantsToClassify(pageId, levelId, 0);
-  const reviewUrl = remainingCount > 0
-    ? `/wiki/search?cql=ancestor%3D${pageId}+AND+type%3Dpage+AND+culmat_classification_level+!%3D+%22${encodeURIComponent(levelId)}%22`
-    : null;
+  // Publish final status and clear the active job marker
+  await Promise.all([
+    publishGlobal(channel, { classified, failed, total: totalToClassify, done: true }),
+    kvs.delete(asyncJobKey(pageId)),
+  ]);
 
-  // Publish final status
-  await publishGlobal(channel, {
-    classified,
-    failed,
-    total: totalToClassify,
-    remainingCount,
-    reviewUrl,
-    done: true,
-  });
-
-  console.log(`Async classification complete: classified=${classified}, failed=${failed}, remaining=${remainingCount}`);
+  console.log(`Async classification complete: classified=${classified}, failed=${failed}`);
 }

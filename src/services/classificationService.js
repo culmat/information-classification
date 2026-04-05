@@ -180,9 +180,11 @@ export async function classifyPage({
  * @param {number} startIndex - pagination offset
  * @returns {Promise<{results: Array, totalSize: number}>}
  */
-export async function findDescendantsToClassify(pageId, levelId, limit = 0, startIndex = 0) {
+export async function findDescendantsToClassify(pageId, levelId, limit = 0, startIndex = 0, { asApp: useApp = false } = {}) {
   const cql = `ancestor=${pageId} AND type=page AND culmat_classification_level != "${levelId}"`;
-  const response = await api.asUser().requestConfluence(
+  // Queue consumers have no user context — use asApp() when called from the async consumer.
+  const requester = useApp ? api.asApp() : api.asUser();
+  const response = await requester.requestConfluence(
     route`/wiki/rest/api/search?cql=${cql}&limit=${limit}&start=${startIndex}`,
     { headers: { Accept: 'application/json' } }
   );
@@ -201,13 +203,14 @@ export async function findDescendantsToClassify(pageId, levelId, limit = 0, star
  * @param {Object} params
  * @returns {Promise<boolean>} true if successful
  */
-export async function classifySinglePage({ childPageId, spaceKey, levelId, accountId, locale, level }) {
+export async function classifySinglePage({ childPageId, spaceKey, levelId, accountId, locale, level, asApp: useApp = false }) {
   const lang = (locale || 'en').substring(0, 2);
   const levelName = level.name?.[lang] || level.name?.en || levelId;
   const now = new Date().toISOString();
+  const opts = { asApp: useApp };
 
   // Read current level for history (CQL confirmed it differs, but we need the previous value)
-  const currentClassification = await getClassification(childPageId);
+  const currentClassification = await getClassification(childPageId, opts);
   const previousLevel = currentClassification?.level || null;
 
   const classificationData = {
@@ -217,7 +220,7 @@ export async function classifySinglePage({ childPageId, spaceKey, levelId, accou
   };
   const bylineData = { title: levelName, tooltip: levelName };
 
-  const success = await setClassification(childPageId, classificationData, bylineData);
+  const success = await setClassification(childPageId, classificationData, bylineData, opts);
   if (!success) return false;
 
   await appendHistory(childPageId, {
@@ -225,7 +228,7 @@ export async function classifySinglePage({ childPageId, spaceKey, levelId, accou
     to: levelId,
     by: accountId,
     at: now,
-  });
+  }, opts);
 
   return true;
 }
@@ -242,9 +245,13 @@ async function classifyDescendants({ pageId, spaceKey, levelId, accountId, local
 
   let classified = 0;
   let failed = 0;
+  // Track processed pages — CQL index updates are async, so a page we just
+  // classified may still appear in the next CQL batch. Skip it to avoid
+  // double-counting and redundant writes.
+  const processed = new Set();
 
-  // Always fetch from startIndex=0 because classified pages drop out of the CQL result set.
-  // Each batch returns the next N unclassified pages.
+  // Always fetch from startIndex=0 because classified pages eventually drop
+  // out of the CQL result set once the index catches up.
   while (true) {
     if (Date.now() - startTime > MAX_DURATION_MS) {
       console.warn(`Recursive classification timed out after ${classified} descendants`);
@@ -252,13 +259,16 @@ async function classifyDescendants({ pageId, spaceKey, levelId, accountId, local
     }
 
     const { results } = await findDescendantsToClassify(pageId, levelId, 25, 0);
-    if (results.length === 0) break;
+    // Filter out pages we already processed in a previous batch
+    const unprocessed = results.filter((p) => !processed.has(p.id));
+    if (unprocessed.length === 0) break;
 
-    for (const page of results) {
+    for (const page of unprocessed) {
       if (Date.now() - startTime > MAX_DURATION_MS) {
         return { classified, failed, timedOut: true };
       }
 
+      processed.add(page.id);
       try {
         const success = await classifySinglePage({ childPageId: page.id, spaceKey, levelId, accountId, locale, level });
         if (success) {

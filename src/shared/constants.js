@@ -23,6 +23,10 @@ export const spaceConfigKey = (spaceKey) =>
 // Async classification threshold — above this count, use background processing
 export const ASYNC_THRESHOLD = 50;
 
+// KVS key prefix for tracking active async classification jobs
+export const ASYNC_JOB_KEY_PREFIX = 'async-job:';
+export const asyncJobKey = (pageId) => `${ASYNC_JOB_KEY_PREFIX}${pageId}`;
+
 // Lozenge color mapping — maps our level color names to Forge Lozenge appearances.
 // Forge Lozenge renders with solid colored fill (green/blue/orange/red/grey backgrounds),
 // compared to Tag which renders with colored outlines only.
