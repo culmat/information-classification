@@ -9,9 +9,12 @@ vi.mock('@forge/kvs', () => ({
   kvs: { get: (...args) => mockKvsGet(...args), set: vi.fn(), delete: vi.fn() },
 }));
 
+const mockFindDescendantsToClassify = vi.fn().mockResolvedValue({ results: [], totalSize: 0 });
+
 vi.mock('../../src/services/classificationService', () => ({
   getPageClassification: (...args) => mockGetPageClassification(...args),
   classifyPage: (...args) => mockClassifyPage(...args),
+  findDescendantsToClassify: (...args) => mockFindDescendantsToClassify(...args),
 }));
 
 const { getClassificationResolver, setClassificationResolver } = await import(

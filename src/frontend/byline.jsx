@@ -74,12 +74,11 @@ const sectionStyle = xcss({
   paddingTop: 'space.100',
 });
 
-const historyCardStyle = xcss({
-  padding: 'space.100',
-  borderColor: 'color.border',
-  borderWidth: 'border.width',
-  borderStyle: 'solid',
-  borderRadius: 'border.radius',
+const historyEntryStyle = xcss({
+  paddingBottom: 'space.075',
+  borderBottomColor: 'color.border',
+  borderBottomWidth: 'border.width',
+  borderBottomStyle: 'solid',
 });
 
 
@@ -322,10 +321,12 @@ const App = () => {
     return level ? colorToLozenge(level.color) : 'default';
   };
 
-  // Helper: compact date format for narrow popup columns
+  // Helper: compact date+time format for history entries
   const formatDate = (dateStr) => {
     const d = new Date(dateStr);
-    return d.toLocaleDateString(undefined, { year: '2-digit', month: 'short', day: 'numeric' });
+    const opts = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+    if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+    return d.toLocaleString(undefined, opts);
   };
 
   // History entries from content property (newest last → reverse for display)
@@ -434,22 +435,17 @@ const App = () => {
             {/* History entries use short property names: { from, to, by, at }.
                Keep in sync with appendHistory() calls in classificationService.js. */}
             {historyEntries.map((entry, index) => (
-              <Box key={entry.id || index} xcss={historyCardStyle}>
-                <Stack space="space.050">
-                  <Inline space="space.050" alignBlock="center">
-                    {entry.from && (
-                      <>
-                        <Lozenge isBold appearance={levelAppearance(entry.from)}>{entry.from}</Lozenge>
-                        <Text> → </Text>
-                      </>
-                    )}
-                    <Lozenge isBold appearance={levelAppearance(entry.to)}>{entry.to}</Lozenge>
-                  </Inline>
-                  <Inline space="space.100" alignBlock="center">
-                    <User accountId={entry.by} />
-                    <Text>{formatDate(entry.at)}</Text>
-                  </Inline>
-                </Stack>
+              <Box key={entry.id || index} xcss={index < historyEntries.length - 1 ? historyEntryStyle : undefined}>
+                <Inline space="space.050" alignBlock="center">
+                  {entry.from && (
+                    <>
+                      <Lozenge isBold appearance={levelAppearance(entry.from)}>{entry.from}</Lozenge>
+                      <Text> → </Text>
+                    </>
+                  )}
+                  <Lozenge isBold appearance={levelAppearance(entry.to)}>{entry.to}</Lozenge>
+                </Inline>
+                <Text><User accountId={entry.by} /> · {formatDate(entry.at)}</Text>
               </Box>
             ))}
           </Stack>

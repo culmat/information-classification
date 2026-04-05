@@ -27,14 +27,14 @@ vi.mock('../../src/services/restrictionService', () => ({
 }));
 
 // Mock @forge/api for the recursive child page fetching
+const mockRequestConfluence = vi.fn().mockResolvedValue({
+  ok: true,
+  json: () => Promise.resolve({ results: [], totalSize: 0, _links: {} }),
+});
 vi.mock('@forge/api', () => ({
   default: {
-    asApp: () => ({
-      requestConfluence: vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ results: [], _links: {} }),
-      }),
-    }),
+    asApp: () => ({ requestConfluence: mockRequestConfluence }),
+    asUser: () => ({ requestConfluence: mockRequestConfluence }),
   },
   route: (strings, ...values) => strings.reduce((acc, str, i) => acc + str + (values[i] || ''), ''),
 }));
@@ -232,9 +232,10 @@ describe('classifyPage', () => {
     });
 
     expect(mockAppendHistory).toHaveBeenCalledWith(
+      '123',
       expect.objectContaining({
-        previousLevel: 'internal',
-        newLevel: 'confidential',
+        from: 'internal',
+        to: 'confidential',
       })
     );
   });
@@ -251,9 +252,10 @@ describe('classifyPage', () => {
     });
 
     expect(mockAppendHistory).toHaveBeenCalledWith(
+      '123',
       expect.objectContaining({
-        previousLevel: null,
-        newLevel: 'public',
+        from: null,
+        to: 'public',
       })
     );
   });
@@ -289,7 +291,7 @@ describe('classifyPage', () => {
     expect(result.error).toBe('write_failed');
   });
 
-  it('should pass recursive flag to audit log', async () => {
+  it('should log history when classifying recursively', async () => {
     mockGetClassification.mockResolvedValue(null);
     mockHasViewRestrictions.mockResolvedValue(false);
 
@@ -302,7 +304,8 @@ describe('classifyPage', () => {
     });
 
     expect(mockAppendHistory).toHaveBeenCalledWith(
-      expect.objectContaining({ recursive: true })
+      '123',
+      expect.objectContaining({ from: null, to: 'public' })
     );
   });
 });
