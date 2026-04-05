@@ -275,7 +275,7 @@ const App = () => {
   }, [pageId, spaceKey, selectedLevel, recursive, locale, t, loadClassification]);
 
   // Open the classification modal
-  const openModal = useCallback(() => {
+  const openModal = useCallback(async () => {
     setSelectedLevel(currentLevelId);
     setRecursive(false);
     setMessage(null);
@@ -285,7 +285,17 @@ const App = () => {
     setAsyncJob(null);
     setAsyncProgress(null);
     setShowModal(true);
-  }, [currentLevelId]);
+
+    // Re-check for an active background job (may have been started before close)
+    try {
+      const result = await invoke('getClassification', { pageId, spaceKey });
+      if (result.success && result.activeJob) {
+        setAsyncJob({ jobId: result.activeJob.jobId, total: result.activeJob.total, startedAt: result.activeJob.startedAt });
+        setAsyncProgress({ classified: result.activeJob.classified || 0, failed: result.activeJob.failed || 0, total: result.activeJob.total, done: false });
+        setSaving(true);
+      }
+    } catch (_) { /* ignore — modal opens normally without async state */ }
+  }, [currentLevelId, pageId, spaceKey]);
 
   // Close modal and refresh the byline badge so it reflects any classification change.
   const closeModal = useCallback(() => {

@@ -3,6 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock dependencies
 const mockGetPageClassification = vi.fn();
 const mockClassifyPage = vi.fn();
+const mockKvsGet = vi.fn().mockResolvedValue(null);
+
+vi.mock('@forge/kvs', () => ({
+  kvs: { get: (...args) => mockKvsGet(...args), set: vi.fn(), delete: vi.fn() },
+}));
 
 vi.mock('../../src/services/classificationService', () => ({
   getPageClassification: (...args) => mockGetPageClassification(...args),
