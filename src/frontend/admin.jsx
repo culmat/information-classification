@@ -365,12 +365,101 @@ const App = () => {
 
         <Tabs id="admin-tabs" onChange={(index) => setActiveTab(index)}>
           <TabList>
+            <Tab>{t('admin.tabs.statistics')}</Tab>
             <Tab>{t('admin.tabs.levels')}</Tab>
             <Tab>{t('admin.tabs.contacts')}</Tab>
             <Tab>{t('admin.tabs.links')}</Tab>
-            <Tab>{t('admin.tabs.statistics')}</Tab>
             <Tab>{t('admin.tabs.languages')}</Tab>
           </TabList>
+
+          {/* Statistics Tab */}
+          <TabPanel>
+            <Box xcss={tabPanelStyle}>
+            <Stack space="space.200">
+              <Heading size="medium">{t('admin.audit.title')}</Heading>
+
+              {/* Coverage stats */}
+              {auditData && (
+                <Inline space="space.400">
+                  <Stack space="space.050">
+                    <Text>{t('admin.audit.classified_pages')}</Text>
+                    <Heading size="medium">{auditData.classifiedPages} / {auditData.totalPages}</Heading>
+                  </Stack>
+                </Inline>
+              )}
+
+              {/* Coverage toggle — keep in sync with the identical toggle
+                 in spaceSettings.jsx (Statistics tab). */}
+              <Inline space="space.100" alignBlock="center">
+                <Toggle
+                  id="coverage-toggle"
+                  isChecked={showUnclassified}
+                  onChange={() => setShowUnclassified(!showUnclassified)}
+                />
+                <Label labelFor="coverage-toggle">{t('admin.audit.show_unclassified')}</Label>
+              </Inline>
+
+              {/* Distribution chart — when "show unclassified" is OFF, unclassified
+                 pages are rolled into the default level so the chart always reflects
+                 the effective classification of every page.
+                 Keep chart logic in sync with spaceSettings.jsx (Statistics tab). */}
+              {auditData && auditData.totalPages > 0 && (() => {
+                const unclassified = auditData.totalPages - auditData.classifiedPages;
+                const chartData = (auditData.distribution || []).map((l) => ({ ...l }));
+                if (showUnclassified) {
+                  // Show unclassified as a separate slice
+                  if (unclassified > 0) {
+                    chartData.push({ level: t('admin.audit.unclassified'), count: unclassified });
+                  }
+                } else if (unclassified > 0 && config?.defaultLevelId) {
+                  // Roll unclassified pages into the default level
+                  const defaultEntry = chartData.find((d) => d.level === config.defaultLevelId);
+                  if (defaultEntry) {
+                    defaultEntry.count += unclassified;
+                  }
+                }
+                const filtered = chartData.filter((l) => l.count > 0);
+                return filtered.length > 0 ? (
+                  <Stack space="space.100">
+                    <Heading size="small">{t('admin.audit.distribution')}</Heading>
+                    <DonutChart
+                      data={filtered}
+                      colorAccessor="level"
+                      valueAccessor="count"
+                      labelAccessor="level"
+                    />
+                  </Stack>
+                ) : null;
+              })()}
+
+              {/* Recently classified pages — keep in sync with spaceSettings.jsx.
+                 Only show heading + table when there are entries to display. */}
+              {(auditData?.recentPages || []).length > 0 && (
+                <>
+                  <Heading size="small">{t('admin.audit.recent_changes')}</Heading>
+                  <DynamicTable
+                    head={{
+                      cells: [
+                        { key: 'title', content: t('admin.audit.page') },
+                        { key: 'space', content: t('admin.audit.space') },
+                      ],
+                    }}
+                    rows={auditData.recentPages.map((page, index) => ({
+                      key: page.id || String(index),
+                      cells: [
+                        { key: 'title', content: page.url
+                          ? <Link href={`/wiki${page.url}`}>{page.title}</Link>
+                          : <Text>{page.title}</Text> },
+                        { key: 'space', content: <Text>{page.spaceKey}</Text> },
+                      ],
+                    }))}
+                    rowsPerPage={20}
+                  />
+                </>
+              )}
+            </Stack>
+            </Box>
+          </TabPanel>
 
           {/* Levels Tab */}
           <TabPanel>
@@ -458,95 +547,6 @@ const App = () => {
                 rows={linkRows}
                 emptyView={<Text>{t('byline.no_links')}</Text>}
               />
-            </Stack>
-            </Box>
-          </TabPanel>
-
-          {/* Audit Tab */}
-          <TabPanel>
-            <Box xcss={tabPanelStyle}>
-            <Stack space="space.200">
-              <Heading size="medium">{t('admin.audit.title')}</Heading>
-
-              {/* Coverage stats */}
-              {auditData && (
-                <Inline space="space.400">
-                  <Stack space="space.050">
-                    <Text>{t('admin.audit.classified_pages')}</Text>
-                    <Heading size="medium">{auditData.classifiedPages} / {auditData.totalPages}</Heading>
-                  </Stack>
-                </Inline>
-              )}
-
-              {/* Coverage toggle — keep in sync with the identical toggle
-                 in spaceSettings.jsx (Statistics tab). */}
-              <Inline space="space.100" alignBlock="center">
-                <Toggle
-                  id="coverage-toggle"
-                  isChecked={showUnclassified}
-                  onChange={() => setShowUnclassified(!showUnclassified)}
-                />
-                <Label labelFor="coverage-toggle">{t('admin.audit.show_unclassified')}</Label>
-              </Inline>
-
-              {/* Distribution chart — when "show unclassified" is OFF, unclassified
-                 pages are rolled into the default level so the chart always reflects
-                 the effective classification of every page.
-                 Keep chart logic in sync with spaceSettings.jsx (Statistics tab). */}
-              {auditData && auditData.totalPages > 0 && (() => {
-                const unclassified = auditData.totalPages - auditData.classifiedPages;
-                const chartData = (auditData.distribution || []).map((l) => ({ ...l }));
-                if (showUnclassified) {
-                  // Show unclassified as a separate slice
-                  if (unclassified > 0) {
-                    chartData.push({ level: t('admin.audit.unclassified'), count: unclassified });
-                  }
-                } else if (unclassified > 0 && config?.defaultLevelId) {
-                  // Roll unclassified pages into the default level
-                  const defaultEntry = chartData.find((d) => d.level === config.defaultLevelId);
-                  if (defaultEntry) {
-                    defaultEntry.count += unclassified;
-                  }
-                }
-                const filtered = chartData.filter((l) => l.count > 0);
-                return filtered.length > 0 ? (
-                  <Stack space="space.100">
-                    <Heading size="small">{t('admin.audit.distribution')}</Heading>
-                    <DonutChart
-                      data={filtered}
-                      colorAccessor="level"
-                      valueAccessor="count"
-                      labelAccessor="level"
-                    />
-                  </Stack>
-                ) : null;
-              })()}
-
-              {/* Recently classified pages — keep in sync with spaceSettings.jsx.
-                 Only show heading + table when there are entries to display. */}
-              {(auditData?.recentPages || []).length > 0 && (
-                <>
-                  <Heading size="small">{t('admin.audit.recent_changes')}</Heading>
-                  <DynamicTable
-                    head={{
-                      cells: [
-                        { key: 'title', content: t('admin.audit.page') },
-                        { key: 'space', content: t('admin.audit.space') },
-                      ],
-                    }}
-                    rows={auditData.recentPages.map((page, index) => ({
-                      key: page.id || String(index),
-                      cells: [
-                        { key: 'title', content: page.url
-                          ? <Link href={`/wiki${page.url}`}>{page.title}</Link>
-                          : <Text>{page.title}</Text> },
-                        { key: 'space', content: <Text>{page.spaceKey}</Text> },
-                      ],
-                    }))}
-                    rowsPerPage={20}
-                  />
-                </>
-              )}
             </Stack>
             </Box>
           </TabPanel>
@@ -658,8 +658,8 @@ const App = () => {
           </TabPanel>
         </Tabs>
 
-        {/* Save button and messages — hidden on the read-only Statistics tab (index 3) */}
-        {activeTab !== 3 && (
+        {/* Save button and messages — hidden on the read-only Statistics tab (index 0) */}
+        {activeTab !== 0 && (
           <>
             {message && (
               <SectionMessage appearance={message.type === 'error' ? 'error' : 'confirmation'}>

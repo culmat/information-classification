@@ -153,7 +153,7 @@ const App = () => {
     }
   }, [spaceKey, globalConfig, t]);
 
-  // Load statistics on first Statistics tab switch
+  // Load statistics — now the default tab, so load on mount
   const loadStats = useCallback(async () => {
     if (statsData || statsLoading || !spaceKey) return;
     setStatsLoading(true);
@@ -168,6 +168,8 @@ const App = () => {
     }
   }, [spaceKey, statsData, statsLoading]);
 
+  useEffect(() => { loadStats(); }, [loadStats]);
+
   if (loading) {
     return <Box xcss={containerStyle}><Spinner size="large" /></Box>;
   }
@@ -181,67 +183,11 @@ const App = () => {
       <Stack space="space.300">
         <Heading size="large">{t('space_settings.title')}</Heading>
 
-        <Tabs id="space-settings-tabs" onChange={(index) => { if (index === 1) loadStats(); }}>
+        <Tabs id="space-settings-tabs">
           <TabList>
-            <Tab>{t('admin.tabs.levels')}</Tab>
             <Tab>{t('admin.tabs.statistics')}</Tab>
+            <Tab>{t('admin.tabs.levels')}</Tab>
           </TabList>
-
-          {/* Configuration Tab */}
-          <TabPanel>
-            <Box xcss={tabPanelStyle}>
-            <Stack space="space.200">
-              <Text>{t('space_settings.description')}</Text>
-
-              {/* Level enable/disable checkboxes */}
-              <Stack space="space.050">
-                <Heading size="small">{t('space_settings.enabled_levels')}</Heading>
-                {globalAllowedLevels.map((level) => (
-                  <Inline key={level.id} space="space.100" alignBlock="center">
-                    <Checkbox
-                      isChecked={enabledLevelIds.includes(level.id)}
-                      onChange={() => handleToggleLevel(level.id)}
-                      label=""
-                    />
-                    <Lozenge isBold appearance={colorToLozenge(level.color)}>{localize(level.name, 'en')}</Lozenge>
-                  </Inline>
-                ))}
-              </Stack>
-
-              {/* Default level selector */}
-              <Stack space="space.050">
-                <Label labelFor="space-default-level">{t('space_settings.default_level')}</Label>
-                <Select
-                  inputId="space-default-level"
-                  value={globalAllowedLevels
-                    .filter((l) => l.id === defaultLevelId)
-                    .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
-                  options={globalAllowedLevels
-                    .filter((l) => enabledLevelIds.includes(l.id))
-                    .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
-                  onChange={(option) => setDefaultLevelId(option.value)}
-                />
-              </Stack>
-
-              {/* Status message */}
-              {message && (
-                <SectionMessage appearance={message.type === 'error' ? 'error' : 'confirmation'}>
-                  <Text>{message.text}</Text>
-                </SectionMessage>
-              )}
-
-              {/* Action buttons */}
-              <ButtonGroup>
-                <Button appearance="primary" onClick={handleSave} isLoading={saving}>
-                  {t('space_settings.save_button')}
-                </Button>
-                <Button appearance="subtle" onClick={handleReset} isDisabled={saving}>
-                  {t('space_settings.reset_button')}
-                </Button>
-              </ButtonGroup>
-            </Stack>
-            </Box>
-          </TabPanel>
 
           {/* Statistics Tab */}
           <TabPanel>
@@ -326,6 +272,62 @@ const App = () => {
                   />
                 </>
               )}
+            </Stack>
+            </Box>
+          </TabPanel>
+
+          {/* Configuration Tab */}
+          <TabPanel>
+            <Box xcss={tabPanelStyle}>
+            <Stack space="space.200">
+              <Text>{t('space_settings.description')}</Text>
+
+              {/* Level enable/disable checkboxes */}
+              <Stack space="space.050">
+                <Heading size="small">{t('space_settings.enabled_levels')}</Heading>
+                {globalAllowedLevels.map((level) => (
+                  <Inline key={level.id} space="space.100" alignBlock="center">
+                    <Checkbox
+                      isChecked={enabledLevelIds.includes(level.id)}
+                      onChange={() => handleToggleLevel(level.id)}
+                      label=""
+                    />
+                    <Lozenge isBold appearance={colorToLozenge(level.color)}>{localize(level.name, 'en')}</Lozenge>
+                  </Inline>
+                ))}
+              </Stack>
+
+              {/* Default level selector */}
+              <Stack space="space.050">
+                <Label labelFor="space-default-level">{t('space_settings.default_level')}</Label>
+                <Select
+                  inputId="space-default-level"
+                  value={globalAllowedLevels
+                    .filter((l) => l.id === defaultLevelId)
+                    .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
+                  options={globalAllowedLevels
+                    .filter((l) => enabledLevelIds.includes(l.id))
+                    .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
+                  onChange={(option) => setDefaultLevelId(option.value)}
+                />
+              </Stack>
+
+              {/* Status message */}
+              {message && (
+                <SectionMessage appearance={message.type === 'error' ? 'error' : 'confirmation'}>
+                  <Text>{message.text}</Text>
+                </SectionMessage>
+              )}
+
+              {/* Action buttons */}
+              <ButtonGroup>
+                <Button appearance="primary" onClick={handleSave} isLoading={saving}>
+                  {t('space_settings.save_button')}
+                </Button>
+                <Button appearance="subtle" onClick={handleReset} isDisabled={saving}>
+                  {t('space_settings.reset_button')}
+                </Button>
+              </ButtonGroup>
             </Stack>
             </Box>
           </TabPanel>
