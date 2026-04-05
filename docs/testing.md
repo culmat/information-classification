@@ -50,7 +50,7 @@ App ID: `c5452f23-8798-4ee2-b33c-ee3d3a792547`.
 - Confluence pages take 3-5 seconds to fully load Forge modules. Use `waitForTimeout(5000)` before interacting.
 - Screenshots may time out on Confluence — pass `{ timeout: 10000 }` or skip screenshots and read text content.
 - Use `page.getByRole('tab', { name: 'Audit' }).click()` for tab navigation.
-- **Always save screenshots to `.playwright-mcp/`** (e.g. `filename: '.playwright-mcp/my-test.png'`). This directory is gitignored. Never save to the project root.
+- **Always save screenshots and snapshots to `.playwright-mcp/`** (e.g. `filename: '.playwright-mcp/my-test.png'`). This directory is gitignored. Never save files to the project root.
 
 ## E2E with acli
 
