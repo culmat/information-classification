@@ -234,7 +234,12 @@ const App = () => {
                     defaultEntry.count += unclassified;
                   }
                 }
+                const allLevelIds = (globalAllowedLevels || []).map((l) => l.id);
                 const filtered = chartData.filter((l) => l.count > 0);
+                const spaceFilter = ` AND space="${spaceKey}"`;
+                const unclassifiedCql = allLevelIds.length > 0
+                  ? `type=page${spaceFilter} AND NOT (${allLevelIds.map((id) => `culmat_classification_level="${id}"`).join(' OR ')})`
+                  : null;
                 return filtered.length > 0 ? (
                   <Stack space="space.100">
                     <Heading size="small">{t('admin.audit.distribution')}</Heading>
@@ -244,6 +249,17 @@ const App = () => {
                       valueAccessor="count"
                       labelAccessor="level"
                     />
+                    <Stack space="space.050">
+                      {filtered.map((entry) => {
+                        const isUnclassified = entry.level === t('admin.audit.unclassified');
+                        const cql = isUnclassified ? unclassifiedCql : `type=page${spaceFilter} AND culmat_classification_level="${entry.level}"`;
+                        return cql ? (
+                          <Text key={entry.level}><Link href={`/wiki/search?cql=${encodeURIComponent(cql)}`} openNewTab>{entry.level} ({entry.count})</Link></Text>
+                        ) : (
+                          <Text key={entry.level}>{entry.level} ({entry.count})</Text>
+                        );
+                      })}
+                    </Stack>
                   </Stack>
                 ) : null;
               })()}
