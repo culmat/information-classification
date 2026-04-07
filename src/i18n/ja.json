@@ -88,7 +88,8 @@
         "default_must_be_allowed": "デフォルトレベルは許可されている必要があります。",
         "unique_ids": "レベルIDは一意である必要があります。",
         "name_required": "英語名は必須です。"
-      }
+      },
+      "empty": "レベルが設定されていません。"
     },
     "contacts": {
       "title": "連絡先",

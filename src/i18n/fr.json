@@ -88,7 +88,8 @@
         "default_must_be_allowed": "Le niveau par défaut doit être autorisé.",
         "unique_ids": "Les identifiants de niveau doivent être uniques.",
         "name_required": "Un nom en anglais est requis."
-      }
+      },
+      "empty": "Aucun niveau configuré."
     },
     "contacts": {
       "title": "Contacts",

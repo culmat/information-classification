@@ -88,7 +88,8 @@
         "default_must_be_allowed": "Die Standardstufe muss erlaubt sein.",
         "unique_ids": "Stufen-IDs müssen eindeutig sein.",
         "name_required": "Ein englischer Name ist erforderlich."
-      }
+      },
+      "empty": "Keine Stufen konfiguriert."
     },
     "contacts": {
       "title": "Kontakte",

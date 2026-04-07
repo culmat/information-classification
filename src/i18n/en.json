@@ -88,7 +88,8 @@
         "default_must_be_allowed": "Default level must be allowed.",
         "unique_ids": "Level IDs must be unique.",
         "name_required": "English name is required."
-      }
+      },
+      "empty": "No levels configured."
     },
     "contacts": {
       "title": "Contacts",

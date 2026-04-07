@@ -41,28 +41,12 @@ import ForgeReconciler, {
   TabList,
   TabPanel,
   ProgressBar,
+  EmptyState,
   xcss,
 } from '@forge/react';
 import { invoke, view, realtime, showFlag } from '@forge/bridge';
 import { colorToLozenge } from '../shared/constants';
-
-/**
- * Helper to resolve a localized string from a { lang: text } object.
- * Falls back to English if the user's language isn't available.
- */
-function localize(obj, locale) {
-  if (!obj || typeof obj === 'string') return obj || '';
-  const lang = (locale || 'en').substring(0, 2);
-  return obj[lang] || obj.en || Object.values(obj)[0] || '';
-}
-
-/**
- * Helper to interpolate {placeholder} values in a string.
- */
-function interpolate(template, values) {
-  if (!template) return '';
-  return template.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? `{${key}}`);
-}
+import { localize, interpolate } from '../shared/i18n';
 
 // Style for the popup content area
 const popupContentStyle = xcss({
@@ -499,7 +483,7 @@ const App = () => {
               )}
 
               {relevantContacts.length === 0 && relevantLinks.length === 0 && (
-                <Text>{t('byline.no_resources')}</Text>
+                <EmptyState header={t('byline.no_resources')} />
               )}
             </Stack>
           </Box>
@@ -513,7 +497,7 @@ const App = () => {
                 <Text>{t('byline.history_truncated')}</Text>
               )}
               {historyEntries.length === 0 && (
-                <Text>{t('byline.no_history')}</Text>
+                <EmptyState header={t('byline.no_history')} />
               )}
               {/* History entries use short property names: { from, to, by, at }.
                Keep in sync with appendHistory() calls in classificationService.js. */}

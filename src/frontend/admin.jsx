@@ -43,27 +43,24 @@ import ForgeReconciler, {
   User,
   Badge,
   Link,
-  DonutChart,
   ProgressBar,
+  EmptyState,
+  Tag,
+  TagGroup,
+  Form,
+  FormFooter,
+  RequiredAsterisk,
   xcss,
 } from '@forge/react';
 import { invoke, requestConfluence, showFlag, realtime } from '@forge/bridge';
-import { COLOR_OPTIONS, colorToLozenge, colorToHex } from '../shared/constants';
+import {
+  COLOR_OPTIONS,
+  colorToLozenge,
+  normalizeColor,
+} from '../shared/constants';
 import { SUPPORTED_LANGUAGES } from '../shared/defaults';
-
-/**
- * Helper to resolve a localized string from a { lang: text } object.
- */
-function interpolate(template, values) {
-  if (!template) return '';
-  return template.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? `{${key}}`);
-}
-
-function localize(obj, locale) {
-  if (!obj || typeof obj === 'string') return obj || '';
-  const lang = (locale || 'en').substring(0, 2);
-  return obj[lang] || obj.en || Object.values(obj)[0] || '';
-}
+import { localize, interpolate } from '../shared/i18n';
+import StatisticsPanel from './StatisticsPanel';
 
 /**
  * Generates a simple unique ID for new items.
@@ -746,13 +743,23 @@ const App = () => {
       { key: 'role', content: <Text>{localize(contact.role, 'en')}</Text> },
       {
         key: 'applies',
-        content: (
-          <Text>
-            {contact.levelIds?.length > 0
-              ? contact.levelIds.join(', ')
-              : t('admin.contacts.applies_to_all')}
-          </Text>
-        ),
+        content:
+          contact.levelIds?.length > 0 ? (
+            <TagGroup>
+              {contact.levelIds.map((id) => {
+                const level = (config?.levels || []).find((l) => l.id === id);
+                return (
+                  <Tag
+                    key={id}
+                    text={level ? localize(level.name, 'en') : id}
+                    color={level ? normalizeColor(level.color) : 'standard'}
+                  />
+                );
+              })}
+            </TagGroup>
+          ) : (
+            <Tag text={t('admin.contacts.applies_to_all')} color="standard" />
+          ),
       },
       {
         key: 'actions',
@@ -793,13 +800,23 @@ const App = () => {
       },
       {
         key: 'applies',
-        content: (
-          <Text>
-            {link.levelIds?.length > 0
-              ? link.levelIds.join(', ')
-              : t('admin.links.applies_to_all')}
-          </Text>
-        ),
+        content:
+          link.levelIds?.length > 0 ? (
+            <TagGroup>
+              {link.levelIds.map((id) => {
+                const level = (config?.levels || []).find((l) => l.id === id);
+                return (
+                  <Tag
+                    key={id}
+                    text={level ? localize(level.name, 'en') : id}
+                    color={level ? normalizeColor(level.color) : 'standard'}
+                  />
+                );
+              })}
+            </TagGroup>
+          ) : (
+            <Tag text={t('admin.links.applies_to_all')} color="standard" />
+          ),
       },
       {
         key: 'actions',
@@ -834,172 +851,20 @@ const App = () => {
 
           {/* Statistics Tab */}
           <TabPanel>
-            <Box xcss={tabPanelStyle}>
-              <Stack space="space.200">
-                <Heading size="medium">{t('admin.audit.title')}</Heading>
-
-                {/* Coverage stats */}
-                {auditData && (
-                  <Inline space="space.400">
-                    <Stack space="space.050">
-                      <Text>{t('admin.audit.classified_pages')}</Text>
-                      <Heading size="medium">
-                        {auditData.classifiedPages} / {auditData.totalPages}
-                      </Heading>
-                    </Stack>
-                  </Inline>
-                )}
-
-                {/* Coverage toggle — keep in sync with the identical toggle
-                 in spaceSettings.jsx (Statistics tab). */}
-                <Inline space="space.100" alignBlock="center">
-                  <Toggle
-                    id="coverage-toggle"
-                    isChecked={showUnclassified}
-                    onChange={() => setShowUnclassified(!showUnclassified)}
-                  />
-                  <Label labelFor="coverage-toggle">
-                    {t('admin.audit.show_unclassified')}
-                  </Label>
-                </Inline>
-
-                {/* Distribution chart — when "show unclassified" is OFF, unclassified
-                 pages are rolled into the default level so the chart always reflects
-                 the effective classification of every page.
-                 Keep chart logic in sync with spaceSettings.jsx (Statistics tab). */}
-                {auditData &&
-                  auditData.totalPages > 0 &&
-                  (() => {
-                    const unclassified =
-                      auditData.totalPages - auditData.classifiedPages;
-                    const chartData = (auditData.distribution || []).map(
-                      (l) => ({ ...l }),
-                    );
-                    if (showUnclassified) {
-                      // Show unclassified as a separate slice
-                      if (unclassified > 0) {
-                        chartData.push({
-                          level: t('admin.audit.unclassified'),
-                          count: unclassified,
-                        });
-                      }
-                    } else if (unclassified > 0 && config?.defaultLevelId) {
-                      // Roll unclassified pages into the default level
-                      const defaultEntry = chartData.find(
-                        (d) => d.level === config.defaultLevelId,
-                      );
-                      if (defaultEntry) {
-                        defaultEntry.count += unclassified;
-                      }
-                    }
-                    const filtered = chartData.filter((l) => l.count > 0);
-                    const allLevelIds = (config?.levels || []).map((l) => l.id);
-                    const unclassifiedCql =
-                      allLevelIds.length > 0
-                        ? `type=page AND NOT (${allLevelIds.map((id) => `culmat_classification_level="${id}"`).join(' OR ')})`
-                        : null;
-                    return filtered.length > 0 ? (
-                      <Stack space="space.100">
-                        <Inline space="space.050" alignBlock="center">
-                          <Heading size="small">
-                            {t('admin.audit.distribution')}
-                          </Heading>
-                          <Button
-                            appearance="subtle"
-                            spacing="compact"
-                            iconBefore="refresh"
-                            isLoading={auditLoading}
-                            onClick={refreshAuditData}
-                          >
-                            {' '}
-                          </Button>
-                        </Inline>
-                        <DonutChart
-                          data={filtered}
-                          colorAccessor="level"
-                          valueAccessor="count"
-                          labelAccessor="level"
-                          colorPalette={[
-                            ...(config?.levels || []).map((l) => ({
-                              key: l.id,
-                              value: colorToHex(l.color),
-                            })),
-                            {
-                              key: t('admin.audit.unclassified'),
-                              value: '#8993A5',
-                            },
-                          ]}
-                        />
-                        {auditLoading ? (
-                          <Spinner size="small" />
-                        ) : (
-                          <Stack space="space.050">
-                            {filtered.map((entry) => {
-                              const isUnclassified =
-                                entry.level === t('admin.audit.unclassified');
-                              const cql = isUnclassified
-                                ? unclassifiedCql
-                                : `type=page AND culmat_classification_level="${entry.level}"`;
-                              return cql ? (
-                                <Text key={entry.level}>
-                                  <Link
-                                    href={`/wiki/search?cql=${encodeURIComponent(cql)}`}
-                                    openNewTab
-                                  >
-                                    {entry.level} ({entry.count})
-                                  </Link>
-                                </Text>
-                              ) : (
-                                <Text key={entry.level}>
-                                  {entry.level} ({entry.count})
-                                </Text>
-                              );
-                            })}
-                          </Stack>
-                        )}
-                      </Stack>
-                    ) : null;
-                  })()}
-
-                {/* Recently classified pages — keep in sync with spaceSettings.jsx.
-                 Only show heading + table when there are entries to display. */}
-                {(auditData?.recentPages || []).length > 0 && (
-                  <>
-                    <Heading size="small">
-                      {t('admin.audit.recent_changes')}
-                    </Heading>
-                    <DynamicTable
-                      head={{
-                        cells: [
-                          { key: 'title', content: t('admin.audit.page') },
-                          { key: 'space', content: t('admin.audit.space') },
-                        ],
-                      }}
-                      rows={auditData.recentPages.map((page, index) => ({
-                        key: page.id || String(index),
-                        cells: [
-                          {
-                            key: 'title',
-                            content: page.url ? (
-                              <Link href={`/wiki${page.url}`}>
-                                {page.title}
-                              </Link>
-                            ) : (
-                              <Text>{page.title}</Text>
-                            ),
-                          },
-                          {
-                            key: 'space',
-                            content: <Text>{page.spaceKey}</Text>,
-                          },
-                        ],
-                      }))}
-                      rowsPerPage={20}
-                    />
-                  </>
-                )}
-              </Stack>
-            </Box>
+            <StatisticsPanel
+              data={auditData}
+              levels={config?.levels}
+              defaultLevelId={config?.defaultLevelId}
+              showUnclassified={showUnclassified}
+              onToggleUnclassified={() =>
+                setShowUnclassified(!showUnclassified)
+              }
+              isLoading={auditLoading}
+              onRefresh={refreshAuditData}
+              spaceFilter=""
+              showSpaceColumn
+              t={t}
+            />
           </TabPanel>
 
           {/* Levels Tab */}
@@ -1030,7 +895,7 @@ const App = () => {
                     ],
                   }}
                   rows={levelRows}
-                  emptyView={<Text>No levels configured.</Text>}
+                  emptyView={<EmptyState header={t('admin.levels.empty')} />}
                 />
 
                 {/* Default level selector */}
@@ -1090,7 +955,7 @@ const App = () => {
                     ],
                   }}
                   rows={contactRows}
-                  emptyView={<Text>{t('byline.no_contacts')}</Text>}
+                  emptyView={<EmptyState header={t('byline.no_contacts')} />}
                 />
               </Stack>
             </Box>
@@ -1122,7 +987,7 @@ const App = () => {
                     ],
                   }}
                   rows={linkRows}
-                  emptyView={<Text>{t('byline.no_links')}</Text>}
+                  emptyView={<EmptyState header={t('byline.no_links')} />}
                 />
               </Stack>
             </Box>
@@ -1843,7 +1708,8 @@ const TranslatableField = ({
     {languages.map(({ code }) => (
       <Stack space="space.050" key={code}>
         <Label labelFor={`${label}-${code}`}>
-          {label} ({t(`language_names.${code}`)}){code === 'en' ? ' *' : ''}
+          {label} ({t(`language_names.${code}`)})
+          {code === 'en' && <RequiredAsterisk />}
         </Label>
         {multiline ? (
           <TextArea
@@ -1879,100 +1745,104 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
             : t('admin.levels.add_button')}
         </ModalTitle>
       </ModalHeader>
-      <ModalBody>
-        <Stack space="space.200">
-          <TranslatableField
-            languages={languages}
-            label={t('admin.levels.name')}
-            obj={data.name}
-            onChange={(code, value) =>
-              update('name', { ...data.name, [code]: value })
-            }
-            t={t}
-          />
-          <Stack space="space.050">
-            <Label labelFor="level-color">{t('admin.levels.color')}</Label>
-            <Select
-              inputId="level-color"
-              value={
-                COLOR_OPTIONS.find((c) => c.value === data.color) || {
-                  label: data.color,
-                  value: data.color,
-                }
-              }
-              options={COLOR_OPTIONS}
-              onChange={(option) => update('color', option.value)}
-            />
-            {data.name?.en && (
-              <Inline space="space.100" alignBlock="center">
-                <Text>{t('admin.levels.color_preview')}:</Text>
-                <Lozenge isBold appearance={colorToLozenge(data.color)}>
-                  {data.name.en}
-                </Lozenge>
-              </Inline>
-            )}
-          </Stack>
-          <TranslatableField
-            languages={languages}
-            label={t('admin.levels.description')}
-            obj={data.description}
-            onChange={(code, value) =>
-              update('description', { ...data.description, [code]: value })
-            }
-            multiline
-            t={t}
-          />
-          <Inline space="space.100" alignBlock="center">
-            <Toggle
-              id="level-allowed"
-              isChecked={data.allowed}
-              onChange={() => update('allowed', !data.allowed)}
-            />
-            <Label labelFor="level-allowed">{t('admin.levels.allowed')}</Label>
-          </Inline>
-          <Inline space="space.100" alignBlock="center">
-            <Toggle
-              id="level-protection"
-              isChecked={data.requiresProtection}
-              onChange={() =>
-                update('requiresProtection', !data.requiresProtection)
-              }
-            />
-            <Label labelFor="level-protection">
-              {t('admin.levels.requires_protection')}
-            </Label>
-          </Inline>
-          {!data.allowed && (
+      <Form onSubmit={() => onSave(data)}>
+        <ModalBody>
+          <Stack space="space.200">
             <TranslatableField
               languages={languages}
-              label={t('admin.levels.error_message')}
-              obj={data.errorMessage}
+              label={t('admin.levels.name')}
+              obj={data.name}
               onChange={(code, value) =>
-                update('errorMessage', {
-                  ...(data.errorMessage || {}),
-                  [code]: value,
-                })
+                update('name', { ...data.name, [code]: value })
+              }
+              t={t}
+            />
+            <Stack space="space.050">
+              <Label labelFor="level-color">{t('admin.levels.color')}</Label>
+              <Select
+                inputId="level-color"
+                value={
+                  COLOR_OPTIONS.find((c) => c.value === data.color) || {
+                    label: data.color,
+                    value: data.color,
+                  }
+                }
+                options={COLOR_OPTIONS}
+                onChange={(option) => update('color', option.value)}
+              />
+              {data.name?.en && (
+                <Inline space="space.100" alignBlock="center">
+                  <Text>{t('admin.levels.color_preview')}:</Text>
+                  <Lozenge isBold appearance={colorToLozenge(data.color)}>
+                    {data.name.en}
+                  </Lozenge>
+                </Inline>
+              )}
+            </Stack>
+            <TranslatableField
+              languages={languages}
+              label={t('admin.levels.description')}
+              obj={data.description}
+              onChange={(code, value) =>
+                update('description', { ...data.description, [code]: value })
               }
               multiline
               t={t}
             />
-          )}
-        </Stack>
-      </ModalBody>
-      <ModalFooter>
-        <ButtonGroup>
-          <Button appearance="subtle" onClick={onClose}>
-            {t('classify.cancel_button')}
-          </Button>
-          <Button
-            appearance="primary"
-            onClick={() => onSave(data)}
-            isDisabled={!data.name?.en}
-          >
-            {t('classify.apply_button')}
-          </Button>
-        </ButtonGroup>
-      </ModalFooter>
+            <Inline space="space.100" alignBlock="center">
+              <Toggle
+                id="level-allowed"
+                isChecked={data.allowed}
+                onChange={() => update('allowed', !data.allowed)}
+              />
+              <Label labelFor="level-allowed">
+                {t('admin.levels.allowed')}
+              </Label>
+            </Inline>
+            <Inline space="space.100" alignBlock="center">
+              <Toggle
+                id="level-protection"
+                isChecked={data.requiresProtection}
+                onChange={() =>
+                  update('requiresProtection', !data.requiresProtection)
+                }
+              />
+              <Label labelFor="level-protection">
+                {t('admin.levels.requires_protection')}
+              </Label>
+            </Inline>
+            {!data.allowed && (
+              <TranslatableField
+                languages={languages}
+                label={t('admin.levels.error_message')}
+                obj={data.errorMessage}
+                onChange={(code, value) =>
+                  update('errorMessage', {
+                    ...(data.errorMessage || {}),
+                    [code]: value,
+                  })
+                }
+                multiline
+                t={t}
+              />
+            )}
+          </Stack>
+        </ModalBody>
+        <ModalFooter>
+          <FormFooter>
+            <Button appearance="subtle" onClick={onClose}>
+              {t('classify.cancel_button')}
+            </Button>
+            <Button
+              appearance="primary"
+              type="submit"
+              isDisabled={!data.name?.en}
+            >
+              {t('classify.apply_button')}
+            </Button>
+          </FormFooter>
+        </ModalFooter>
+      </Form>
     </Modal>
   );
 };
@@ -1989,90 +1859,96 @@ const ContactModal = ({ contact, levels, languages, onSave, onClose, t }) => {
       <ModalHeader>
         <ModalTitle>{t('admin.contacts.add_button')}</ModalTitle>
       </ModalHeader>
-      <ModalBody>
-        <Stack space="space.200">
-          <Stack space="space.050">
-            <Label labelFor="contact-type">{t('admin.contacts.type')}</Label>
-            <Select
-              inputId="contact-type"
-              value={{
-                label: t(`admin.contacts.type_${data.type}`),
-                value: data.type,
-              }}
-              options={[
-                { label: t('admin.contacts.type_user'), value: 'user' },
-                { label: t('admin.contacts.type_email'), value: 'email' },
-                { label: t('admin.contacts.type_text'), value: 'text' },
-              ]}
-              onChange={(option) => update('type', option.value)}
-            />
-          </Stack>
-          <Stack space="space.050">
-            <Label labelFor="contact-value">{t('admin.contacts.value')}</Label>
-            {data.type === 'user' ? (
-              <UserPicker
-                id="contact-value"
-                onChange={(user) => update('value', user?.id || '')}
+      <Form onSubmit={() => onSave(data)}>
+        <ModalBody>
+          <Stack space="space.200">
+            <Stack space="space.050">
+              <Label labelFor="contact-type">{t('admin.contacts.type')}</Label>
+              <Select
+                inputId="contact-type"
+                value={{
+                  label: t(`admin.contacts.type_${data.type}`),
+                  value: data.type,
+                }}
+                options={[
+                  { label: t('admin.contacts.type_user'), value: 'user' },
+                  { label: t('admin.contacts.type_email'), value: 'email' },
+                  { label: t('admin.contacts.type_text'), value: 'text' },
+                ]}
+                onChange={(option) => update('type', option.value)}
               />
-            ) : (
-              <Textfield
-                id="contact-value"
-                value={data.value || ''}
-                onChange={(e) => update('value', e.target.value)}
-                placeholder={
-                  data.type === 'email' ? 'email@example.com' : 'Security Team'
-                }
-              />
-            )}
-          </Stack>
-          <TranslatableField
-            languages={languages}
-            label={t('admin.contacts.role')}
-            obj={data.role}
-            onChange={(code, value) =>
-              update('role', { ...data.role, [code]: value })
-            }
-            t={t}
-          />
-          <Stack space="space.050">
-            <Label labelFor="contact-levels">
-              {t('admin.contacts.applies_to')}
-            </Label>
-            <Select
-              inputId="contact-levels"
-              isMulti
-              value={levels
-                .filter((l) => data.levelIds?.includes(l.id))
-                .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
-              options={levels.map((l) => ({
-                label: localize(l.name, 'en'),
-                value: l.id,
-              }))}
-              onChange={(options) =>
-                update(
-                  'levelIds',
-                  (options || []).map((o) => o.value),
-                )
+            </Stack>
+            <Stack space="space.050">
+              <Label labelFor="contact-value">
+                {t('admin.contacts.value')}
+                <RequiredAsterisk />
+              </Label>
+              {data.type === 'user' ? (
+                <UserPicker
+                  id="contact-value"
+                  onChange={(user) => update('value', user?.id || '')}
+                />
+              ) : (
+                <Textfield
+                  id="contact-value"
+                  value={data.value || ''}
+                  onChange={(e) => update('value', e.target.value)}
+                  placeholder={
+                    data.type === 'email'
+                      ? 'email@example.com'
+                      : 'Security Team'
+                  }
+                />
+              )}
+            </Stack>
+            <TranslatableField
+              languages={languages}
+              label={t('admin.contacts.role')}
+              obj={data.role}
+              onChange={(code, value) =>
+                update('role', { ...data.role, [code]: value })
               }
-              placeholder={t('admin.contacts.applies_to_all')}
+              t={t}
             />
+            <Stack space="space.050">
+              <Label labelFor="contact-levels">
+                {t('admin.contacts.applies_to')}
+              </Label>
+              <Select
+                inputId="contact-levels"
+                isMulti
+                value={levels
+                  .filter((l) => data.levelIds?.includes(l.id))
+                  .map((l) => ({
+                    label: localize(l.name, 'en'),
+                    value: l.id,
+                  }))}
+                options={levels.map((l) => ({
+                  label: localize(l.name, 'en'),
+                  value: l.id,
+                }))}
+                onChange={(options) =>
+                  update(
+                    'levelIds',
+                    (options || []).map((o) => o.value),
+                  )
+                }
+                placeholder={t('admin.contacts.applies_to_all')}
+              />
+            </Stack>
           </Stack>
-        </Stack>
-      </ModalBody>
-      <ModalFooter>
-        <ButtonGroup>
-          <Button appearance="subtle" onClick={onClose}>
-            {t('classify.cancel_button')}
-          </Button>
-          <Button
-            appearance="primary"
-            onClick={() => onSave(data)}
-            isDisabled={!data.value}
-          >
-            {t('classify.apply_button')}
-          </Button>
-        </ButtonGroup>
-      </ModalFooter>
+        </ModalBody>
+        <ModalFooter>
+          <FormFooter>
+            <Button appearance="subtle" onClick={onClose}>
+              {t('classify.cancel_button')}
+            </Button>
+            <Button appearance="primary" type="submit" isDisabled={!data.value}>
+              {t('classify.apply_button')}
+            </Button>
+          </FormFooter>
+        </ModalFooter>
+      </Form>
     </Modal>
   );
 };
@@ -2128,156 +2004,163 @@ const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
       <ModalHeader>
         <ModalTitle>{t('admin.links.add_button')}</ModalTitle>
       </ModalHeader>
-      <ModalBody>
-        <Stack space="space.200">
-          <Stack space="space.050">
-            <Label labelFor="link-type">{t('admin.links.type')}</Label>
-            <Select
-              inputId="link-type"
-              value={{
-                label: t(`admin.links.type_${data.type || 'external'}`),
-                value: data.type || 'external',
-              }}
-              options={[
-                { label: t('admin.links.type_page'), value: 'page' },
-                { label: t('admin.links.type_external'), value: 'external' },
-              ]}
-              onChange={(option) => {
-                update('type', option.value);
-                setData((prev) => ({
-                  ...prev,
-                  type: option.value,
-                  url: '',
-                  label: prev.label,
-                }));
-                setPageOptions([]);
-              }}
-            />
-          </Stack>
-          <TranslatableField
-            languages={languages}
-            label={t('admin.links.label')}
-            obj={data.label}
-            onChange={(code, value) =>
-              update('label', { ...data.label, [code]: value })
-            }
-            t={t}
-          />
-          <Stack space="space.050">
-            <Label labelFor="link-url">{t('admin.links.url')}</Label>
-            {(data.type || 'external') === 'page' ? (
-              <>
-                {data.url ? (
-                  <Inline
-                    space="space.100"
-                    alignBlock="center"
-                    spread="space-between"
-                  >
-                    <Text>{data.pageTitle || data.url}</Text>
-                    <Button
-                      appearance="subtle"
-                      onClick={() => {
-                        setData((prev) => ({
-                          ...prev,
-                          url: '',
-                          pageTitle: '',
-                        }));
-                        setPageOptions([]);
-                        setPageSearchQuery('');
-                      }}
-                    >
-                      {t('admin.links.change_page')}
-                    </Button>
-                  </Inline>
-                ) : (
-                  <>
-                    <Textfield
-                      id="link-url"
-                      value={pageSearchQuery}
-                      onChange={(e) => searchPages(e.target.value)}
-                      placeholder={t('admin.links.search_page')}
-                    />
-                    {pageSearchLoading && <Spinner size="small" />}
-                    {pageOptions.length > 0 && (
-                      <Stack space="space.050">
-                        {pageOptions.map((p) => (
-                          <Button
-                            key={p.value}
-                            appearance="subtle"
-                            shouldFitContainer
-                            onClick={() => {
-                              setData((prev) => ({
-                                ...prev,
-                                url: p.value,
-                                pageTitle: p.pageTitle,
-                                label: {
-                                  ...prev.label,
-                                  en: prev.label?.en || p.pageTitle || '',
-                                },
-                              }));
-                              setPageOptions([]);
-                              setPageSearchQuery('');
-                            }}
-                          >
-                            {p.label}
-                          </Button>
-                        ))}
-                      </Stack>
-                    )}
-                    {pageSearchQuery.length >= 2 &&
-                      !pageSearchLoading &&
-                      pageOptions.length === 0 && (
-                        <Text>{t('admin.links.search_page_empty')}</Text>
-                      )}
-                  </>
-                )}
-              </>
-            ) : (
-              <Textfield
-                id="link-url"
-                value={data.url || ''}
-                onChange={(e) => update('url', e.target.value)}
-                placeholder="https://..."
+      <Form onSubmit={() => onSave(data)}>
+        <ModalBody>
+          <Stack space="space.200">
+            <Stack space="space.050">
+              <Label labelFor="link-type">{t('admin.links.type')}</Label>
+              <Select
+                inputId="link-type"
+                value={{
+                  label: t(`admin.links.type_${data.type || 'external'}`),
+                  value: data.type || 'external',
+                }}
+                options={[
+                  { label: t('admin.links.type_page'), value: 'page' },
+                  { label: t('admin.links.type_external'), value: 'external' },
+                ]}
+                onChange={(option) => {
+                  update('type', option.value);
+                  setData((prev) => ({
+                    ...prev,
+                    type: option.value,
+                    url: '',
+                    label: prev.label,
+                  }));
+                  setPageOptions([]);
+                }}
               />
-            )}
-          </Stack>
-          <Stack space="space.050">
-            <Label labelFor="link-levels">{t('admin.links.applies_to')}</Label>
-            <Select
-              inputId="link-levels"
-              isMulti
-              value={levels
-                .filter((l) => data.levelIds?.includes(l.id))
-                .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
-              options={levels.map((l) => ({
-                label: localize(l.name, 'en'),
-                value: l.id,
-              }))}
-              onChange={(options) =>
-                update(
-                  'levelIds',
-                  (options || []).map((o) => o.value),
-                )
+            </Stack>
+            <TranslatableField
+              languages={languages}
+              label={t('admin.links.label')}
+              obj={data.label}
+              onChange={(code, value) =>
+                update('label', { ...data.label, [code]: value })
               }
-              placeholder={t('admin.links.applies_to_all')}
+              t={t}
             />
+            <Stack space="space.050">
+              <Label labelFor="link-url">
+                {t('admin.links.url')}
+                <RequiredAsterisk />
+              </Label>
+              {(data.type || 'external') === 'page' ? (
+                <>
+                  {data.url ? (
+                    <Inline
+                      space="space.100"
+                      alignBlock="center"
+                      spread="space-between"
+                    >
+                      <Text>{data.pageTitle || data.url}</Text>
+                      <Button
+                        appearance="subtle"
+                        onClick={() => {
+                          setData((prev) => ({
+                            ...prev,
+                            url: '',
+                            pageTitle: '',
+                          }));
+                          setPageOptions([]);
+                          setPageSearchQuery('');
+                        }}
+                      >
+                        {t('admin.links.change_page')}
+                      </Button>
+                    </Inline>
+                  ) : (
+                    <>
+                      <Textfield
+                        id="link-url"
+                        value={pageSearchQuery}
+                        onChange={(e) => searchPages(e.target.value)}
+                        placeholder={t('admin.links.search_page')}
+                      />
+                      {pageSearchLoading && <Spinner size="small" />}
+                      {pageOptions.length > 0 && (
+                        <Stack space="space.050">
+                          {pageOptions.map((p) => (
+                            <Button
+                              key={p.value}
+                              appearance="subtle"
+                              shouldFitContainer
+                              onClick={() => {
+                                setData((prev) => ({
+                                  ...prev,
+                                  url: p.value,
+                                  pageTitle: p.pageTitle,
+                                  label: {
+                                    ...prev.label,
+                                    en: prev.label?.en || p.pageTitle || '',
+                                  },
+                                }));
+                                setPageOptions([]);
+                                setPageSearchQuery('');
+                              }}
+                            >
+                              {p.label}
+                            </Button>
+                          ))}
+                        </Stack>
+                      )}
+                      {pageSearchQuery.length >= 2 &&
+                        !pageSearchLoading &&
+                        pageOptions.length === 0 && (
+                          <Text>{t('admin.links.search_page_empty')}</Text>
+                        )}
+                    </>
+                  )}
+                </>
+              ) : (
+                <Textfield
+                  id="link-url"
+                  value={data.url || ''}
+                  onChange={(e) => update('url', e.target.value)}
+                  placeholder="https://..."
+                />
+              )}
+            </Stack>
+            <Stack space="space.050">
+              <Label labelFor="link-levels">
+                {t('admin.links.applies_to')}
+              </Label>
+              <Select
+                inputId="link-levels"
+                isMulti
+                value={levels
+                  .filter((l) => data.levelIds?.includes(l.id))
+                  .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
+                options={levels.map((l) => ({
+                  label: localize(l.name, 'en'),
+                  value: l.id,
+                }))}
+                onChange={(options) =>
+                  update(
+                    'levelIds',
+                    (options || []).map((o) => o.value),
+                  )
+                }
+                placeholder={t('admin.links.applies_to_all')}
+              />
+            </Stack>
           </Stack>
-        </Stack>
-      </ModalBody>
-      <ModalFooter>
-        <ButtonGroup>
-          <Button appearance="subtle" onClick={onClose}>
-            {t('classify.cancel_button')}
-          </Button>
-          <Button
-            appearance="primary"
-            onClick={() => onSave(data)}
-            isDisabled={!data.url || !data.label?.en}
-          >
-            {t('classify.apply_button')}
-          </Button>
-        </ButtonGroup>
-      </ModalFooter>
+        </ModalBody>
+        <ModalFooter>
+          <FormFooter>
+            <Button appearance="subtle" onClick={onClose}>
+              {t('classify.cancel_button')}
+            </Button>
+            <Button
+              appearance="primary"
+              type="submit"
+              isDisabled={!data.url || !data.label?.en}
+            >
+              {t('classify.apply_button')}
+            </Button>
+          </FormFooter>
+        </ModalFooter>
+      </Form>
     </Modal>
   );
 };
