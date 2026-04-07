@@ -38,7 +38,7 @@ modules:
           uiSupport:
             valueType: string
             name: Classification Level
-            defaultOperator: "="
+            defaultOperator: '='
             tooltip: The classification level of the page
         - path: classifiedAt
           type: date
