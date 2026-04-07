@@ -143,6 +143,7 @@
       "title": "Importer depuis les labels",
       "scan_button": "Rechercher les labels",
       "scanning": "Recherche de labels pour {count} niveaux...",
+      "level_column": "Niveau",
       "labels_column": "Labels (séparés par virgules)",
       "pages_column": "Pages correspondantes",
       "refresh_button": "Actualiser le comptage",
@@ -163,6 +164,7 @@
     "export": {
       "title": "Exporter vers les labels",
       "description": "Ajouter des labels aux pages basés sur les classifications actuelles. Cela vous permet de revenir à tout moment à une classification par labels.",
+      "level_column": "Niveau",
       "label_name": "Nom du label",
       "start_button": "Démarrer l'export",
       "summary": "Ajoutera des labels à {count} pages",

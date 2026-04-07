@@ -44,12 +44,8 @@ export async function getPageClassification(pageId, spaceKey) {
     if (level.requiresProtection && !isProtected) {
       // Confidential page without restrictions
       restrictionWarning = 'requires_protection';
-    } else if (
-      !level.requiresProtection &&
-      isProtected &&
-      levelId !== 'confidential'
-    ) {
-      // Non-confidential page (e.g. Internal, Public) WITH restrictions — mismatch
+    } else if (!level.requiresProtection && isProtected) {
+      // Level doesn't require protection but page has restrictions — mismatch
       restrictionWarning = 'has_unnecessary_protection';
     }
   }

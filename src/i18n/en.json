@@ -141,6 +141,7 @@
     },
     "import": {
       "title": "Import from Labels",
+      "level_column": "Level",
       "labels_column": "Labels (comma-separated)",
       "pages_column": "Matched pages",
       "refresh_button": "Refresh counts",
@@ -161,6 +162,7 @@
     "export": {
       "title": "Export to Labels",
       "description": "Add page labels based on current classifications. This lets you return to label-based classification at any time.",
+      "level_column": "Level",
       "label_name": "Label name",
       "start_button": "Start Export",
       "summary": "Will add labels to {count} pages",

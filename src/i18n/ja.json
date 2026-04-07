@@ -143,6 +143,7 @@
       "title": "ラベルからインポート",
       "scan_button": "ラベルをスキャン",
       "scanning": "{count}レベルのラベルをスキャン中...",
+      "level_column": "レベル",
       "labels_column": "ラベル（カンマ区切り）",
       "pages_column": "一致するページ",
       "refresh_button": "カウントを更新",
@@ -163,6 +164,7 @@
     "export": {
       "title": "ラベルにエクスポート",
       "description": "現在の分類に基づいてページラベルを追加します。これにより、いつでもラベルベースの分類に戻ることができます。",
+      "level_column": "レベル",
       "label_name": "ラベル名",
       "start_button": "エクスポート開始",
       "summary": "{count}ページにラベルを追加します",

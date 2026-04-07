@@ -11,12 +11,7 @@ import { getEffectiveConfig } from './storage/configStore';
 import { getSpaceConfig } from './storage/spaceConfigStore';
 import { getClassification } from './services/contentPropertyService';
 import { hasViewRestrictions } from './services/restrictionService';
-
-function localize(obj, locale) {
-  if (!obj || typeof obj === 'string') return obj || '';
-  const lang = (locale || 'en').substring(0, 2);
-  return obj[lang] || obj.en || Object.values(obj)[0] || '';
-}
+import { localize } from './shared/i18n';
 
 export async function handler(req) {
   try {

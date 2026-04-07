@@ -208,17 +208,10 @@ async function handleImport(event) {
 
     for (const labelName of mapping.labels) {
       // Fetch all pages with this label at once (CQL offset doesn't work reliably with label index lag)
-      const { totalSize } = await findPagesByLabel(labelName, 0, 0, spaceKey, {
+      const { results } = await findPagesByLabel(labelName, 5000, 0, spaceKey, {
         asApp: true,
       });
-      if (totalSize === 0) continue;
-      const { results } = await findPagesByLabel(
-        labelName,
-        totalSize,
-        0,
-        spaceKey,
-        { asApp: true },
-      );
+      if (results.length === 0) continue;
       console.log(
         `[import] ${mapping.levelId}/${labelName}: ${results.length} pages`,
       );
@@ -257,9 +250,9 @@ async function handleImport(event) {
           }
           // Remove ALL import labels from this page (handles multi-label pages)
           if (removeLabels) {
-            for (const l of allImportLabels) {
-              await removeLabelFromPage(page.id, l, true);
-            }
+            await Promise.all(
+              allImportLabels.map((l) => removeLabelFromPage(page.id, l, true)),
+            );
           }
         } catch (error) {
           console.error(`Failed to import page ${page.id}:`, error);
@@ -333,16 +326,12 @@ async function handleExport(event) {
   for (const mapping of mappings) {
     const { levelId, labelName } = mapping;
 
-    // Fetch total count, then all pages in one call (CQL start offset doesn't work with content property aliases)
-    const { totalSize } = await findPagesByLevel(levelId, 0, 0, {
+    // Fetch all pages at once (CQL start offset doesn't work reliably with content property aliases)
+    const { results } = await findPagesByLevel(levelId, 5000, 0, {
       asApp: true,
       spaceKey,
     });
-    if (totalSize === 0) continue;
-    const { results } = await findPagesByLevel(levelId, totalSize, 0, {
-      asApp: true,
-      spaceKey,
-    });
+    if (results.length === 0) continue;
     console.log(`[export] ${levelId}/${labelName}: ${results.length} pages`);
 
     for (const page of results) {

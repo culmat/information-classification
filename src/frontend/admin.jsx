@@ -55,11 +55,12 @@ import ForgeReconciler, {
 import { invoke, requestConfluence, showFlag, realtime } from '@forge/bridge';
 import {
   COLOR_OPTIONS,
+  buildSpaceFilter,
   colorToLozenge,
   normalizeColor,
 } from '../shared/constants';
 import { SUPPORTED_LANGUAGES } from '../shared/defaults';
-import { localize, interpolate } from '../shared/i18n';
+import { localize, interpolate, formatEta } from '../shared/i18n';
 import StatisticsPanel from './StatisticsPanel';
 
 /**
@@ -103,13 +104,11 @@ const App = () => {
   const [importScopeAll, setImportScopeAll] = useState(true);
   const [importSpaceKeys, setImportSpaceKeys] = useState([]); // [{ label, value }]
   const [availableSpaces, setAvailableSpaces] = useState([]); // [{ label, value }]
-  const [_importResult, setImportResult] = useState(null);
   const [importProgress, setImportProgress] = useState(null); // { classified, failed, total, done }
 
   // Label export state
   const [exportMappings, setExportMappings] = useState({}); // { levelId: labelName }
   const [exportLoading, setExportLoading] = useState(false);
-  const [_exportResult, setExportResult] = useState(null);
   const [exportProgress, setExportProgress] = useState(null); // { classified, failed, total, done }
   const [exportScopeAll, setExportScopeAll] = useState(true);
   const [exportSpaceKeys, setExportSpaceKeys] = useState([]); // [{ label, value }]
@@ -490,7 +489,6 @@ const App = () => {
         removeLabels: importRemoveLabels,
         spaceKey,
       });
-      setImportResult(result);
       setImportProgress((prev) => ({ ...prev, total: result.count || 0 }));
     } catch (error) {
       console.error('Import failed:', error);
@@ -510,7 +508,6 @@ const App = () => {
       }))
       .filter((m) => m.labelName.length > 0);
     setExportLoading(true);
-    setExportResult(null);
     setExportProgress({ classified: 0, failed: 0, total: 0, done: false });
     try {
       const exportKeys = exportScopeAll
@@ -521,7 +518,6 @@ const App = () => {
         spaceKey: exportKeys,
       });
       if (result.success) {
-        setExportResult(result);
         setExportProgress({
           classified: 0,
           failed: 0,
@@ -1159,7 +1155,10 @@ const App = () => {
                       <DynamicTable
                         head={{
                           cells: [
-                            { key: 'level', content: 'Level' },
+                            {
+                              key: 'level',
+                              content: t('admin.import.level_column'),
+                            },
                             {
                               key: 'labels',
                               content: t('admin.import.labels_column'),
@@ -1195,12 +1194,9 @@ const App = () => {
                             const selectedKeys = importScopeAll
                               ? []
                               : (importSpaceKeys || []).map((o) => o.value);
-                            const spaceFilter =
-                              selectedKeys.length === 0
-                                ? ''
-                                : selectedKeys.length === 1
-                                  ? ` AND space="${selectedKeys[0]}"`
-                                  : ` AND space in (${selectedKeys.map((k) => `"${k}"`).join(',')})`;
+                            const spaceFilter = buildSpaceFilter(
+                              selectedKeys.join(','),
+                            );
                             const cql =
                               labels.length > 0
                                 ? `type=page AND (${labels.map((l) => `label = "${l}"`).join(' OR ')})${spaceFilter}`
@@ -1357,25 +1353,13 @@ const App = () => {
                           {(importProgress.classified || 0) > 0 &&
                             importProgress.startedAt &&
                             (() => {
-                              const elapsed =
-                                Date.now() - importProgress.startedAt;
-                              const classified = importProgress.classified || 0;
-                              const remaining = Math.round(
-                                ((elapsed / classified) *
-                                  (importProgress.total - classified)) /
-                                  1000,
+                              const eta = formatEta(
+                                importProgress.startedAt,
+                                importProgress.classified || 0,
+                                importProgress.total,
+                                t,
                               );
-                              return (
-                                <Text>
-                                  {remaining >= 60
-                                    ? interpolate(t('classify.async_eta_min'), {
-                                        minutes: Math.ceil(remaining / 60),
-                                      })
-                                    : interpolate(t('classify.async_eta_sec'), {
-                                        seconds: remaining,
-                                      })}
-                                </Text>
-                              );
+                              return eta ? <Text>{eta}</Text> : null;
                             })()}
                         </Stack>
                       )}
@@ -1405,7 +1389,10 @@ const App = () => {
                       <DynamicTable
                         head={{
                           cells: [
-                            { key: 'level', content: 'Level' },
+                            {
+                              key: 'level',
+                              content: t('admin.export.level_column'),
+                            },
                             {
                               key: 'label',
                               content: t('admin.export.label_name'),
@@ -1507,25 +1494,13 @@ const App = () => {
                           {(exportProgress.classified || 0) > 0 &&
                             exportProgress.startedAt &&
                             (() => {
-                              const elapsed =
-                                Date.now() - exportProgress.startedAt;
-                              const classified = exportProgress.classified || 0;
-                              const remaining = Math.round(
-                                ((elapsed / classified) *
-                                  (exportProgress.total - classified)) /
-                                  1000,
+                              const eta = formatEta(
+                                exportProgress.startedAt,
+                                exportProgress.classified || 0,
+                                exportProgress.total,
+                                t,
                               );
-                              return (
-                                <Text>
-                                  {remaining >= 60
-                                    ? interpolate(t('classify.async_eta_min'), {
-                                        minutes: Math.ceil(remaining / 60),
-                                      })
-                                    : interpolate(t('classify.async_eta_sec'), {
-                                        seconds: remaining,
-                                      })}
-                                </Text>
-                              );
+                              return eta ? <Text>{eta}</Text> : null;
                             })()}
                         </Stack>
                       )}

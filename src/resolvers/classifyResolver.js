@@ -22,15 +22,7 @@ import {
   errorResponse,
   validationError,
 } from '../utils/responseHelper';
-
-/**
- * Helper to resolve a localized string from a { lang: text } object.
- */
-function localize(obj, locale) {
-  if (!obj || typeof obj === 'string') return obj || '';
-  const lang = (locale || 'en').substring(0, 2);
-  return obj[lang] || obj.en || Object.values(obj)[0] || '';
-}
+import { localize } from '../shared/i18n';
 
 /**
  * Resolver: getDynamicProperties
@@ -112,14 +104,7 @@ export async function getClassificationResolver(req) {
  * Expected payload: { pageId, spaceKey, levelId, recursive, locale }
  */
 export async function setClassificationResolver(req) {
-  const {
-    pageId,
-    spaceKey,
-    levelId,
-    recursive,
-    locale,
-    descendantsToClassify: _descendantsToClassify,
-  } = req.payload;
+  const { pageId, spaceKey, levelId, recursive, locale } = req.payload;
   const accountId = req.context.accountId;
 
   if (!pageId || !spaceKey || !levelId) {

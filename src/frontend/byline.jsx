@@ -46,7 +46,7 @@ import ForgeReconciler, {
 } from '@forge/react';
 import { invoke, view, realtime, showFlag } from '@forge/bridge';
 import { colorToLozenge } from '../shared/constants';
-import { localize, interpolate } from '../shared/i18n';
+import { localize, interpolate, formatEta } from '../shared/i18n';
 
 // Style for the popup content area
 const popupContentStyle = xcss({
@@ -236,7 +236,6 @@ const App = () => {
         levelId: selectedLevel,
         recursive,
         locale,
-        descendantsToClassify: descendantCount,
       });
 
       if (result.success) {
@@ -661,22 +660,13 @@ const App = () => {
                     {(asyncProgress.classified || 0) > 0 &&
                       asyncJob.startedAt &&
                       (() => {
-                        const elapsed = Date.now() - asyncJob.startedAt;
-                        const classified = asyncProgress.classified || 0;
-                        const remaining = Math.round(
-                          ((elapsed / classified) *
-                            (asyncJob.total - classified)) /
-                            1000,
+                        const eta = formatEta(
+                          asyncJob.startedAt,
+                          asyncProgress.classified || 0,
+                          asyncJob.total,
+                          t,
                         );
-                        const eta =
-                          remaining >= 60
-                            ? interpolate(t('classify.async_eta_min'), {
-                                minutes: Math.ceil(remaining / 60),
-                              })
-                            : interpolate(t('classify.async_eta_sec'), {
-                                seconds: remaining,
-                              });
-                        return <Text>{eta}</Text>;
+                        return eta ? <Text>{eta}</Text> : null;
                       })()}
                     <Text>{t('classify.async_close_hint')}</Text>
                   </Stack>

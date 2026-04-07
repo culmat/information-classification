@@ -143,6 +143,7 @@
       "title": "Aus Labels importieren",
       "scan_button": "Nach Labels suchen",
       "scanning": "Labels für {count} Stufen werden gesucht...",
+      "level_column": "Stufe",
       "labels_column": "Labels (kommagetrennt)",
       "pages_column": "Übereinstimmende Seiten",
       "refresh_button": "Anzahl aktualisieren",
@@ -163,6 +164,7 @@
     "export": {
       "title": "In Labels exportieren",
       "description": "Seitenbezeichnungen basierend auf aktuellen Klassifizierungen hinzufügen. So können Sie jederzeit zur labelbasierten Klassifizierung zurückkehren.",
+      "level_column": "Stufe",
       "label_name": "Label-Name",
       "start_button": "Export starten",
       "summary": "{count} Seiten werden mit Labels versehen",
