@@ -36,7 +36,7 @@ import ForgeReconciler, {
   xcss,
 } from '@forge/react';
 import { invoke } from '@forge/bridge';
-import { colorToLozenge } from '../shared/constants';
+import { colorToLozenge, colorToHex } from '../shared/constants';
 
 function localize(obj, locale) {
   if (!obj || typeof obj === 'string') return obj || '';
@@ -248,6 +248,10 @@ const App = () => {
                       colorAccessor="level"
                       valueAccessor="count"
                       labelAccessor="level"
+                      colorPalette={[
+                        ...(globalAllowedLevels || []).map((l) => ({ key: l.id, value: colorToHex(l.color) })),
+                        { key: t('admin.audit.unclassified'), value: '#8993A5' },
+                      ]}
                     />
                     <Stack space="space.050">
                       {filtered.map((entry) => {

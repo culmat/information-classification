@@ -23,6 +23,18 @@ export const spaceConfigKey = (spaceKey) =>
 // Async classification threshold — above this count, use background processing
 export const ASYNC_THRESHOLD = 50;
 
+/**
+ * Builds a CQL space filter from a comma-separated space key string.
+ * Returns '' for null/empty, ' AND space="X"' for single, ' AND space in ("X","Y")' for multiple.
+ */
+export function buildSpaceFilter(spaceKey) {
+  if (!spaceKey) return '';
+  const keys = spaceKey.split(',').map((k) => k.trim()).filter(Boolean);
+  if (keys.length === 0) return '';
+  if (keys.length === 1) return ` AND space="${keys[0]}"`;
+  return ` AND space in (${keys.map((k) => `"${k}"`).join(',')})`;
+}
+
 // KVS key prefix for tracking active async classification jobs
 export const ASYNC_JOB_KEY_PREFIX = 'async-job:';
 export const asyncJobKey = (pageId) => `${ASYNC_JOB_KEY_PREFIX}${pageId}`;
@@ -64,6 +76,27 @@ export const COLOR_TO_LOZENGE = {
   gray: 'default',      // legacy American spelling alias
   standard: 'default',
 };
+
+// Maps level color names to hex values for chart rendering (DonutChart colorPalette).
+// Uses Atlassian design system accent colors.
+export const COLOR_TO_HEX = {
+  green: '#22A06B', greenLight: '#4BCE97',
+  blue: '#1D7AFC', blueLight: '#579DFF',
+  red: '#E2483D', redLight: '#F87168',
+  yellow: '#CF9F02', yellowLight: '#F5CD47',
+  purple: '#8270DB', purpleLight: '#9F8FEF',
+  teal: '#1D9AAA', tealLight: '#60C6D2',
+  orange: '#D97008', orangeLight: '#FAA53D',
+  magenta: '#CD519D', magentaLight: '#E774BB',
+  grey: '#758195', greyLight: '#8993A5',
+  gray: '#758195',
+  lime: '#5B7F24', limeLight: '#94C748',
+  standard: '#758195',
+};
+
+export function colorToHex(color) {
+  return COLOR_TO_HEX[color] || COLOR_TO_HEX[normalizeColor(color)] || '#758195';
+}
 
 // Converts a level color name to the matching Lozenge appearance string.
 // Falls back to 'default' for any unrecognised color so the UI never breaks.

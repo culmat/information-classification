@@ -57,6 +57,7 @@
       "contacts": "Contacts",
       "links": "Liens",
       "statistics": "Statistiques",
+      "labels": "Labels",
       "languages": "Langues"
     },
     "levels": {
@@ -136,6 +137,36 @@
       "filter_apply": "Appliquer le filtre",
       "filter_clear": "Effacer",
       "empty": "Aucune classification pour le moment."
+    },
+    "import": {
+      "title": "Importer depuis les labels",
+      "scan_button": "Rechercher les labels",
+      "scanning": "Recherche de labels pour {count} niveaux...",
+      "labels_column": "Labels (séparés par virgules)",
+      "pages_column": "Pages correspondantes",
+      "refresh_button": "Actualiser le comptage",
+      "scope_all": "Toute l'instance",
+      "scope_space": "Espace :",
+      "scope_empty": "Entrez une ou plusieurs clés d'espace.",
+      "remove_labels": "Supprimer les labels après import (recommandé)",
+      "remove_labels_help": "Après l'import, les labels ne reflètent plus la classification réelle. Les labels obsolètes sont trompeurs. Un journal d'import est sauvegardé et vous pouvez exporter les classifications vers des labels à tout moment.",
+      "remove_labels_atomic": "Les labels sont supprimés page par page. En cas d'interruption, relancez.",
+      "never_weaken": "Les pages déjà classifiées à un niveau plus restrictif ne seront pas rétrogradées.",
+      "index_lag_hint": "Le nombre de pages peut prendre jusqu'à une minute pour refléter les modifications récentes. En cas de doute, actualisez jusqu'à stabilisation.",
+      "start_button": "Démarrer l'import",
+      "summary": "{count} pages de {labels} labels seront importées",
+      "complete": "Import terminé : {classified} pages classifiées.",
+      "pages_suffix": "pages",
+      "page_suffix": "page"
+    },
+    "export": {
+      "title": "Exporter vers les labels",
+      "description": "Ajouter des labels aux pages basés sur les classifications actuelles. Cela vous permet de revenir à tout moment à une classification par labels.",
+      "label_name": "Nom du label",
+      "start_button": "Démarrer l'export",
+      "summary": "Ajoutera des labels à {count} pages",
+      "complete": "Export terminé : {exported} pages étiquetées.",
+      "running": "Export en cours..."
     },
     "languages": {
       "title": "Langues du contenu",

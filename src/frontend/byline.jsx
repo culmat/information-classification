@@ -281,19 +281,21 @@ const App = () => {
     setDescendantCount(null);
     setTotalDescendants(null);
     setCountLoading(false);
-    setAsyncJob(null);
-    setAsyncProgress(null);
     setShowModal(true);
 
-    // Re-check for an active background job (may have been started before close)
+    // Check for an active background job before resetting async state
     try {
       const result = await invoke('getClassification', { pageId, spaceKey });
       if (result.success && result.activeJob) {
         setAsyncJob({ jobId: result.activeJob.jobId, total: result.activeJob.total, startedAt: result.activeJob.startedAt });
         setAsyncProgress({ classified: result.activeJob.classified || 0, failed: result.activeJob.failed || 0, total: result.activeJob.total, done: false });
         setSaving(true);
+        return;
       }
-    } catch (_) { /* ignore — modal opens normally without async state */ }
+    } catch (_) { /* ignore */ }
+    // No active job — clear async state
+    setAsyncJob(null);
+    setAsyncProgress(null);
   }, [currentLevelId, pageId, spaceKey]);
 
   // Close modal and refresh the byline badge so it reflects any classification change.

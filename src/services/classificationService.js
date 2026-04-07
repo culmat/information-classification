@@ -11,6 +11,7 @@
  */
 
 import api, { route } from '@forge/api';
+import { buildSpaceFilter } from '../shared/constants';
 import { getEffectiveConfig } from '../storage/configStore';
 import { getSpaceConfig } from '../storage/spaceConfigStore';
 import {
@@ -188,8 +189,8 @@ export async function findDescendantsToClassify(pageId, levelId, limit = 0, star
 /**
  * Finds all pages classified with a specific level (for reclassification / deletion warning).
  */
-export async function findPagesByLevel(levelId, limit = 0, startIndex = 0, { asApp: useApp = false } = {}) {
-  const cql = `type=page AND culmat_classification_level = "${levelId}"`;
+export async function findPagesByLevel(levelId, limit = 0, startIndex = 0, { asApp: useApp = false, spaceKey = null } = {}) {
+  const cql = `type=page AND culmat_classification_level = "${levelId}"${buildSpaceFilter(spaceKey)}`;
   return cqlPageSearch(cql, limit, startIndex, useApp);
 }
 

@@ -6,6 +6,7 @@ import Resolver from '@forge/resolver';
 import { getClassificationResolver, setClassificationResolver, getDynamicPropertiesResolver, countDescendantsResolver, getClassificationProgressResolver } from './classifyResolver';
 import { getConfigResolver, setConfigResolver, getAuditDataResolver, countLevelUsageResolver, reclassifyLevelResolver } from './configResolver';
 import { getSpaceConfigResolver, setSpaceConfigResolver, resetSpaceConfigResolver } from './spaceConfigResolver';
+import { listSpacesResolver, countLabelPagesResolver, startLabelImportResolver, startLabelExportResolver } from './importResolver';
 
 const resolver = new Resolver();
 
@@ -50,5 +51,11 @@ resolver.define('reclassifyLevel', wrapResolver(reclassifyLevelResolver));
 resolver.define('getSpaceConfig', wrapResolver(getSpaceConfigResolver));
 resolver.define('setSpaceConfig', wrapResolver(setSpaceConfigResolver));
 resolver.define('resetSpaceConfig', wrapResolver(resetSpaceConfigResolver));
+
+// Label import wizard (used by admin frontend)
+resolver.define('listSpaces', wrapResolver(listSpacesResolver));
+resolver.define('countLabelPages', wrapResolver(countLabelPagesResolver));
+resolver.define('startLabelImport', wrapResolver(startLabelImportResolver));
+resolver.define('startLabelExport', wrapResolver(startLabelExportResolver));
 
 export const handler = resolver.getDefinitions();

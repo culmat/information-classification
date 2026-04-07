@@ -57,6 +57,7 @@
       "contacts": "Contacts",
       "links": "Links",
       "statistics": "Statistics",
+      "labels": "Labels",
       "languages": "Languages"
     },
     "levels": {
@@ -136,6 +137,34 @@
       "filter_apply": "Apply Filter",
       "filter_clear": "Clear",
       "empty": "No classifications yet."
+    },
+    "import": {
+      "title": "Import from Labels",
+      "labels_column": "Labels (comma-separated)",
+      "pages_column": "Matched pages",
+      "refresh_button": "Refresh counts",
+      "scope_all": "Whole instance",
+      "scope_space": "Space:",
+      "scope_empty": "Enter one or more space keys to scope the import.",
+      "remove_labels": "Remove matched labels after import (recommended)",
+      "remove_labels_help": "After import, labels no longer reflect actual classifications — changes via the app won't update labels. Stale labels mislead users. This is reversible: an import log is saved, and you can export classifications back to labels anytime.",
+      "remove_labels_atomic": "Labels are removed per-page. If interrupted, re-run to resume.",
+      "never_weaken": "Pages already classified at a more restrictive level will not be downgraded.",
+      "index_lag_hint": "Matched page counts may take up to a minute to reflect recent changes. If numbers look unexpected, refresh until they stabilize.",
+      "start_button": "Start Import",
+      "summary": "Will import {count} pages from {labels} labels",
+      "complete": "Import complete: {classified} pages classified.",
+      "pages_suffix": "pages",
+      "page_suffix": "page"
+    },
+    "export": {
+      "title": "Export to Labels",
+      "description": "Add page labels based on current classifications. This lets you return to label-based classification at any time.",
+      "label_name": "Label name",
+      "start_button": "Start Export",
+      "summary": "Will add labels to {count} pages",
+      "complete": "Export complete: {exported} pages labeled.",
+      "running": "Exporting..."
     },
     "languages": {
       "title": "Content Languages",

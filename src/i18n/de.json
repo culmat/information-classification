@@ -57,6 +57,7 @@
       "contacts": "Kontakte",
       "links": "Links",
       "statistics": "Statistiken",
+      "labels": "Labels",
       "languages": "Sprachen"
     },
     "levels": {
@@ -136,6 +137,36 @@
       "filter_apply": "Filter anwenden",
       "filter_clear": "Zurücksetzen",
       "empty": "Noch keine Klassifizierungen."
+    },
+    "import": {
+      "title": "Aus Labels importieren",
+      "scan_button": "Nach Labels suchen",
+      "scanning": "Labels für {count} Stufen werden gesucht...",
+      "labels_column": "Labels (kommagetrennt)",
+      "pages_column": "Übereinstimmende Seiten",
+      "refresh_button": "Anzahl aktualisieren",
+      "scope_all": "Gesamte Instanz",
+      "scope_space": "Space:",
+      "scope_empty": "Geben Sie einen oder mehrere Space-Schlüssel ein.",
+      "remove_labels": "Labels nach Import entfernen (empfohlen)",
+      "remove_labels_help": "Nach dem Import spiegeln Labels nicht mehr die tatsächliche Klassifizierung wider. Veraltete Labels sind irreführend. Ein Import-Protokoll wird gespeichert und Sie können Klassifizierungen jederzeit zurück in Labels exportieren.",
+      "remove_labels_atomic": "Labels werden seitenweise entfernt. Bei Unterbrechung erneut ausführen.",
+      "never_weaken": "Seiten mit einer restriktiveren Stufe werden nicht herabgestuft.",
+      "index_lag_hint": "Die Seitenanzahl kann bis zu einer Minute brauchen, um aktuelle Änderungen widerzuspiegeln. Falls die Zahlen unerwartet sind, aktualisieren Sie bis sie stabil bleiben.",
+      "start_button": "Import starten",
+      "summary": "{count} Seiten aus {labels} Labels werden importiert",
+      "complete": "Import abgeschlossen: {classified} Seiten klassifiziert.",
+      "pages_suffix": "Seiten",
+      "page_suffix": "Seite"
+    },
+    "export": {
+      "title": "In Labels exportieren",
+      "description": "Seitenbezeichnungen basierend auf aktuellen Klassifizierungen hinzufügen. So können Sie jederzeit zur labelbasierten Klassifizierung zurückkehren.",
+      "label_name": "Label-Name",
+      "start_button": "Export starten",
+      "summary": "{count} Seiten werden mit Labels versehen",
+      "complete": "Export abgeschlossen: {exported} Seiten mit Labels versehen.",
+      "running": "Wird exportiert..."
     },
     "languages": {
       "title": "Inhaltssprachen",

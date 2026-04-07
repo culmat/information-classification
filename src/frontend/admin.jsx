@@ -20,6 +20,7 @@ import ForgeReconciler, {
   Stack,
   Inline,
   Lozenge,
+  Radio,
   Spinner,
   SectionMessage,
   Tabs,
@@ -43,10 +44,11 @@ import ForgeReconciler, {
   Badge,
   Link,
   DonutChart,
+  ProgressBar,
   xcss,
 } from '@forge/react';
-import { invoke, requestConfluence, showFlag } from '@forge/bridge';
-import { COLOR_OPTIONS, colorToLozenge } from '../shared/constants';
+import { invoke, requestConfluence, showFlag, realtime } from '@forge/bridge';
+import { COLOR_OPTIONS, colorToLozenge, colorToHex } from '../shared/constants';
 import { SUPPORTED_LANGUAGES } from '../shared/defaults';
 
 /**
@@ -91,6 +93,27 @@ const App = () => {
   const [editingLevel, setEditingLevel] = useState(null);
   const [showLevelModal, setShowLevelModal] = useState(false);
 
+  // Label import wizard state
+  const [importStep, setImportStep] = useState('idle'); // idle | running | done
+  const [importLabels, setImportLabels] = useState({}); // { levelId: "label1, label2" }
+  const [importCounts, setImportCounts] = useState({}); // { levelId: number }
+  const [importCountLoading, setImportCountLoading] = useState(false);
+  const [importLevelLoading, setImportLevelLoading] = useState({}); // { levelId: boolean }
+  const [importRemoveLabels, setImportRemoveLabels] = useState(true);
+  const [importScopeAll, setImportScopeAll] = useState(true);
+  const [importSpaceKeys, setImportSpaceKeys] = useState([]); // [{ label, value }]
+  const [availableSpaces, setAvailableSpaces] = useState([]); // [{ label, value }]
+  const [importResult, setImportResult] = useState(null);
+  const [importProgress, setImportProgress] = useState(null); // { classified, failed, total, done }
+
+  // Label export state
+  const [exportMappings, setExportMappings] = useState({}); // { levelId: labelName }
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportResult, setExportResult] = useState(null);
+  const [exportProgress, setExportProgress] = useState(null); // { classified, failed, total, done }
+  const [exportScopeAll, setExportScopeAll] = useState(true);
+  const [exportSpaceKeys, setExportSpaceKeys] = useState([]); // [{ label, value }]
+
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { levelId, levelName, pageCount, reclassifyTo }
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -102,6 +125,18 @@ const App = () => {
   // Editing state for link modal
   const [editingLink, setEditingLink] = useState(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
+
+  const refreshAuditData = async () => {
+    setAuditLoading(true);
+    try {
+      const auditResult = await invoke('getAuditData');
+      if (auditResult.success) setAuditData(auditResult);
+    } catch (error) {
+      console.error('Failed to load audit data:', error);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
 
   // Load config and audit data on mount — separate calls so config
   // still loads even if audit (SQL-dependent) fails
@@ -118,12 +153,7 @@ const App = () => {
         setMessage({ type: 'error', text: t('admin.save_error') });
       }
 
-      try {
-        const auditResult = await invoke('getAuditData');
-        if (auditResult.success) setAuditData(auditResult);
-      } catch (error) {
-        console.error('Failed to load audit data (SQL may not be provisioned yet):', error);
-      }
+      await refreshAuditData();
 
       setLoading(false);
     })();
@@ -207,6 +237,228 @@ const App = () => {
 
     // No pages use this level — delete immediately
     removeLevelFromConfig(levelId);
+  };
+
+  // Label import wizard actions
+  // Generate default label strings from level ID + all translations
+  const getDefaultImportLabels = () => {
+    const result = {};
+    for (const level of (config?.levels || []).filter((l) => l.allowed)) {
+      const names = new Set();
+      names.add(level.id);
+      if (level.name) {
+        for (const val of Object.values(level.name)) {
+          if (val) names.add(val.toLowerCase());
+        }
+      }
+      result[level.id] = [...names].join(', ');
+    }
+    return result;
+  };
+
+  // Initialize import labels and auto-load counts on first render
+  const [importInitialized, setImportInitialized] = useState(false);
+
+  // Load available spaces on mount
+  useEffect(() => {
+    invoke('listSpaces').then((result) => {
+      if (result.success && result.spaces) {
+        setAvailableSpaces(result.spaces.map((s) => ({ label: `${s.name} (${s.key})`, value: s.key })));
+      }
+    }).catch(() => {});
+  }, []);
+
+  // Use refs for scope so debounced callbacks always read latest values
+  const importScopeAllRef = useRef(importScopeAll);
+  const importSpaceKeysRef = useRef(importSpaceKeys);
+  importScopeAllRef.current = importScopeAll;
+  importSpaceKeysRef.current = importSpaceKeys;
+
+  // Returns null for "all", comma-separated keys for "space", or '' if space mode but no keys selected
+  const getImportSpaceKey = () => {
+    if (importScopeAllRef.current) return null;
+    const keys = (importSpaceKeysRef.current || []).map((o) => o.value).filter(Boolean);
+    return keys.length > 0 ? keys.join(',') : '';
+  };
+
+  const refreshImportCounts = async (labelsOverride) => {
+    setImportCountLoading(true);
+    const allowedLevels = (config?.levels || []).filter((l) => l.allowed);
+    const allLevelIds = allowedLevels.map((l) => l.id);
+    setImportLevelLoading(Object.fromEntries(allLevelIds.map((id) => [id, true])));
+    const spaceKey = getImportSpaceKey();
+
+    // Space mode but no valid keys entered — show 0 for all levels
+    if (spaceKey === '') {
+      setImportCounts(Object.fromEntries(allLevelIds.map((id) => [id, 0])));
+      setImportCountLoading(false);
+      setImportLevelLoading({});
+      return;
+    }
+    const counts = {};
+    const allLabels = [];
+    const source = labelsOverride || importLabels;
+    for (const level of allowedLevels) {
+      const labelStr = source[level.id] || '';
+      const labels = labelStr.split(',').map((l) => l.trim()).filter(Boolean);
+      allLabels.push(...labels.map((l) => ({ level: level.id, label: l })));
+    }
+    // Count all labels in parallel
+    const results = await Promise.all(
+      allLabels.map(async ({ level, label }) => {
+        try {
+          const result = await invoke('countLabelPages', { label, spaceKey });
+          return { level, count: result.success ? result.count : 0 };
+        } catch (_) { return { level, count: 0 }; }
+      })
+    );
+    for (const { level, count } of results) {
+      counts[level] = (counts[level] || 0) + count;
+    }
+    setImportCounts(counts);
+    setImportCountLoading(false);
+    setImportLevelLoading({});
+  };
+
+  // Auto-refresh on scope change (no debounce needed — Select gives us clean values)
+  const onScopeChange = () => {
+    // Use setTimeout(0) to let state update propagate to refs
+    setTimeout(() => refreshImportCounts(), 50);
+  };
+
+  // Per-level auto-refresh with debounce
+  const importDebounceRef = useRef({});
+  const refreshLevelCount = (levelId, labelStr) => {
+    clearTimeout(importDebounceRef.current[levelId]);
+    importDebounceRef.current[levelId] = setTimeout(async () => {
+      setImportLevelLoading((prev) => ({ ...prev, [levelId]: true }));
+      const spaceKey = getImportSpaceKey();
+      if (spaceKey === '') {
+        setImportCounts((prev) => ({ ...prev, [levelId]: 0 }));
+        setImportLevelLoading((prev) => ({ ...prev, [levelId]: false }));
+        return;
+      }
+      const labels = labelStr.split(',').map((l) => l.trim()).filter(Boolean);
+      let total = 0;
+      for (const label of labels) {
+        try {
+          const result = await invoke('countLabelPages', { label, spaceKey });
+          total += result.success ? result.count : 0;
+        } catch (_) {}
+      }
+      setImportCounts((prev) => ({ ...prev, [levelId]: total }));
+      setImportLevelLoading((prev) => ({ ...prev, [levelId]: false }));
+    }, 600);
+  };
+
+  useEffect(() => {
+    if (config && !importInitialized) {
+      const defaults = getDefaultImportLabels();
+      if (Object.keys(defaults).length > 0) {
+        setImportLabels(defaults);
+        setImportInitialized(true);
+        refreshImportCounts(defaults);
+      }
+    }
+  }, [config, importInitialized]);
+
+  // Subscribe to Realtime progress for import — subscribe once, persist via ref
+  const importSubRef = useRef(null);
+  useEffect(() => {
+    if (importStep !== 'running') return;
+    // Clean up any previous subscription
+    if (importSubRef.current) { importSubRef.current.unsubscribe(); importSubRef.current = null; }
+    realtime.subscribeGlobal('classification-progress:label-import', (data) => {
+      setImportProgress((prev) => ({ ...prev, ...data }));
+      if (data.done) {
+        setImportStep('done');
+        showFlag({
+          id: 'import-complete',
+          title: interpolate(t('admin.import.complete'), { classified: data.classified || 0 }),
+          type: 'success',
+          isAutoDismiss: true,
+        });
+        refreshImportCounts();
+        if (importSubRef.current) { importSubRef.current.unsubscribe(); importSubRef.current = null; }
+      }
+    }).then((sub) => { importSubRef.current = sub; });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [importStep === 'running']);
+
+  // Subscribe to Realtime progress for export — subscribe once, persist via ref
+  const exportSubRef = useRef(null);
+  const [exportListening, setExportListening] = useState(false);
+  useEffect(() => {
+    if (!exportListening) return;
+    if (exportSubRef.current) { exportSubRef.current.unsubscribe(); exportSubRef.current = null; }
+    realtime.subscribeGlobal('classification-progress:label-export', (data) => {
+      setExportProgress((prev) => ({ ...prev, ...data }));
+      if (data.done) {
+        setExportLoading(false);
+        setExportListening(false);
+        showFlag({
+          id: 'export-complete',
+          title: interpolate(t('admin.export.complete'), { exported: data.classified || 0 }),
+          type: 'success',
+          isAutoDismiss: true,
+        });
+        if (exportSubRef.current) { exportSubRef.current.unsubscribe(); exportSubRef.current = null; }
+      }
+    }).then((sub) => { exportSubRef.current = sub; });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exportListening]);
+
+  const startImport = async () => {
+    // Build mappings from the label inputs
+    const mappings = (config?.levels || []).filter((l) => l.allowed)
+      .map((level) => ({
+        levelId: level.id,
+        labels: (importLabels[level.id] || '').split(',').map((l) => l.trim()).filter(Boolean),
+      }))
+      .filter((m) => m.labels.length > 0);
+
+    if (mappings.length === 0) return;
+
+    setImportStep('running');
+    setImportProgress({ classified: 0, failed: 0, total: 0, done: false, startedAt: Date.now() });
+    try {
+      const spaceKey = getImportSpaceKey() || null;
+      const result = await invoke('startLabelImport', { mappings, removeLabels: importRemoveLabels, spaceKey });
+      setImportResult(result);
+      setImportProgress((prev) => ({ ...prev, total: result.count || 0 }));
+    } catch (error) {
+      console.error('Import failed:', error);
+      setImportStep('idle');
+      setImportProgress(null);
+    }
+  };
+
+  const startExport = async () => {
+    const mappings = (config?.levels || [])
+      .map((level) => ({
+        levelId: level.id,
+        labelName: (exportMappings[level.id] !== undefined ? exportMappings[level.id] : level.id).trim(),
+      }))
+      .filter((m) => m.labelName.length > 0);
+    setExportLoading(true);
+    setExportResult(null);
+    setExportProgress({ classified: 0, failed: 0, total: 0, done: false });
+    try {
+      const exportKeys = exportScopeAll ? null : (exportSpaceKeys || []).map((o) => o.value).join(',') || null;
+      const result = await invoke('startLabelExport', { mappings, spaceKey: exportKeys });
+      if (result.success) {
+        setExportResult(result);
+        setExportProgress({ classified: 0, failed: 0, total: result.count || 0, done: false, startedAt: Date.now() });
+        setExportListening(true);
+      } else {
+        setExportProgress(null);
+        setExportLoading(false);
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      setExportProgress(null);
+      setExportLoading(false);
+    }
   };
 
   const removeLevelFromConfig = (levelId) => {
@@ -410,6 +662,7 @@ const App = () => {
             <Tab>{t('admin.tabs.contacts')}</Tab>
             <Tab>{t('admin.tabs.links')}</Tab>
             <Tab>{t('admin.tabs.languages')}</Tab>
+            <Tab>{t('admin.tabs.labels')}</Tab>
           </TabList>
 
           {/* Statistics Tab */}
@@ -465,12 +718,19 @@ const App = () => {
                   : null;
                 return filtered.length > 0 ? (
                   <Stack space="space.100">
-                    <Heading size="small">{t('admin.audit.distribution')}</Heading>
+                    <Inline space="space.050" alignBlock="center">
+                      <Heading size="small">{t('admin.audit.distribution')}</Heading>
+                      <Button appearance="subtle" spacing="compact" iconBefore="refresh" isLoading={auditLoading} onClick={refreshAuditData}> </Button>
+                    </Inline>
                     <DonutChart
                       data={filtered}
                       colorAccessor="level"
                       valueAccessor="count"
                       labelAccessor="level"
+                      colorPalette={[
+                        ...(config?.levels || []).map((l) => ({ key: l.id, value: colorToHex(l.color) })),
+                        { key: t('admin.audit.unclassified'), value: '#8993A5' },
+                      ]}
                     />
                     <Stack space="space.050">
                       {filtered.map((entry) => {
@@ -711,10 +971,225 @@ const App = () => {
             </Stack>
             </Box>
           </TabPanel>
+
+          {/* Labels Tab — Import & Export as sub-tabs */}
+          <TabPanel>
+            <Box xcss={tabPanelStyle}>
+            <Tabs id="labels-subtabs">
+              <TabList>
+                <Tab>{t('admin.import.title')}</Tab>
+                <Tab>{t('admin.export.title')}</Tab>
+              </TabList>
+
+              {/* Import sub-tab */}
+              <TabPanel>
+              <Box xcss={tabPanelStyle}>
+              <Stack space="space.200">
+                <DynamicTable
+                  head={{
+                    cells: [
+                      { key: 'level', content: 'Level' },
+                      { key: 'labels', content: t('admin.import.labels_column') },
+                      { key: 'pages', content: (
+                        <Inline space="space.050" alignBlock="center">
+                          <Text>{t('admin.import.pages_column')}</Text>
+                          <Button appearance="subtle" spacing="compact" iconBefore="refresh" isLoading={importCountLoading} onClick={() => refreshImportCounts()}> </Button>
+                        </Inline>
+                      ) },
+                    ],
+                  }}
+                  rows={(config?.levels || []).filter((l) => l.allowed).map((level) => {
+                    const count = importCounts[level.id];
+                    const labelStr = importLabels[level.id] || '';
+                    const labels = labelStr.split(',').map((l) => l.trim()).filter(Boolean);
+                    const selectedKeys = importScopeAll ? [] : (importSpaceKeys || []).map((o) => o.value);
+                    const spaceFilter = selectedKeys.length === 0 ? '' : selectedKeys.length === 1 ? ` AND space="${selectedKeys[0]}"` : ` AND space in (${selectedKeys.map((k) => `"${k}"`).join(',')})`;
+                    const cql = labels.length > 0
+                      ? `type=page AND (${labels.map((l) => `label = "${l}"`).join(' OR ')})${spaceFilter}`
+                      : null;
+                    return {
+                      key: level.id,
+                      cells: [
+                        { key: 'level', content: <Lozenge isBold appearance={colorToLozenge(level.color)}>{level.id}</Lozenge> },
+                        {
+                          key: 'labels',
+                          content: (
+                            <Textfield
+                              value={labelStr}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setImportLabels((prev) => ({ ...prev, [level.id]: val }));
+                                refreshLevelCount(level.id, val);
+                              }}
+                            />
+                          ),
+                        },
+                        {
+                          key: 'pages',
+                          content: importLevelLoading[level.id]
+                            ? <Spinner size="small" />
+                            : count !== undefined && cql
+                              ? <Text><Link href={`/wiki/search?cql=${encodeURIComponent(cql)}`} openNewTab>{count}</Link></Text>
+                              : <Text>{count !== undefined ? String(count) : '—'}</Text>,
+                        },
+                      ],
+                    };
+                  })}
+                />
+
+                {/* Scope selector */}
+                <Stack space="space.100">
+                  <Inline space="space.200" alignBlock="center">
+                    <Inline space="space.100" alignBlock="center">
+                      <Radio value="all" isChecked={importScopeAll} onChange={() => { setImportScopeAll(true); onScopeChange(); }} label="" />
+                      <Text>{t('admin.import.scope_all')}</Text>
+                    </Inline>
+                    <Inline space="space.100" alignBlock="center">
+                      <Radio value="space" isChecked={!importScopeAll} onChange={() => { setImportScopeAll(false); onScopeChange(); }} label="" />
+                      <Text>{t('admin.import.scope_space')}</Text>
+                    </Inline>
+                  </Inline>
+                  {!importScopeAll && (
+                    <Select
+                      isMulti
+                      options={availableSpaces}
+                      value={importSpaceKeys}
+                      onChange={(selected) => { setImportSpaceKeys(selected || []); setTimeout(() => { importSpaceKeysRef.current = selected || []; refreshImportCounts(); }, 50); }}
+                      placeholder={t('admin.import.scope_empty')}
+                    />
+                  )}
+                </Stack>
+
+                {/* Remove labels option */}
+                <Inline space="space.100" alignBlock="center">
+                  <Toggle
+                    id="import-remove-labels"
+                    isChecked={importRemoveLabels}
+                    onChange={() => setImportRemoveLabels(!importRemoveLabels)}
+                  />
+                  <Label labelFor="import-remove-labels">{t('admin.import.remove_labels')}</Label>
+                </Inline>
+                <SectionMessage appearance="information">
+                  <Text>{t('admin.import.remove_labels_help')}</Text>
+                </SectionMessage>
+
+                {/* Actions */}
+                <Button appearance="primary" onClick={startImport} isDisabled={importStep === 'running' || exportLoading || Object.values(importCounts).reduce((s, c) => s + c, 0) === 0} isLoading={importStep === 'running'}>
+                  {t('admin.import.start_button')}
+                </Button>
+
+                {importStep === 'running' && importProgress && (
+                  <Stack space="space.050">
+                    <Text>{importProgress.classified || 0} / {importProgress.total || '?'}</Text>
+                    <ProgressBar value={importProgress.total > 0 ? (importProgress.classified || 0) / importProgress.total : 0} />
+                    {(importProgress.classified || 0) > 0 && importProgress.startedAt && (() => {
+                      const elapsed = Date.now() - importProgress.startedAt;
+                      const classified = importProgress.classified || 0;
+                      const remaining = Math.round(elapsed / classified * (importProgress.total - classified) / 1000);
+                      return <Text>{remaining >= 60
+                        ? interpolate(t('classify.async_eta_min'), { minutes: Math.ceil(remaining / 60) })
+                        : interpolate(t('classify.async_eta_sec'), { seconds: remaining })}</Text>;
+                    })()}
+                  </Stack>
+                )}
+                {importStep === 'done' && importProgress && (
+                  <SectionMessage appearance="confirmation">
+                    <Text>{interpolate(t('admin.import.complete'), { classified: importProgress.classified || 0 })}</Text>
+                  </SectionMessage>
+                )}
+
+                <SectionMessage appearance="information">
+                  <Text>{t('admin.import.never_weaken')}</Text>
+                </SectionMessage>
+                <Text>{t('admin.import.index_lag_hint')}</Text>
+              </Stack>
+              </Box>
+              </TabPanel>
+
+              {/* Export sub-tab */}
+              <TabPanel>
+              <Box xcss={tabPanelStyle}>
+              <Stack space="space.100">
+                <Text>{t('admin.export.description')}</Text>
+                <DynamicTable
+                  head={{
+                    cells: [
+                      { key: 'level', content: 'Level' },
+                      { key: 'label', content: t('admin.export.label_name') },
+                    ],
+                  }}
+                  rows={(config?.levels || []).map((level) => ({
+                    key: level.id,
+                    cells: [
+                      { key: 'level', content: <Lozenge isBold appearance={colorToLozenge(level.color)}>{level.id}</Lozenge> },
+                      {
+                        key: 'label',
+                        content: (
+                          <Textfield
+                            value={exportMappings[level.id] ?? level.id}
+                            onChange={(e) => setExportMappings((prev) => ({ ...prev, [level.id]: e.target.value }))}
+                          />
+                        ),
+                      },
+                    ],
+                  }))}
+                />
+
+                {/* Scope selector */}
+                <Stack space="space.100">
+                  <Inline space="space.200" alignBlock="center">
+                    <Inline space="space.100" alignBlock="center">
+                      <Radio value="all" isChecked={exportScopeAll} onChange={() => setExportScopeAll(true)} label="" />
+                      <Text>{t('admin.import.scope_all')}</Text>
+                    </Inline>
+                    <Inline space="space.100" alignBlock="center">
+                      <Radio value="space" isChecked={!exportScopeAll} onChange={() => setExportScopeAll(false)} label="" />
+                      <Text>{t('admin.import.scope_space')}</Text>
+                    </Inline>
+                  </Inline>
+                  {!exportScopeAll && (
+                    <Select
+                      isMulti
+                      options={availableSpaces}
+                      value={exportSpaceKeys}
+                      onChange={(selected) => setExportSpaceKeys(selected || [])}
+                      placeholder={t('admin.import.scope_empty')}
+                    />
+                  )}
+                </Stack>
+
+                <Button appearance="primary" onClick={startExport} isLoading={exportLoading} isDisabled={exportLoading || (exportProgress && !exportProgress.done)}>
+                  {t('admin.export.start_button')}
+                </Button>
+                {exportProgress && !exportProgress.done && (
+                  <Stack space="space.050">
+                    <Text>{exportProgress.classified || 0} / {exportProgress.total || '?'}</Text>
+                    <ProgressBar value={exportProgress.total > 0 ? (exportProgress.classified || 0) / exportProgress.total : 0} />
+                    {(exportProgress.classified || 0) > 0 && exportProgress.startedAt && (() => {
+                      const elapsed = Date.now() - exportProgress.startedAt;
+                      const classified = exportProgress.classified || 0;
+                      const remaining = Math.round(elapsed / classified * (exportProgress.total - classified) / 1000);
+                      return <Text>{remaining >= 60
+                        ? interpolate(t('classify.async_eta_min'), { minutes: Math.ceil(remaining / 60) })
+                        : interpolate(t('classify.async_eta_sec'), { seconds: remaining })}</Text>;
+                    })()}
+                  </Stack>
+                )}
+                {exportProgress && exportProgress.done && (
+                  <SectionMessage appearance="confirmation">
+                    <Text>{interpolate(t('admin.export.complete'), { exported: exportProgress.classified || 0 })}</Text>
+                  </SectionMessage>
+                )}
+              </Stack>
+              </Box>
+              </TabPanel>
+            </Tabs>
+            </Box>
+          </TabPanel>
         </Tabs>
 
-        {/* Save button and messages — hidden on the read-only Statistics tab (index 0) */}
-        {activeTab !== 0 && (
+        {/* Save button and messages — hidden on read-only tabs (Statistics=0, Labels=5) */}
+        {activeTab > 0 && activeTab < 5 && (
           <>
             {message && (
               <SectionMessage appearance={message.type === 'error' ? 'error' : 'confirmation'}>
