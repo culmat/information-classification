@@ -81,30 +81,31 @@ export const COLOR_TO_LOZENGE = {
 };
 
 // Maps level color names to hex values for chart rendering (DonutChart colorPalette).
-// Uses Atlassian design system accent colors.
+// Uses Atlassian palette 400-level values (background.accent.{hue}.subtle) to match
+// the Tag component's visual weight.
 export const COLOR_TO_HEX = {
-  green: '#22A06B',
-  greenLight: '#4BCE97',
-  blue: '#1D7AFC',
-  blueLight: '#579DFF',
-  red: '#E2483D',
-  redLight: '#F87168',
-  yellow: '#CF9F02',
-  yellowLight: '#F5CD47',
-  purple: '#8270DB',
-  purpleLight: '#9F8FEF',
-  teal: '#1D9AAA',
-  tealLight: '#60C6D2',
-  orange: '#D97008',
-  orangeLight: '#FAA53D',
-  magenta: '#CD519D',
-  magentaLight: '#E774BB',
-  grey: '#758195',
-  greyLight: '#8993A5',
-  gray: '#758195',
-  lime: '#5B7F24',
-  limeLight: '#94C748',
-  standard: '#758195',
+  green: '#4BCE97',
+  greenLight: '#BAF3DB',
+  blue: '#669DF1',
+  blueLight: '#CFE1FD',
+  red: '#F15B50',
+  redLight: '#FFD5D2',
+  yellow: '#EED12B',
+  yellowLight: '#F5E989',
+  purple: '#C97CF4',
+  purpleLight: '#EED7FC',
+  teal: '#6CC3E0',
+  tealLight: '#C6EDFB',
+  orange: '#FCA700',
+  orangeLight: '#FCE4A6',
+  magenta: '#E774BB',
+  magentaLight: '#FDD0EC',
+  grey: '#8C8F97',
+  greyLight: '#DDDEE1',
+  gray: '#8C8F97',
+  lime: '#94C748',
+  limeLight: '#D3F1A7',
+  standard: '#8C8F97',
 };
 
 export function colorToHex(color) {
