@@ -1,0 +1,7 @@
+section: information-classification
+title: Information Classification for Confluence
+items:
+  - slug: index
+    title: Home
+  - slug: configuration
+    title: Configuration
