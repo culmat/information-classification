@@ -73,7 +73,9 @@ describe('getDefaultConfig', () => {
 
   it('should have the default level reference an allowed level', () => {
     const config = getDefaultConfig();
-    const defaultLevel = config.levels.find((l) => l.id === config.defaultLevelId);
+    const defaultLevel = config.levels.find(
+      (l) => l.id === config.defaultLevelId,
+    );
     expect(defaultLevel).toBeTruthy();
     expect(defaultLevel.allowed).toBe(true);
   });

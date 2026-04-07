@@ -8,7 +8,12 @@
  */
 
 import api, { route } from '@forge/api';
-import { CONTENT_PROPERTY_KEY, BYLINE_PROPERTY_KEY, HISTORY_PROPERTY_KEY, MAX_HISTORY_ENTRIES } from '../shared/constants';
+import {
+  CONTENT_PROPERTY_KEY,
+  BYLINE_PROPERTY_KEY,
+  HISTORY_PROPERTY_KEY,
+  MAX_HISTORY_ENTRIES,
+} from '../shared/constants';
 
 /**
  * Returns the appropriate API requester.
@@ -25,7 +30,10 @@ function getRequester(useApp) {
  * @param {Object} [options] - { asApp: boolean }
  * @returns {Promise<Object|null>} { level, classifiedBy, classifiedAt } or null if not set
  */
-export async function getClassification(pageId, { asApp: useApp = false } = {}) {
+export async function getClassification(
+  pageId,
+  { asApp: useApp = false } = {},
+) {
   return await getProperty(pageId, CONTENT_PROPERTY_KEY, useApp);
 }
 
@@ -38,7 +46,12 @@ export async function getClassification(pageId, { asApp: useApp = false } = {}) 
  * @param {Object} bylineData - { title, tooltip }
  * @returns {Promise<boolean>} true if successful
  */
-export async function setClassification(pageId, classificationData, bylineData, { asApp: useApp = false } = {}) {
+export async function setClassification(
+  pageId,
+  classificationData,
+  bylineData,
+  { asApp: useApp = false } = {},
+) {
   const results = await Promise.all([
     upsertProperty(pageId, CONTENT_PROPERTY_KEY, classificationData, useApp),
     upsertProperty(pageId, BYLINE_PROPERTY_KEY, bylineData, useApp),
@@ -67,7 +80,11 @@ export async function getHistory(pageId, { asApp: useApp = false } = {}) {
  * @param {Object} entry - { from, to, by, at }
  * @returns {Promise<boolean>} true if successful
  */
-export async function appendHistory(pageId, entry, { asApp: useApp = false } = {}) {
+export async function appendHistory(
+  pageId,
+  entry,
+  { asApp: useApp = false } = {},
+) {
   const current = await getHistory(pageId, { asApp: useApp });
   const entries = [...current.entries, entry];
   let truncated = current.truncated;
@@ -78,7 +95,12 @@ export async function appendHistory(pageId, entry, { asApp: useApp = false } = {
     truncated = true;
   }
 
-  return await upsertProperty(pageId, HISTORY_PROPERTY_KEY, { truncated, entries }, useApp);
+  return await upsertProperty(
+    pageId,
+    HISTORY_PROPERTY_KEY,
+    { truncated, entries },
+    useApp,
+  );
 }
 
 /**
@@ -89,16 +111,19 @@ export async function appendHistory(pageId, entry, { asApp: useApp = false } = {
 async function getProperty(pageId, key, useApp = false) {
   try {
     // v2 API: list all properties, then find by key
-    const response = await getRequester(useApp)
-      .requestConfluence(
-        route`/wiki/api/v2/pages/${pageId}/properties?key=${key}`,
-        { headers: { Accept: 'application/json' } }
-      );
+    const response = await getRequester(useApp).requestConfluence(
+      route`/wiki/api/v2/pages/${pageId}/properties?key=${key}`,
+      { headers: { Accept: 'application/json' } },
+    );
 
     if (!response.ok) {
       if (response.status === 404) return null;
       const errorBody = await response.text();
-      console.error(`Failed to read property ${key}:`, response.status, errorBody);
+      console.error(
+        `Failed to read property ${key}:`,
+        response.status,
+        errorBody,
+      );
       return null;
     }
 
@@ -118,33 +143,47 @@ async function getProperty(pageId, key, useApp = false) {
 async function upsertProperty(pageId, key, value, useApp = false) {
   try {
     // First check if property exists
-    const listResponse = await getRequester(useApp)
-      .requestConfluence(
-        route`/wiki/api/v2/pages/${pageId}/properties?key=${key}`,
-        { headers: { Accept: 'application/json' } }
-      );
+    const listResponse = await getRequester(useApp).requestConfluence(
+      route`/wiki/api/v2/pages/${pageId}/properties?key=${key}`,
+      { headers: { Accept: 'application/json' } },
+    );
 
     if (!listResponse.ok && listResponse.status !== 404) {
       const errorBody = await listResponse.text();
-      console.error(`Failed to list property ${key}:`, listResponse.status, errorBody);
+      console.error(
+        `Failed to list property ${key}:`,
+        listResponse.status,
+        errorBody,
+      );
       return false;
     }
 
-    const listData = listResponse.ok ? await listResponse.json() : { results: [] };
+    const listData = listResponse.ok
+      ? await listResponse.json()
+      : { results: [] };
     const existing = listData.results?.[0];
 
     if (!existing) {
       // Property doesn't exist — create it
-      const createResponse = await getRequester(useApp)
-        .requestConfluence(route`/wiki/api/v2/pages/${pageId}/properties`, {
+      const createResponse = await getRequester(useApp).requestConfluence(
+        route`/wiki/api/v2/pages/${pageId}/properties`,
+        {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
           body: JSON.stringify({ key, value }),
-        });
+        },
+      );
 
       if (!createResponse.ok) {
         const errorText = await createResponse.text();
-        console.error(`Failed to create property ${key}:`, createResponse.status, errorText);
+        console.error(
+          `Failed to create property ${key}:`,
+          createResponse.status,
+          errorText,
+        );
         return false;
       }
       return true;
@@ -154,23 +193,29 @@ async function upsertProperty(pageId, key, value, useApp = false) {
     const propId = existing.id;
     const version = existing.version?.number || 1;
 
-    const updateResponse = await getRequester(useApp)
-      .requestConfluence(
-        route`/wiki/api/v2/pages/${pageId}/properties/${propId}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({
-            key,
-            value,
-            version: { number: version + 1 },
-          }),
-        }
-      );
+    const updateResponse = await getRequester(useApp).requestConfluence(
+      route`/wiki/api/v2/pages/${pageId}/properties/${propId}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          key,
+          value,
+          version: { number: version + 1 },
+        }),
+      },
+    );
 
     if (!updateResponse.ok) {
       const errorText = await updateResponse.text();
-      console.error(`Failed to update property ${key}:`, updateResponse.status, errorText);
+      console.error(
+        `Failed to update property ${key}:`,
+        updateResponse.status,
+        errorText,
+      );
       return false;
     }
     return true;

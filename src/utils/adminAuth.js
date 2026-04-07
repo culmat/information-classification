@@ -14,8 +14,8 @@ export async function isConfluenceAdmin(accountId) {
       .requestConfluence(
         route`/wiki/rest/api/user/memberof?accountId=${accountId}`,
         {
-          headers: { 'Accept': 'application/json' }
-        }
+          headers: { Accept: 'application/json' },
+        },
       );
 
     if (!response.ok) {
@@ -25,7 +25,7 @@ export async function isConfluenceAdmin(accountId) {
 
     const data = await response.json();
     return data.results.some(
-      group => group.name === 'confluence-administrators'
+      (group) => group.name === 'confluence-administrators',
     );
   } catch (error) {
     console.error('Error checking admin status:', error);

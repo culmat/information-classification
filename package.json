@@ -7,8 +7,22 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "lint": "eslint src/**/*",
-    "test:e2e": "npx playwright test --config=e2e/playwright.config.js"
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "cpd": "jscpd src/",
+    "test:e2e": "npx playwright test --config=e2e/playwright.config.js",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
     "@playwright/test": "^1.40.0",

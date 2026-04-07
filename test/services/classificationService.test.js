@@ -36,12 +36,12 @@ vi.mock('@forge/api', () => ({
     asApp: () => ({ requestConfluence: mockRequestConfluence }),
     asUser: () => ({ requestConfluence: mockRequestConfluence }),
   },
-  route: (strings, ...values) => strings.reduce((acc, str, i) => acc + str + (values[i] || ''), ''),
+  route: (strings, ...values) =>
+    strings.reduce((acc, str, i) => acc + str + (values[i] || ''), ''),
 }));
 
-const { getPageClassification, classifyPage } = await import(
-  '../../src/services/classificationService'
-);
+const { getPageClassification, classifyPage } =
+  await import('../../src/services/classificationService');
 
 const effectiveConfig = {
   levels: [
@@ -236,7 +236,7 @@ describe('classifyPage', () => {
       expect.objectContaining({
         from: 'internal',
         to: 'confidential',
-      })
+      }),
     );
   });
 
@@ -256,7 +256,7 @@ describe('classifyPage', () => {
       expect.objectContaining({
         from: null,
         to: 'public',
-      })
+      }),
     );
   });
 
@@ -305,7 +305,7 @@ describe('classifyPage', () => {
 
     expect(mockAppendHistory).toHaveBeenCalledWith(
       '123',
-      expect.objectContaining({ from: null, to: 'public' })
+      expect.objectContaining({ from: null, to: 'public' }),
     );
   });
 });

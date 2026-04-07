@@ -2,12 +2,12 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first.
 
 # Agent Guardrails
 
-* Read existing code, specs, and tests before generating new code.
-* No stubs, no TODOs, no placeholder implementations.
-* No new dependencies without asking.
-* No unnecessary abstractions — match existing patterns.
-* Match surrounding code style; don't reformat beyond scope.
-* One logical change per commit.
+- Read existing code, specs, and tests before generating new code.
+- No stubs, no TODOs, no placeholder implementations.
+- No new dependencies without asking.
+- No unnecessary abstractions — match existing patterns.
+- Match surrounding code style; don't reformat beyond scope.
+- One logical change per commit.
 
 # Scenario
 
@@ -81,6 +81,7 @@ Prefer `forge tunnel` over `forge deploy` for faster iteration. Tunnel runs in a
 **After editing code:** run `./tunnel-sync.sh` to sync to the worktree. Tunnel auto-reloads.
 
 **When to use `forge deploy` instead:**
+
 - Manifest changes (new modules, scopes, functions)
 - New npm dependencies
 - Final verification

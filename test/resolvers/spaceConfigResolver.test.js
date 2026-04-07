@@ -16,9 +16,11 @@ vi.mock('../../src/storage/configStore', () => ({
   getGlobalConfig: (...args) => mockGetGlobalConfig(...args),
 }));
 
-const { getSpaceConfigResolver, setSpaceConfigResolver, resetSpaceConfigResolver } = await import(
-  '../../src/resolvers/spaceConfigResolver'
-);
+const {
+  getSpaceConfigResolver,
+  setSpaceConfigResolver,
+  resetSpaceConfigResolver,
+} = await import('../../src/resolvers/spaceConfigResolver');
 
 const globalConfig = {
   levels: [
@@ -84,7 +86,7 @@ describe('setSpaceConfigResolver', () => {
           allowedLevelIds: ['public', 'secret'], // secret is globally disallowed
           defaultLevelId: 'public',
         },
-      })
+      }),
     );
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/not globally allowed/i);
@@ -98,7 +100,7 @@ describe('setSpaceConfigResolver', () => {
           allowedLevelIds: ['public'],
           defaultLevelId: 'internal', // not in allowed list
         },
-      })
+      }),
     );
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/allowed levels/i);
@@ -112,7 +114,9 @@ describe('setSpaceConfigResolver', () => {
       defaultLevelId: 'internal',
     };
 
-    const result = await setSpaceConfigResolver(req({ spaceKey: 'DEV', config }));
+    const result = await setSpaceConfigResolver(
+      req({ spaceKey: 'DEV', config }),
+    );
     expect(result.success).toBe(true);
     expect(mockSetSpaceConfig).toHaveBeenCalledWith('DEV', config);
   });

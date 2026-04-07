@@ -55,9 +55,7 @@ export async function handler(req) {
 
     return {
       title,
-      tooltip: warning
-        ? `${levelName} — restriction mismatch`
-        : levelName,
+      tooltip: warning ? `${levelName} — restriction mismatch` : levelName,
     };
   } catch (error) {
     console.error('Error in dynamicProperties:', error);

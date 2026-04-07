@@ -23,7 +23,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx vitest run
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npx vitest run --coverage
       - run: npx @forge/cli@12 lint
 
   deploy-development:

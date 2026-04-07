@@ -20,7 +20,7 @@ async function checkDirectRestrictions(pageId) {
     .asUser()
     .requestConfluence(
       route`/wiki/rest/api/content/${pageId}/restriction/byOperation/read`,
-      { headers: { Accept: 'application/json' } }
+      { headers: { Accept: 'application/json' } },
     );
 
   if (!response.ok) {
@@ -44,7 +44,7 @@ async function getAncestorIds(pageId) {
     .asUser()
     .requestConfluence(
       route`/wiki/api/v2/pages/${pageId}/ancestors?limit=250`,
-      { headers: { Accept: 'application/json' } }
+      { headers: { Accept: 'application/json' } },
     );
 
   if (!response.ok) {

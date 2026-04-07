@@ -76,7 +76,7 @@ export async function getEffectiveConfig(spaceKey, spaceConfig) {
   // Use space default if set and valid, otherwise fall back to global default
   const spaceDefault = spaceConfig.defaultLevelId;
   const effectiveDefault = filteredLevels.some(
-    (l) => l.id === spaceDefault && l.allowed
+    (l) => l.id === spaceDefault && l.allowed,
   )
     ? spaceDefault
     : globalConfig.defaultLevelId;

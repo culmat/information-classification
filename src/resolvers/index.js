@@ -3,10 +3,31 @@
  */
 
 import Resolver from '@forge/resolver';
-import { getClassificationResolver, setClassificationResolver, getDynamicPropertiesResolver, countDescendantsResolver, getClassificationProgressResolver } from './classifyResolver';
-import { getConfigResolver, setConfigResolver, getAuditDataResolver, countLevelUsageResolver, reclassifyLevelResolver } from './configResolver';
-import { getSpaceConfigResolver, setSpaceConfigResolver, resetSpaceConfigResolver } from './spaceConfigResolver';
-import { listSpacesResolver, countLabelPagesResolver, startLabelImportResolver, startLabelExportResolver } from './importResolver';
+import {
+  getClassificationResolver,
+  setClassificationResolver,
+  getDynamicPropertiesResolver,
+  countDescendantsResolver,
+  getClassificationProgressResolver,
+} from './classifyResolver';
+import {
+  getConfigResolver,
+  setConfigResolver,
+  getAuditDataResolver,
+  countLevelUsageResolver,
+  reclassifyLevelResolver,
+} from './configResolver';
+import {
+  getSpaceConfigResolver,
+  setSpaceConfigResolver,
+  resetSpaceConfigResolver,
+} from './spaceConfigResolver';
+import {
+  listSpacesResolver,
+  countLabelPagesResolver,
+  startLabelImportResolver,
+  startLabelExportResolver,
+} from './importResolver';
 
 const resolver = new Resolver();
 
@@ -27,7 +48,7 @@ function logConnectedSite(context) {
 function wrapResolver(resolverFn) {
   return async (req) => {
     logConnectedSite(req.context);
-    return resolverFn(req);
+    return await resolverFn(req);
   };
 }
 
@@ -35,10 +56,16 @@ function wrapResolver(resolverFn) {
 resolver.define('getClassification', wrapResolver(getClassificationResolver));
 resolver.define('setClassification', wrapResolver(setClassificationResolver));
 resolver.define('countDescendants', wrapResolver(countDescendantsResolver));
-resolver.define('getClassificationProgress', wrapResolver(getClassificationProgressResolver));
+resolver.define(
+  'getClassificationProgress',
+  wrapResolver(getClassificationProgressResolver),
+);
 
 // Dynamic properties — called by Confluence to set byline title/icon before popup opens
-resolver.define('getDynamicProperties', wrapResolver(getDynamicPropertiesResolver));
+resolver.define(
+  'getDynamicProperties',
+  wrapResolver(getDynamicPropertiesResolver),
+);
 
 // Global admin config operations (used by admin frontend)
 resolver.define('getConfig', wrapResolver(getConfigResolver));

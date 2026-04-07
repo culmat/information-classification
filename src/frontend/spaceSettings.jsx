@@ -84,8 +84,13 @@ const App = () => {
             .map((l) => l.id);
 
           if (result.spaceConfig) {
-            setEnabledLevelIds(result.spaceConfig.allowedLevelIds || globalAllowed);
-            setDefaultLevelId(result.spaceConfig.defaultLevelId || result.globalConfig.defaultLevelId);
+            setEnabledLevelIds(
+              result.spaceConfig.allowedLevelIds || globalAllowed,
+            );
+            setDefaultLevelId(
+              result.spaceConfig.defaultLevelId ||
+                result.globalConfig.defaultLevelId,
+            );
           } else {
             setEnabledLevelIds(globalAllowed);
             setDefaultLevelId(result.globalConfig.defaultLevelId);
@@ -103,7 +108,7 @@ const App = () => {
     setEnabledLevelIds((prev) =>
       prev.includes(levelId)
         ? prev.filter((id) => id !== levelId)
-        : [...prev, levelId]
+        : [...prev, levelId],
     );
   };
 
@@ -144,7 +149,10 @@ const App = () => {
         setEnabledLevelIds(globalAllowed);
         setDefaultLevelId(globalConfig.defaultLevelId);
         setSpaceConfig(null);
-        setMessage({ type: 'success', text: t('space_settings.reset_success') });
+        setMessage({
+          type: 'success',
+          text: t('space_settings.reset_success'),
+        });
       }
     } catch (error) {
       console.error('Failed to reset space config:', error);
@@ -152,6 +160,18 @@ const App = () => {
       setSaving(false);
     }
   }, [spaceKey, globalConfig, t]);
+
+  const refreshStats = async () => {
+    setStatsLoading(true);
+    try {
+      const result = await invoke('getAuditData', { spaceKey });
+      if (result.success) setStatsData(result);
+    } catch (error) {
+      console.error('Failed to load space statistics:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   // Load statistics — now the default tab, so load on mount
   const loadStats = useCallback(async () => {
@@ -162,21 +182,33 @@ const App = () => {
       if (result.success) setStatsData(result);
     } catch (error) {
       console.error('Failed to load space statistics:', error);
-      setStatsData({ distribution: [], totalPages: 0, classifiedPages: 0, recentPages: [] });
+      setStatsData({
+        distribution: [],
+        totalPages: 0,
+        classifiedPages: 0,
+        recentPages: [],
+      });
     } finally {
       setStatsLoading(false);
     }
   }, [spaceKey, statsData, statsLoading]);
 
-  useEffect(() => { loadStats(); }, [loadStats]);
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
   if (loading) {
-    return <Box xcss={containerStyle}><Spinner size="large" /></Box>;
+    return (
+      <Box xcss={containerStyle}>
+        <Spinner size="large" />
+      </Box>
+    );
   }
 
   // Only show globally-allowed levels as toggleable options
-  const globalAllowedLevels = (globalConfig?.levels || []).filter((l) => l.allowed);
-
+  const globalAllowedLevels = (globalConfig?.levels || []).filter(
+    (l) => l.allowed,
+  );
 
   return (
     <Box xcss={containerStyle}>
@@ -192,163 +224,252 @@ const App = () => {
           {/* Statistics Tab */}
           <TabPanel>
             <Box xcss={tabPanelStyle}>
-            <Stack space="space.200">
-              {statsLoading && <Spinner size="medium" />}
+              <Stack space="space.200">
+                {statsLoading && <Spinner size="medium" />}
 
-              {statsData && (
-                <Inline space="space.400">
-                  <Stack space="space.050">
-                    <Text>{t('admin.audit.classified_pages')}</Text>
-                    <Heading size="medium">{statsData.classifiedPages} / {statsData.totalPages}</Heading>
-                  </Stack>
-                </Inline>
-              )}
+                {statsData && (
+                  <Inline space="space.400">
+                    <Stack space="space.050">
+                      <Text>{t('admin.audit.classified_pages')}</Text>
+                      <Heading size="medium">
+                        {statsData.classifiedPages} / {statsData.totalPages}
+                      </Heading>
+                    </Stack>
+                  </Inline>
+                )}
 
-              {/* Coverage toggle — keep in sync with the identical toggle
+                {/* Coverage toggle — keep in sync with the identical toggle
                  in admin.jsx (Audit tab). */}
-              <Inline space="space.100" alignBlock="center">
-                <Toggle
-                  id="coverage-toggle"
-                  isChecked={showUnclassified}
-                  onChange={() => setShowUnclassified(!showUnclassified)}
-                />
-                <Label labelFor="coverage-toggle">{t('admin.audit.show_unclassified')}</Label>
-              </Inline>
+                <Inline space="space.100" alignBlock="center">
+                  <Toggle
+                    id="coverage-toggle"
+                    isChecked={showUnclassified}
+                    onChange={() => setShowUnclassified(!showUnclassified)}
+                  />
+                  <Label labelFor="coverage-toggle">
+                    {t('admin.audit.show_unclassified')}
+                  </Label>
+                </Inline>
 
-              {/* Distribution chart — when "show unclassified" is OFF, unclassified
+                {/* Distribution chart — when "show unclassified" is OFF, unclassified
                  pages are rolled into the default level so the chart always reflects
                  the effective classification of every page.
                  Keep chart logic in sync with admin.jsx (Audit tab). */}
-              {statsData && statsData.totalPages > 0 && (() => {
-                const unclassified = statsData.totalPages - statsData.classifiedPages;
-                const chartData = (statsData.distribution || []).map((l) => ({ ...l }));
-                if (showUnclassified) {
-                  // Show unclassified as a separate slice
-                  if (unclassified > 0) {
-                    chartData.push({ level: t('admin.audit.unclassified'), count: unclassified });
-                  }
-                } else if (unclassified > 0 && defaultLevelId) {
-                  // Roll unclassified pages into the default level
-                  const defaultEntry = chartData.find((d) => d.level === defaultLevelId);
-                  if (defaultEntry) {
-                    defaultEntry.count += unclassified;
-                  }
-                }
-                const allLevelIds = (globalAllowedLevels || []).map((l) => l.id);
-                const filtered = chartData.filter((l) => l.count > 0);
-                const spaceFilter = ` AND space="${spaceKey}"`;
-                const unclassifiedCql = allLevelIds.length > 0
-                  ? `type=page${spaceFilter} AND NOT (${allLevelIds.map((id) => `culmat_classification_level="${id}"`).join(' OR ')})`
-                  : null;
-                return filtered.length > 0 ? (
-                  <Stack space="space.100">
-                    <Heading size="small">{t('admin.audit.distribution')}</Heading>
-                    <DonutChart
-                      data={filtered}
-                      colorAccessor="level"
-                      valueAccessor="count"
-                      labelAccessor="level"
-                      colorPalette={[
-                        ...(globalAllowedLevels || []).map((l) => ({ key: l.id, value: colorToHex(l.color) })),
-                        { key: t('admin.audit.unclassified'), value: '#8993A5' },
-                      ]}
-                    />
-                    <Stack space="space.050">
-                      {filtered.map((entry) => {
-                        const isUnclassified = entry.level === t('admin.audit.unclassified');
-                        const cql = isUnclassified ? unclassifiedCql : `type=page${spaceFilter} AND culmat_classification_level="${entry.level}"`;
-                        return cql ? (
-                          <Text key={entry.level}><Link href={`/wiki/search?cql=${encodeURIComponent(cql)}`} openNewTab>{entry.level} ({entry.count})</Link></Text>
+                {statsData &&
+                  statsData.totalPages > 0 &&
+                  (() => {
+                    const unclassified =
+                      statsData.totalPages - statsData.classifiedPages;
+                    const chartData = (statsData.distribution || []).map(
+                      (l) => ({ ...l }),
+                    );
+                    if (showUnclassified) {
+                      // Show unclassified as a separate slice
+                      if (unclassified > 0) {
+                        chartData.push({
+                          level: t('admin.audit.unclassified'),
+                          count: unclassified,
+                        });
+                      }
+                    } else if (unclassified > 0 && defaultLevelId) {
+                      // Roll unclassified pages into the default level
+                      const defaultEntry = chartData.find(
+                        (d) => d.level === defaultLevelId,
+                      );
+                      if (defaultEntry) {
+                        defaultEntry.count += unclassified;
+                      }
+                    }
+                    const allLevelIds = (globalAllowedLevels || []).map(
+                      (l) => l.id,
+                    );
+                    const filtered = chartData.filter((l) => l.count > 0);
+                    const spaceFilter = ` AND space="${spaceKey}"`;
+                    const unclassifiedCql =
+                      allLevelIds.length > 0
+                        ? `type=page${spaceFilter} AND NOT (${allLevelIds.map((id) => `culmat_classification_level="${id}"`).join(' OR ')})`
+                        : null;
+                    return filtered.length > 0 ? (
+                      <Stack space="space.100">
+                        <Inline space="space.050" alignBlock="center">
+                          <Heading size="small">
+                            {t('admin.audit.distribution')}
+                          </Heading>
+                          <Button
+                            appearance="subtle"
+                            spacing="compact"
+                            iconBefore="refresh"
+                            isLoading={statsLoading}
+                            onClick={refreshStats}
+                          >
+                            {' '}
+                          </Button>
+                        </Inline>
+                        <DonutChart
+                          data={filtered}
+                          colorAccessor="level"
+                          valueAccessor="count"
+                          labelAccessor="level"
+                          colorPalette={[
+                            ...(globalAllowedLevels || []).map((l) => ({
+                              key: l.id,
+                              value: colorToHex(l.color),
+                            })),
+                            {
+                              key: t('admin.audit.unclassified'),
+                              value: '#8993A5',
+                            },
+                          ]}
+                        />
+                        {statsLoading ? (
+                          <Spinner size="small" />
                         ) : (
-                          <Text key={entry.level}>{entry.level} ({entry.count})</Text>
-                        );
-                      })}
-                    </Stack>
-                  </Stack>
-                ) : null;
-              })()}
+                          <Stack space="space.050">
+                            {filtered.map((entry) => {
+                              const isUnclassified =
+                                entry.level === t('admin.audit.unclassified');
+                              const cql = isUnclassified
+                                ? unclassifiedCql
+                                : `type=page${spaceFilter} AND culmat_classification_level="${entry.level}"`;
+                              return cql ? (
+                                <Text key={entry.level}>
+                                  <Link
+                                    href={`/wiki/search?cql=${encodeURIComponent(cql)}`}
+                                    openNewTab
+                                  >
+                                    {entry.level} ({entry.count})
+                                  </Link>
+                                </Text>
+                              ) : (
+                                <Text key={entry.level}>
+                                  {entry.level} ({entry.count})
+                                </Text>
+                              );
+                            })}
+                          </Stack>
+                        )}
+                      </Stack>
+                    ) : null;
+                  })()}
 
-              {/* Recently classified pages — same table as admin.jsx (Statistics tab),
+                {/* Recently classified pages — same table as admin.jsx (Statistics tab),
                  scoped to this space. Keep in sync with admin.jsx.
                  Only show heading + table when there are entries to display. */}
-              {(statsData?.recentPages || []).length > 0 && (
-                <>
-                  <Heading size="small">{t('admin.audit.recent_changes')}</Heading>
-                  <DynamicTable
-                    head={{
-                      cells: [
-                        { key: 'title', content: t('admin.audit.page') },
-                      ],
-                    }}
-                    rows={statsData.recentPages.map((page, index) => ({
-                      key: page.id || String(index),
-                      cells: [
-                        { key: 'title', content: page.url
-                          ? <Link href={`/wiki${page.url}`}>{page.title}</Link>
-                          : <Text>{page.title}</Text> },
-                      ],
-                    }))}
-                    rowsPerPage={20}
-                  />
-                </>
-              )}
-            </Stack>
+                {(statsData?.recentPages || []).length > 0 && (
+                  <>
+                    <Heading size="small">
+                      {t('admin.audit.recent_changes')}
+                    </Heading>
+                    <DynamicTable
+                      head={{
+                        cells: [
+                          { key: 'title', content: t('admin.audit.page') },
+                        ],
+                      }}
+                      rows={statsData.recentPages.map((page, index) => ({
+                        key: page.id || String(index),
+                        cells: [
+                          {
+                            key: 'title',
+                            content: page.url ? (
+                              <Link href={`/wiki${page.url}`}>
+                                {page.title}
+                              </Link>
+                            ) : (
+                              <Text>{page.title}</Text>
+                            ),
+                          },
+                        ],
+                      }))}
+                      rowsPerPage={20}
+                    />
+                  </>
+                )}
+              </Stack>
             </Box>
           </TabPanel>
 
           {/* Configuration Tab */}
           <TabPanel>
             <Box xcss={tabPanelStyle}>
-            <Stack space="space.200">
-              <Text>{t('space_settings.description')}</Text>
+              <Stack space="space.200">
+                <Text>{t('space_settings.description')}</Text>
 
-              {/* Level enable/disable checkboxes */}
-              <Stack space="space.050">
-                <Heading size="small">{t('space_settings.enabled_levels')}</Heading>
-                {globalAllowedLevels.map((level) => (
-                  <Inline key={level.id} space="space.100" alignBlock="center">
-                    <Checkbox
-                      isChecked={enabledLevelIds.includes(level.id)}
-                      onChange={() => handleToggleLevel(level.id)}
-                      label=""
-                    />
-                    <Lozenge isBold appearance={colorToLozenge(level.color)}>{localize(level.name, 'en')}</Lozenge>
-                  </Inline>
-                ))}
+                {/* Level enable/disable checkboxes */}
+                <Stack space="space.050">
+                  <Heading size="small">
+                    {t('space_settings.enabled_levels')}
+                  </Heading>
+                  {globalAllowedLevels.map((level) => (
+                    <Inline
+                      key={level.id}
+                      space="space.100"
+                      alignBlock="center"
+                    >
+                      <Checkbox
+                        isChecked={enabledLevelIds.includes(level.id)}
+                        onChange={() => handleToggleLevel(level.id)}
+                        label=""
+                      />
+                      <Lozenge isBold appearance={colorToLozenge(level.color)}>
+                        {localize(level.name, 'en')}
+                      </Lozenge>
+                    </Inline>
+                  ))}
+                </Stack>
+
+                {/* Default level selector */}
+                <Stack space="space.050">
+                  <Label labelFor="space-default-level">
+                    {t('space_settings.default_level')}
+                  </Label>
+                  <Select
+                    inputId="space-default-level"
+                    value={globalAllowedLevels
+                      .filter((l) => l.id === defaultLevelId)
+                      .map((l) => ({
+                        label: localize(l.name, 'en'),
+                        value: l.id,
+                      }))}
+                    options={globalAllowedLevels
+                      .filter((l) => enabledLevelIds.includes(l.id))
+                      .map((l) => ({
+                        label: localize(l.name, 'en'),
+                        value: l.id,
+                      }))}
+                    onChange={(option) => setDefaultLevelId(option.value)}
+                  />
+                </Stack>
+
+                {/* Status message */}
+                {message && (
+                  <SectionMessage
+                    appearance={
+                      message.type === 'error' ? 'error' : 'confirmation'
+                    }
+                  >
+                    <Text>{message.text}</Text>
+                  </SectionMessage>
+                )}
+
+                {/* Action buttons */}
+                <ButtonGroup>
+                  <Button
+                    appearance="primary"
+                    onClick={handleSave}
+                    isLoading={saving}
+                  >
+                    {t('space_settings.save_button')}
+                  </Button>
+                  <Button
+                    appearance="subtle"
+                    onClick={handleReset}
+                    isDisabled={saving}
+                  >
+                    {t('space_settings.reset_button')}
+                  </Button>
+                </ButtonGroup>
               </Stack>
-
-              {/* Default level selector */}
-              <Stack space="space.050">
-                <Label labelFor="space-default-level">{t('space_settings.default_level')}</Label>
-                <Select
-                  inputId="space-default-level"
-                  value={globalAllowedLevels
-                    .filter((l) => l.id === defaultLevelId)
-                    .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
-                  options={globalAllowedLevels
-                    .filter((l) => enabledLevelIds.includes(l.id))
-                    .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
-                  onChange={(option) => setDefaultLevelId(option.value)}
-                />
-              </Stack>
-
-              {/* Status message */}
-              {message && (
-                <SectionMessage appearance={message.type === 'error' ? 'error' : 'confirmation'}>
-                  <Text>{message.text}</Text>
-                </SectionMessage>
-              )}
-
-              {/* Action buttons */}
-              <ButtonGroup>
-                <Button appearance="primary" onClick={handleSave} isLoading={saving}>
-                  {t('space_settings.save_button')}
-                </Button>
-                <Button appearance="subtle" onClick={handleReset} isDisabled={saving}>
-                  {t('space_settings.reset_button')}
-                </Button>
-              </ButtonGroup>
-            </Stack>
             </Box>
           </TabPanel>
         </Tabs>
@@ -360,5 +481,5 @@ const App = () => {
 ForgeReconciler.render(
   <I18nProvider>
     <App />
-  </I18nProvider>
+  </I18nProvider>,
 );

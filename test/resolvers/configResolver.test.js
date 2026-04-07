@@ -9,13 +9,20 @@ vi.mock('../../src/storage/configStore', () => ({
 }));
 
 vi.mock('@forge/api', () => ({
-  default: { asUser: () => ({ requestConfluence: vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ totalSize: 0, results: [] }) }) }) },
-  route: (strings, ...values) => strings.reduce((acc, str, i) => acc + str + (values[i] || ''), ''),
+  default: {
+    asUser: () => ({
+      requestConfluence: vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ totalSize: 0, results: [] }),
+      }),
+    }),
+  },
+  route: (strings, ...values) =>
+    strings.reduce((acc, str, i) => acc + str + (values[i] || ''), ''),
 }));
 
-const { getConfigResolver, setConfigResolver } = await import(
-  '../../src/resolvers/configResolver'
-);
+const { getConfigResolver, setConfigResolver } =
+  await import('../../src/resolvers/configResolver');
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -47,7 +54,9 @@ describe('setConfigResolver — validation', () => {
 
   it('should reject empty levels array', async () => {
     const result = await setConfigResolver(
-      adminReq({ config: { languages: langs, levels: [], defaultLevelId: 'x' } })
+      adminReq({
+        config: { languages: langs, levels: [], defaultLevelId: 'x' },
+      }),
     );
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/at least one/i);
@@ -59,11 +68,16 @@ describe('setConfigResolver — validation', () => {
         config: {
           languages: langs,
           levels: [
-            { id: 'secret', name: { en: 'Secret' }, color: 'red', allowed: false },
+            {
+              id: 'secret',
+              name: { en: 'Secret' },
+              color: 'red',
+              allowed: false,
+            },
           ],
           defaultLevelId: 'secret',
         },
-      })
+      }),
     );
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/allowed/i);
@@ -75,12 +89,22 @@ describe('setConfigResolver — validation', () => {
         config: {
           languages: langs,
           levels: [
-            { id: 'public', name: { en: 'Public' }, color: 'green', allowed: true },
-            { id: 'secret', name: { en: 'Secret' }, color: 'red', allowed: false },
+            {
+              id: 'public',
+              name: { en: 'Public' },
+              color: 'green',
+              allowed: true,
+            },
+            {
+              id: 'secret',
+              name: { en: 'Secret' },
+              color: 'red',
+              allowed: false,
+            },
           ],
           defaultLevelId: 'secret',
         },
-      })
+      }),
     );
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/default.*allowed/i);
@@ -92,12 +116,22 @@ describe('setConfigResolver — validation', () => {
         config: {
           languages: langs,
           levels: [
-            { id: 'public', name: { en: 'Public' }, color: 'green', allowed: true },
-            { id: 'public', name: { en: 'Public 2' }, color: 'blue', allowed: true },
+            {
+              id: 'public',
+              name: { en: 'Public' },
+              color: 'green',
+              allowed: true,
+            },
+            {
+              id: 'public',
+              name: { en: 'Public 2' },
+              color: 'blue',
+              allowed: true,
+            },
           ],
           defaultLevelId: 'public',
         },
-      })
+      }),
     );
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/unique/i);
@@ -109,11 +143,16 @@ describe('setConfigResolver — validation', () => {
         config: {
           languages: langs,
           levels: [
-            { id: 'custom', name: { en: 'Custom' }, color: 'pink', allowed: true },
+            {
+              id: 'custom',
+              name: { en: 'Custom' },
+              color: 'pink',
+              allowed: true,
+            },
           ],
           defaultLevelId: 'custom',
         },
-      })
+      }),
     );
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/color/i);
@@ -125,11 +164,16 @@ describe('setConfigResolver — validation', () => {
         config: {
           languages: langs,
           levels: [
-            { id: 'custom', name: { de: 'Benutzerdefiniert' }, color: 'green', allowed: true },
+            {
+              id: 'custom',
+              name: { de: 'Benutzerdefiniert' },
+              color: 'green',
+              allowed: true,
+            },
           ],
           defaultLevelId: 'custom',
         },
-      })
+      }),
     );
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/english name/i);
@@ -142,7 +186,12 @@ describe('setConfigResolver — validation', () => {
       languages: langs,
       levels: [
         { id: 'public', name: { en: 'Public' }, color: 'green', allowed: true },
-        { id: 'internal', name: { en: 'Internal' }, color: 'yellow', allowed: true },
+        {
+          id: 'internal',
+          name: { en: 'Internal' },
+          color: 'yellow',
+          allowed: true,
+        },
       ],
       defaultLevelId: 'internal',
       contacts: [],
@@ -157,7 +206,9 @@ describe('setConfigResolver — validation', () => {
   it('should reject non-array contacts', async () => {
     const config = {
       languages: langs,
-      levels: [{ id: 'pub', name: { en: 'Public' }, color: 'green', allowed: true }],
+      levels: [
+        { id: 'pub', name: { en: 'Public' }, color: 'green', allowed: true },
+      ],
       defaultLevelId: 'pub',
       contacts: 'not-an-array',
     };
@@ -169,7 +220,9 @@ describe('setConfigResolver — validation', () => {
   it('should reject non-array links', async () => {
     const config = {
       languages: langs,
-      levels: [{ id: 'pub', name: { en: 'Public' }, color: 'green', allowed: true }],
+      levels: [
+        { id: 'pub', name: { en: 'Public' }, color: 'green', allowed: true },
+      ],
       defaultLevelId: 'pub',
       links: 'not-an-array',
     };

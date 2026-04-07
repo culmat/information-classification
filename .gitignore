@@ -20,6 +20,7 @@ Thumbs.db
 *.wmv
 
 /.forge/
+coverage/
 .vscode
 .env
 /tmp

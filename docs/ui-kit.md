@@ -39,7 +39,9 @@ const levelAppearance = (levelId) => {
   return level ? colorToLozenge(level.color) : 'default';
 };
 
-<Lozenge isBold appearance={levelAppearance('confidential')}>confidential</Lozenge>
+<Lozenge isBold appearance={levelAppearance('confidential')}>
+  confidential
+</Lozenge>;
 ```
 
 Color mapping is in `src/shared/constants.js` (`colorToLozenge`).

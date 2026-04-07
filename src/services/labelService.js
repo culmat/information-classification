@@ -12,17 +12,26 @@ import { buildSpaceFilter } from '../shared/constants';
  * spaceKey supports comma-separated values: "IC, DEV".
  * Returns { results: [{ id, title }], totalSize }.
  */
-export async function findPagesByLabel(labelName, limit = 0, startIndex = 0, spaceKey = null, { asApp: useApp = false } = {}) {
+export async function findPagesByLabel(
+  labelName,
+  limit = 0,
+  startIndex = 0,
+  spaceKey = null,
+  { asApp: useApp = false } = {},
+) {
   const cql = `type=page AND label = "${labelName}"${buildSpaceFilter(spaceKey)}`;
   const requester = useApp ? api.asApp() : api.asUser();
   const response = await requester.requestConfluence(
     route`/wiki/rest/api/search?cql=${cql}&limit=${limit}&start=${startIndex}`,
-    { headers: { Accept: 'application/json' } }
+    { headers: { Accept: 'application/json' } },
   );
   if (!response.ok) return { results: [], totalSize: 0 };
   const data = await response.json();
   return {
-    results: (data.results || []).map((r) => ({ id: String(r.content.id), title: r.content.title })),
+    results: (data.results || []).map((r) => ({
+      id: String(r.content.id),
+      title: r.content.title,
+    })),
     totalSize: data.totalSize || 0,
   };
 }
@@ -35,7 +44,7 @@ export async function removeLabelFromPage(pageId, labelName, useApp = false) {
   const requester = useApp ? api.asApp() : api.asUser();
   const response = await requester.requestConfluence(
     route`/wiki/rest/api/content/${pageId}/label?name=${labelName}`,
-    { method: 'DELETE' }
+    { method: 'DELETE' },
   );
   return response.status === 204 || response.ok;
 }
@@ -50,12 +59,17 @@ export async function addLabelToPage(pageId, labelName, useApp = false) {
     route`/wiki/rest/api/content/${pageId}/label`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
       body: JSON.stringify([{ prefix: 'global', name: labelName }]),
-    }
+    },
   );
   if (!response.ok) {
-    console.error(`addLabelToPage(${pageId}, ${labelName}): ${response.status}`);
+    console.error(
+      `addLabelToPage(${pageId}, ${labelName}): ${response.status}`,
+    );
   }
   return response.ok;
 }
@@ -77,10 +91,12 @@ export async function getAllLabels() {
     });
     if (!response.ok) break;
     const data = await response.json();
-    for (const label of (data.results || [])) {
+    for (const label of data.results || []) {
       labels.push({ id: label.id, name: label.name || label.prefix });
     }
-    cursor = data._links?.next ? new URL(data._links.next, 'https://x').searchParams.get('cursor') : null;
+    cursor = data._links?.next
+      ? new URL(data._links.next, 'https://x').searchParams.get('cursor')
+      : null;
     if (!cursor || labels.length > 5000) break; // safety cap
   }
 

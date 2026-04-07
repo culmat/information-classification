@@ -9,17 +9,19 @@ vi.mock('@forge/kvs', () => ({
   kvs: { get: (...args) => mockKvsGet(...args), set: vi.fn(), delete: vi.fn() },
 }));
 
-const mockFindDescendantsToClassify = vi.fn().mockResolvedValue({ results: [], totalSize: 0 });
+const mockFindDescendantsToClassify = vi
+  .fn()
+  .mockResolvedValue({ results: [], totalSize: 0 });
 
 vi.mock('../../src/services/classificationService', () => ({
   getPageClassification: (...args) => mockGetPageClassification(...args),
   classifyPage: (...args) => mockClassifyPage(...args),
-  findDescendantsToClassify: (...args) => mockFindDescendantsToClassify(...args),
+  findDescendantsToClassify: (...args) =>
+    mockFindDescendantsToClassify(...args),
 }));
 
-const { getClassificationResolver, setClassificationResolver } = await import(
-  '../../src/resolvers/classifyResolver'
-);
+const { getClassificationResolver, setClassificationResolver } =
+  await import('../../src/resolvers/classifyResolver');
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -95,7 +97,10 @@ describe('setClassificationResolver', () => {
   });
 
   it('should call classifyPage with correct parameters', async () => {
-    mockClassifyPage.mockResolvedValue({ success: true, classification: { level: 'public' } });
+    mockClassifyPage.mockResolvedValue({
+      success: true,
+      classification: { level: 'public' },
+    });
 
     const result = await setClassificationResolver({
       context: { accountId: 'user-123' },
@@ -144,7 +149,7 @@ describe('setClassificationResolver', () => {
     });
 
     expect(mockClassifyPage).toHaveBeenCalledWith(
-      expect.objectContaining({ recursive: false })
+      expect.objectContaining({ recursive: false }),
     );
   });
 
@@ -157,7 +162,7 @@ describe('setClassificationResolver', () => {
     });
 
     expect(mockClassifyPage).toHaveBeenCalledWith(
-      expect.objectContaining({ locale: 'en' })
+      expect.objectContaining({ locale: 'en' }),
     );
   });
 });

@@ -10,9 +10,8 @@ vi.mock('@forge/kvs', () => ({
 }));
 
 // Import after mocking
-const { getGlobalConfig, setGlobalConfig, getEffectiveConfig } = await import(
-  '../../src/storage/configStore'
-);
+const { getGlobalConfig, setGlobalConfig, getEffectiveConfig } =
+  await import('../../src/storage/configStore');
 const { getDefaultConfig } = await import('../../src/shared/defaults');
 
 beforeEach(() => {
@@ -97,7 +96,9 @@ describe('getEffectiveConfig', () => {
     expect(result.levels.find((l) => l.id === 'public').allowed).toBe(true);
     expect(result.levels.find((l) => l.id === 'internal').allowed).toBe(true);
     // confidential should be disallowed (not in space allowedLevelIds)
-    expect(result.levels.find((l) => l.id === 'confidential').allowed).toBe(false);
+    expect(result.levels.find((l) => l.id === 'confidential').allowed).toBe(
+      false,
+    );
     // secret remains disallowed (globally disallowed AND not in space list)
     expect(result.levels.find((l) => l.id === 'secret').allowed).toBe(false);
   });

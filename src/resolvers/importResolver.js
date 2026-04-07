@@ -8,8 +8,6 @@ import { Queue } from '@forge/events';
 import { kvs } from '@forge/kvs';
 import { findPagesByLabel } from '../services/labelService';
 import { findPagesByLevel } from '../services/classificationService';
-import { matchLabelsToLevels } from '../shared/labelMatcher';
-import { getGlobalConfig } from '../storage/configStore';
 import { asyncJobKey } from '../shared/constants';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 
@@ -17,15 +15,19 @@ import { successResponse, errorResponse } from '../utils/responseHelper';
  * Resolver: listSpaces
  * Returns all spaces for the space picker.
  */
-export async function listSpacesResolver(req) {
+export async function listSpacesResolver(_req) {
   try {
-    const response = await api.asUser().requestConfluence(
-      route`/wiki/api/v2/spaces?limit=250&sort=name`,
-      { headers: { Accept: 'application/json' } }
-    );
+    const response = await api
+      .asUser()
+      .requestConfluence(route`/wiki/api/v2/spaces?limit=250&sort=name`, {
+        headers: { Accept: 'application/json' },
+      });
     if (!response.ok) return successResponse({ spaces: [] });
     const data = await response.json();
-    const spaces = (data.results || []).map((s) => ({ key: s.key, name: s.name }));
+    const spaces = (data.results || []).map((s) => ({
+      key: s.key,
+      name: s.name,
+    }));
     return successResponse({ spaces });
   } catch (error) {
     console.error('Error listing spaces:', error);
@@ -126,7 +128,9 @@ export async function startLabelExportResolver(req) {
     // Count total pages to export
     let totalToExport = 0;
     for (const mapping of mappings) {
-      const { totalSize } = await findPagesByLevel(mapping.levelId, 0, 0, { spaceKey });
+      const { totalSize } = await findPagesByLevel(mapping.levelId, 0, 0, {
+        spaceKey,
+      });
       totalToExport += totalSize;
     }
 

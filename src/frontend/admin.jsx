@@ -87,7 +87,10 @@ const App = () => {
   const [showUnclassified, setShowUnclassified] = useState(true); // coverage toggle
   const [activeTab, setActiveTab] = useState(0);
   const [message, setMessage] = useState(null);
-  const isDirty = config && savedConfig && JSON.stringify(config) !== JSON.stringify(savedConfig);
+  const isDirty =
+    config &&
+    savedConfig &&
+    JSON.stringify(config) !== JSON.stringify(savedConfig);
 
   // Editing state for level modal
   const [editingLevel, setEditingLevel] = useState(null);
@@ -103,13 +106,13 @@ const App = () => {
   const [importScopeAll, setImportScopeAll] = useState(true);
   const [importSpaceKeys, setImportSpaceKeys] = useState([]); // [{ label, value }]
   const [availableSpaces, setAvailableSpaces] = useState([]); // [{ label, value }]
-  const [importResult, setImportResult] = useState(null);
+  const [_importResult, setImportResult] = useState(null);
   const [importProgress, setImportProgress] = useState(null); // { classified, failed, total, done }
 
   // Label export state
   const [exportMappings, setExportMappings] = useState({}); // { levelId: labelName }
   const [exportLoading, setExportLoading] = useState(false);
-  const [exportResult, setExportResult] = useState(null);
+  const [_exportResult, setExportResult] = useState(null);
   const [exportProgress, setExportProgress] = useState(null); // { classified, failed, total, done }
   const [exportScopeAll, setExportScopeAll] = useState(true);
   const [exportSpaceKeys, setExportSpaceKeys] = useState([]); // [{ label, value }]
@@ -159,7 +162,6 @@ const App = () => {
     })();
   }, [t]);
 
-
   // Save configuration
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -176,7 +178,10 @@ const App = () => {
           isAutoDismiss: true,
         });
       } else {
-        setMessage({ type: 'error', text: result.error || t('admin.save_error') });
+        setMessage({
+          type: 'error',
+          text: result.error || t('admin.save_error'),
+        });
       }
     } catch (error) {
       console.error('Failed to save config:', error);
@@ -230,10 +235,17 @@ const App = () => {
     try {
       const result = await invoke('countLevelUsage', { levelId });
       if (result.success && result.count > 0) {
-        setDeleteConfirm({ levelId, levelName, pageCount: result.count, reclassifyTo: null });
+        setDeleteConfirm({
+          levelId,
+          levelName,
+          pageCount: result.count,
+          reclassifyTo: null,
+        });
         return;
       }
-    } catch (_) { /* CQL failed — allow delete without warning */ }
+    } catch (_) {
+      /* CQL failed — allow delete without warning */
+    }
 
     // No pages use this level — delete immediately
     removeLevelFromConfig(levelId);
@@ -261,11 +273,18 @@ const App = () => {
 
   // Load available spaces on mount
   useEffect(() => {
-    invoke('listSpaces').then((result) => {
-      if (result.success && result.spaces) {
-        setAvailableSpaces(result.spaces.map((s) => ({ label: `${s.name} (${s.key})`, value: s.key })));
-      }
-    }).catch(() => {});
+    invoke('listSpaces')
+      .then((result) => {
+        if (result.success && result.spaces) {
+          setAvailableSpaces(
+            result.spaces.map((s) => ({
+              label: `${s.name} (${s.key})`,
+              value: s.key,
+            })),
+          );
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Use refs for scope so debounced callbacks always read latest values
@@ -277,7 +296,9 @@ const App = () => {
   // Returns null for "all", comma-separated keys for "space", or '' if space mode but no keys selected
   const getImportSpaceKey = () => {
     if (importScopeAllRef.current) return null;
-    const keys = (importSpaceKeysRef.current || []).map((o) => o.value).filter(Boolean);
+    const keys = (importSpaceKeysRef.current || [])
+      .map((o) => o.value)
+      .filter(Boolean);
     return keys.length > 0 ? keys.join(',') : '';
   };
 
@@ -285,7 +306,9 @@ const App = () => {
     setImportCountLoading(true);
     const allowedLevels = (config?.levels || []).filter((l) => l.allowed);
     const allLevelIds = allowedLevels.map((l) => l.id);
-    setImportLevelLoading(Object.fromEntries(allLevelIds.map((id) => [id, true])));
+    setImportLevelLoading(
+      Object.fromEntries(allLevelIds.map((id) => [id, true])),
+    );
     const spaceKey = getImportSpaceKey();
 
     // Space mode but no valid keys entered — show 0 for all levels
@@ -300,7 +323,10 @@ const App = () => {
     const source = labelsOverride || importLabels;
     for (const level of allowedLevels) {
       const labelStr = source[level.id] || '';
-      const labels = labelStr.split(',').map((l) => l.trim()).filter(Boolean);
+      const labels = labelStr
+        .split(',')
+        .map((l) => l.trim())
+        .filter(Boolean);
       allLabels.push(...labels.map((l) => ({ level: level.id, label: l })));
     }
     // Count all labels in parallel
@@ -309,8 +335,10 @@ const App = () => {
         try {
           const result = await invoke('countLabelPages', { label, spaceKey });
           return { level, count: result.success ? result.count : 0 };
-        } catch (_) { return { level, count: 0 }; }
-      })
+        } catch (_) {
+          return { level, count: 0 };
+        }
+      }),
     );
     for (const { level, count } of results) {
       counts[level] = (counts[level] || 0) + count;
@@ -338,7 +366,10 @@ const App = () => {
         setImportLevelLoading((prev) => ({ ...prev, [levelId]: false }));
         return;
       }
-      const labels = labelStr.split(',').map((l) => l.trim()).filter(Boolean);
+      const labels = labelStr
+        .split(',')
+        .map((l) => l.trim())
+        .filter(Boolean);
       let total = 0;
       for (const label of labels) {
         try {
@@ -367,21 +398,33 @@ const App = () => {
   useEffect(() => {
     if (importStep !== 'running') return;
     // Clean up any previous subscription
-    if (importSubRef.current) { importSubRef.current.unsubscribe(); importSubRef.current = null; }
-    realtime.subscribeGlobal('classification-progress:label-import', (data) => {
-      setImportProgress((prev) => ({ ...prev, ...data }));
-      if (data.done) {
-        setImportStep('done');
-        showFlag({
-          id: 'import-complete',
-          title: interpolate(t('admin.import.complete'), { classified: data.classified || 0 }),
-          type: 'success',
-          isAutoDismiss: true,
-        });
-        refreshImportCounts();
-        if (importSubRef.current) { importSubRef.current.unsubscribe(); importSubRef.current = null; }
-      }
-    }).then((sub) => { importSubRef.current = sub; });
+    if (importSubRef.current) {
+      importSubRef.current.unsubscribe();
+      importSubRef.current = null;
+    }
+    realtime
+      .subscribeGlobal('classification-progress:label-import', (data) => {
+        setImportProgress((prev) => ({ ...prev, ...data }));
+        if (data.done) {
+          setImportStep('done');
+          showFlag({
+            id: 'import-complete',
+            title: interpolate(t('admin.import.complete'), {
+              classified: data.classified || 0,
+            }),
+            type: 'success',
+            isAutoDismiss: true,
+          });
+          refreshImportCounts();
+          if (importSubRef.current) {
+            importSubRef.current.unsubscribe();
+            importSubRef.current = null;
+          }
+        }
+      })
+      .then((sub) => {
+        importSubRef.current = sub;
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [importStep === 'running']);
 
@@ -390,40 +433,66 @@ const App = () => {
   const [exportListening, setExportListening] = useState(false);
   useEffect(() => {
     if (!exportListening) return;
-    if (exportSubRef.current) { exportSubRef.current.unsubscribe(); exportSubRef.current = null; }
-    realtime.subscribeGlobal('classification-progress:label-export', (data) => {
-      setExportProgress((prev) => ({ ...prev, ...data }));
-      if (data.done) {
-        setExportLoading(false);
-        setExportListening(false);
-        showFlag({
-          id: 'export-complete',
-          title: interpolate(t('admin.export.complete'), { exported: data.classified || 0 }),
-          type: 'success',
-          isAutoDismiss: true,
-        });
-        if (exportSubRef.current) { exportSubRef.current.unsubscribe(); exportSubRef.current = null; }
-      }
-    }).then((sub) => { exportSubRef.current = sub; });
+    if (exportSubRef.current) {
+      exportSubRef.current.unsubscribe();
+      exportSubRef.current = null;
+    }
+    realtime
+      .subscribeGlobal('classification-progress:label-export', (data) => {
+        setExportProgress((prev) => ({ ...prev, ...data }));
+        if (data.done) {
+          setExportLoading(false);
+          setExportListening(false);
+          showFlag({
+            id: 'export-complete',
+            title: interpolate(t('admin.export.complete'), {
+              exported: data.classified || 0,
+            }),
+            type: 'success',
+            isAutoDismiss: true,
+          });
+          if (exportSubRef.current) {
+            exportSubRef.current.unsubscribe();
+            exportSubRef.current = null;
+          }
+        }
+      })
+      .then((sub) => {
+        exportSubRef.current = sub;
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exportListening]);
 
   const startImport = async () => {
     // Build mappings from the label inputs
-    const mappings = (config?.levels || []).filter((l) => l.allowed)
+    const mappings = (config?.levels || [])
+      .filter((l) => l.allowed)
       .map((level) => ({
         levelId: level.id,
-        labels: (importLabels[level.id] || '').split(',').map((l) => l.trim()).filter(Boolean),
+        labels: (importLabels[level.id] || '')
+          .split(',')
+          .map((l) => l.trim())
+          .filter(Boolean),
       }))
       .filter((m) => m.labels.length > 0);
 
     if (mappings.length === 0) return;
 
     setImportStep('running');
-    setImportProgress({ classified: 0, failed: 0, total: 0, done: false, startedAt: Date.now() });
+    setImportProgress({
+      classified: 0,
+      failed: 0,
+      total: 0,
+      done: false,
+      startedAt: Date.now(),
+    });
     try {
       const spaceKey = getImportSpaceKey() || null;
-      const result = await invoke('startLabelImport', { mappings, removeLabels: importRemoveLabels, spaceKey });
+      const result = await invoke('startLabelImport', {
+        mappings,
+        removeLabels: importRemoveLabels,
+        spaceKey,
+      });
       setImportResult(result);
       setImportProgress((prev) => ({ ...prev, total: result.count || 0 }));
     } catch (error) {
@@ -437,18 +506,32 @@ const App = () => {
     const mappings = (config?.levels || [])
       .map((level) => ({
         levelId: level.id,
-        labelName: (exportMappings[level.id] !== undefined ? exportMappings[level.id] : level.id).trim(),
+        labelName: (exportMappings[level.id] !== undefined
+          ? exportMappings[level.id]
+          : level.id
+        ).trim(),
       }))
       .filter((m) => m.labelName.length > 0);
     setExportLoading(true);
     setExportResult(null);
     setExportProgress({ classified: 0, failed: 0, total: 0, done: false });
     try {
-      const exportKeys = exportScopeAll ? null : (exportSpaceKeys || []).map((o) => o.value).join(',') || null;
-      const result = await invoke('startLabelExport', { mappings, spaceKey: exportKeys });
+      const exportKeys = exportScopeAll
+        ? null
+        : (exportSpaceKeys || []).map((o) => o.value).join(',') || null;
+      const result = await invoke('startLabelExport', {
+        mappings,
+        spaceKey: exportKeys,
+      });
       if (result.success) {
         setExportResult(result);
-        setExportProgress({ classified: 0, failed: 0, total: result.count || 0, done: false, startedAt: Date.now() });
+        setExportProgress({
+          classified: 0,
+          failed: 0,
+          total: result.count || 0,
+          done: false,
+          startedAt: Date.now(),
+        });
         setExportListening(true);
       } else {
         setExportProgress(null);
@@ -476,9 +559,17 @@ const App = () => {
     if (!deleteConfirm?.reclassifyTo) return;
     setDeleteLoading(true);
     try {
-      await invoke('reclassifyLevel', { fromLevelId: deleteConfirm.levelId, toLevelId: deleteConfirm.reclassifyTo });
+      await invoke('reclassifyLevel', {
+        fromLevelId: deleteConfirm.levelId,
+        toLevelId: deleteConfirm.reclassifyTo,
+      });
       removeLevelFromConfig(deleteConfirm.levelId);
-      showFlag({ id: 'reclassify-started', title: t('admin.levels.delete_reclassifying'), type: 'info', isAutoDismiss: true });
+      showFlag({
+        id: 'reclassify-started',
+        title: t('admin.levels.delete_reclassifying'),
+        type: 'info',
+        isAutoDismiss: true,
+      });
     } catch (error) {
       console.error('Failed to reclassify:', error);
     } finally {
@@ -570,57 +661,112 @@ const App = () => {
   };
 
   if (loading) {
-    return <Box xcss={containerStyle}><Spinner size="large" /></Box>;
+    return (
+      <Box xcss={containerStyle}>
+        <Spinner size="large" />
+      </Box>
+    );
   }
 
   // --- Table data ---
   // Use numeric keys to prevent DynamicTable from re-sorting rows alphabetically
   const levelRows = (config?.levels || []).map((level, index) => ({
-      key: `level-${index}`,
-      cells: [
-        {
-          key: 'color',
-          content: (
-            <Lozenge isBold appearance={colorToLozenge(level.color)}>{localize(level.name, 'en')}</Lozenge>
-          ),
-        },
-        { key: 'allowed', content: level.allowed ? <Badge appearance="added">Yes</Badge> : <Badge appearance="removed">No</Badge> },
-        { key: 'protection', content: level.requiresProtection ? <Badge>Yes</Badge> : <Text>No</Text> },
-        {
-          key: 'actions',
-          content: (
-            <ButtonGroup>
-              <Button appearance="subtle" onClick={() => moveLevel(level.id, -1)} isDisabled={index === 0}>{t('admin.levels.move_up')}</Button>
-              <Button appearance="subtle" onClick={() => moveLevel(level.id, 1)} isDisabled={index === config.levels.length - 1}>{t('admin.levels.move_down')}</Button>
-              <Button appearance="subtle" onClick={() => editLevel(level)}>{t('admin.levels.edit_button')}</Button>
-              <Button appearance="danger" onClick={() => deleteLevel(level.id)}>{t('admin.levels.delete_button')}</Button>
-            </ButtonGroup>
-          ),
-        },
-      ],
-    }));
-
-  const contactRows = (config?.contacts || []).map((contact) => ({
-    key: contact.id,
+    key: `level-${index}`,
     cells: [
-      { key: 'type', content: <Text>{t(`admin.contacts.type_${contact.type}`)}</Text> },
       {
-        key: 'value',
-        content: contact.type === 'user'
-          ? <User accountId={contact.value} />
-          : <Text>{contact.value}</Text>,
+        key: 'color',
+        content: (
+          <Lozenge isBold appearance={colorToLozenge(level.color)}>
+            {localize(level.name, 'en')}
+          </Lozenge>
+        ),
       },
-      { key: 'role', content: <Text>{localize(contact.role, 'en')}</Text> },
       {
-        key: 'applies',
-        content: <Text>{contact.levelIds?.length > 0 ? contact.levelIds.join(', ') : t('admin.contacts.applies_to_all')}</Text>,
+        key: 'allowed',
+        content: level.allowed ? (
+          <Badge appearance="added">Yes</Badge>
+        ) : (
+          <Badge appearance="removed">No</Badge>
+        ),
+      },
+      {
+        key: 'protection',
+        content: level.requiresProtection ? (
+          <Badge>Yes</Badge>
+        ) : (
+          <Text>No</Text>
+        ),
       },
       {
         key: 'actions',
         content: (
           <ButtonGroup>
-            <Button appearance="subtle" onClick={() => editContact(contact)}>{t('admin.levels.edit_button')}</Button>
-            <Button appearance="danger" onClick={() => deleteContact(contact.id)}>{t('admin.levels.delete_button')}</Button>
+            <Button
+              appearance="subtle"
+              onClick={() => moveLevel(level.id, -1)}
+              isDisabled={index === 0}
+            >
+              {t('admin.levels.move_up')}
+            </Button>
+            <Button
+              appearance="subtle"
+              onClick={() => moveLevel(level.id, 1)}
+              isDisabled={index === config.levels.length - 1}
+            >
+              {t('admin.levels.move_down')}
+            </Button>
+            <Button appearance="subtle" onClick={() => editLevel(level)}>
+              {t('admin.levels.edit_button')}
+            </Button>
+            <Button appearance="danger" onClick={() => deleteLevel(level.id)}>
+              {t('admin.levels.delete_button')}
+            </Button>
+          </ButtonGroup>
+        ),
+      },
+    ],
+  }));
+
+  const contactRows = (config?.contacts || []).map((contact) => ({
+    key: contact.id,
+    cells: [
+      {
+        key: 'type',
+        content: <Text>{t(`admin.contacts.type_${contact.type}`)}</Text>,
+      },
+      {
+        key: 'value',
+        content:
+          contact.type === 'user' ? (
+            <User accountId={contact.value} />
+          ) : (
+            <Text>{contact.value}</Text>
+          ),
+      },
+      { key: 'role', content: <Text>{localize(contact.role, 'en')}</Text> },
+      {
+        key: 'applies',
+        content: (
+          <Text>
+            {contact.levelIds?.length > 0
+              ? contact.levelIds.join(', ')
+              : t('admin.contacts.applies_to_all')}
+          </Text>
+        ),
+      },
+      {
+        key: 'actions',
+        content: (
+          <ButtonGroup>
+            <Button appearance="subtle" onClick={() => editContact(contact)}>
+              {t('admin.levels.edit_button')}
+            </Button>
+            <Button
+              appearance="danger"
+              onClick={() => deleteContact(contact.id)}
+            >
+              {t('admin.levels.delete_button')}
+            </Button>
           </ButtonGroup>
         ),
       },
@@ -630,25 +776,46 @@ const App = () => {
   const linkRows = (config?.links || []).map((link) => ({
     key: link.id,
     cells: [
-      { key: 'type', content: <Text>{t(`admin.links.type_${link.type || 'external'}`)}</Text> },
+      {
+        key: 'type',
+        content: (
+          <Text>{t(`admin.links.type_${link.type || 'external'}`)}</Text>
+        ),
+      },
       { key: 'label', content: <Text>{localize(link.label, 'en')}</Text> },
-      { key: 'url', content: <Link href={link.url} openNewTab>{link.url}</Link> },
+      {
+        key: 'url',
+        content: (
+          <Link href={link.url} openNewTab>
+            {link.url}
+          </Link>
+        ),
+      },
       {
         key: 'applies',
-        content: <Text>{link.levelIds?.length > 0 ? link.levelIds.join(', ') : t('admin.links.applies_to_all')}</Text>,
+        content: (
+          <Text>
+            {link.levelIds?.length > 0
+              ? link.levelIds.join(', ')
+              : t('admin.links.applies_to_all')}
+          </Text>
+        ),
       },
       {
         key: 'actions',
         content: (
           <ButtonGroup>
-            <Button appearance="subtle" onClick={() => editLink(link)}>{t('admin.levels.edit_button')}</Button>
-            <Button appearance="danger" onClick={() => deleteLink(link.id)}>{t('admin.levels.delete_button')}</Button>
+            <Button appearance="subtle" onClick={() => editLink(link)}>
+              {t('admin.levels.edit_button')}
+            </Button>
+            <Button appearance="danger" onClick={() => deleteLink(link.id)}>
+              {t('admin.levels.delete_button')}
+            </Button>
           </ButtonGroup>
         ),
       },
     ],
   }));
-
 
   return (
     <Box xcss={containerStyle}>
@@ -668,522 +835,848 @@ const App = () => {
           {/* Statistics Tab */}
           <TabPanel>
             <Box xcss={tabPanelStyle}>
-            <Stack space="space.200">
-              <Heading size="medium">{t('admin.audit.title')}</Heading>
+              <Stack space="space.200">
+                <Heading size="medium">{t('admin.audit.title')}</Heading>
 
-              {/* Coverage stats */}
-              {auditData && (
-                <Inline space="space.400">
-                  <Stack space="space.050">
-                    <Text>{t('admin.audit.classified_pages')}</Text>
-                    <Heading size="medium">{auditData.classifiedPages} / {auditData.totalPages}</Heading>
-                  </Stack>
-                </Inline>
-              )}
+                {/* Coverage stats */}
+                {auditData && (
+                  <Inline space="space.400">
+                    <Stack space="space.050">
+                      <Text>{t('admin.audit.classified_pages')}</Text>
+                      <Heading size="medium">
+                        {auditData.classifiedPages} / {auditData.totalPages}
+                      </Heading>
+                    </Stack>
+                  </Inline>
+                )}
 
-              {/* Coverage toggle — keep in sync with the identical toggle
+                {/* Coverage toggle — keep in sync with the identical toggle
                  in spaceSettings.jsx (Statistics tab). */}
-              <Inline space="space.100" alignBlock="center">
-                <Toggle
-                  id="coverage-toggle"
-                  isChecked={showUnclassified}
-                  onChange={() => setShowUnclassified(!showUnclassified)}
-                />
-                <Label labelFor="coverage-toggle">{t('admin.audit.show_unclassified')}</Label>
-              </Inline>
+                <Inline space="space.100" alignBlock="center">
+                  <Toggle
+                    id="coverage-toggle"
+                    isChecked={showUnclassified}
+                    onChange={() => setShowUnclassified(!showUnclassified)}
+                  />
+                  <Label labelFor="coverage-toggle">
+                    {t('admin.audit.show_unclassified')}
+                  </Label>
+                </Inline>
 
-              {/* Distribution chart — when "show unclassified" is OFF, unclassified
+                {/* Distribution chart — when "show unclassified" is OFF, unclassified
                  pages are rolled into the default level so the chart always reflects
                  the effective classification of every page.
                  Keep chart logic in sync with spaceSettings.jsx (Statistics tab). */}
-              {auditData && auditData.totalPages > 0 && (() => {
-                const unclassified = auditData.totalPages - auditData.classifiedPages;
-                const chartData = (auditData.distribution || []).map((l) => ({ ...l }));
-                if (showUnclassified) {
-                  // Show unclassified as a separate slice
-                  if (unclassified > 0) {
-                    chartData.push({ level: t('admin.audit.unclassified'), count: unclassified });
-                  }
-                } else if (unclassified > 0 && config?.defaultLevelId) {
-                  // Roll unclassified pages into the default level
-                  const defaultEntry = chartData.find((d) => d.level === config.defaultLevelId);
-                  if (defaultEntry) {
-                    defaultEntry.count += unclassified;
-                  }
-                }
-                const filtered = chartData.filter((l) => l.count > 0);
-                const allLevelIds = (config?.levels || []).map((l) => l.id);
-                const unclassifiedCql = allLevelIds.length > 0
-                  ? `type=page AND NOT (${allLevelIds.map((id) => `culmat_classification_level="${id}"`).join(' OR ')})`
-                  : null;
-                return filtered.length > 0 ? (
-                  <Stack space="space.100">
-                    <Inline space="space.050" alignBlock="center">
-                      <Heading size="small">{t('admin.audit.distribution')}</Heading>
-                      <Button appearance="subtle" spacing="compact" iconBefore="refresh" isLoading={auditLoading} onClick={refreshAuditData}> </Button>
-                    </Inline>
-                    <DonutChart
-                      data={filtered}
-                      colorAccessor="level"
-                      valueAccessor="count"
-                      labelAccessor="level"
-                      colorPalette={[
-                        ...(config?.levels || []).map((l) => ({ key: l.id, value: colorToHex(l.color) })),
-                        { key: t('admin.audit.unclassified'), value: '#8993A5' },
-                      ]}
-                    />
-                    <Stack space="space.050">
-                      {filtered.map((entry) => {
-                        const isUnclassified = entry.level === t('admin.audit.unclassified');
-                        const cql = isUnclassified ? unclassifiedCql : `type=page AND culmat_classification_level="${entry.level}"`;
-                        return cql ? (
-                          <Text key={entry.level}><Link href={`/wiki/search?cql=${encodeURIComponent(cql)}`} openNewTab>{entry.level} ({entry.count})</Link></Text>
+                {auditData &&
+                  auditData.totalPages > 0 &&
+                  (() => {
+                    const unclassified =
+                      auditData.totalPages - auditData.classifiedPages;
+                    const chartData = (auditData.distribution || []).map(
+                      (l) => ({ ...l }),
+                    );
+                    if (showUnclassified) {
+                      // Show unclassified as a separate slice
+                      if (unclassified > 0) {
+                        chartData.push({
+                          level: t('admin.audit.unclassified'),
+                          count: unclassified,
+                        });
+                      }
+                    } else if (unclassified > 0 && config?.defaultLevelId) {
+                      // Roll unclassified pages into the default level
+                      const defaultEntry = chartData.find(
+                        (d) => d.level === config.defaultLevelId,
+                      );
+                      if (defaultEntry) {
+                        defaultEntry.count += unclassified;
+                      }
+                    }
+                    const filtered = chartData.filter((l) => l.count > 0);
+                    const allLevelIds = (config?.levels || []).map((l) => l.id);
+                    const unclassifiedCql =
+                      allLevelIds.length > 0
+                        ? `type=page AND NOT (${allLevelIds.map((id) => `culmat_classification_level="${id}"`).join(' OR ')})`
+                        : null;
+                    return filtered.length > 0 ? (
+                      <Stack space="space.100">
+                        <Inline space="space.050" alignBlock="center">
+                          <Heading size="small">
+                            {t('admin.audit.distribution')}
+                          </Heading>
+                          <Button
+                            appearance="subtle"
+                            spacing="compact"
+                            iconBefore="refresh"
+                            isLoading={auditLoading}
+                            onClick={refreshAuditData}
+                          >
+                            {' '}
+                          </Button>
+                        </Inline>
+                        <DonutChart
+                          data={filtered}
+                          colorAccessor="level"
+                          valueAccessor="count"
+                          labelAccessor="level"
+                          colorPalette={[
+                            ...(config?.levels || []).map((l) => ({
+                              key: l.id,
+                              value: colorToHex(l.color),
+                            })),
+                            {
+                              key: t('admin.audit.unclassified'),
+                              value: '#8993A5',
+                            },
+                          ]}
+                        />
+                        {auditLoading ? (
+                          <Spinner size="small" />
                         ) : (
-                          <Text key={entry.level}>{entry.level} ({entry.count})</Text>
-                        );
-                      })}
-                    </Stack>
-                  </Stack>
-                ) : null;
-              })()}
+                          <Stack space="space.050">
+                            {filtered.map((entry) => {
+                              const isUnclassified =
+                                entry.level === t('admin.audit.unclassified');
+                              const cql = isUnclassified
+                                ? unclassifiedCql
+                                : `type=page AND culmat_classification_level="${entry.level}"`;
+                              return cql ? (
+                                <Text key={entry.level}>
+                                  <Link
+                                    href={`/wiki/search?cql=${encodeURIComponent(cql)}`}
+                                    openNewTab
+                                  >
+                                    {entry.level} ({entry.count})
+                                  </Link>
+                                </Text>
+                              ) : (
+                                <Text key={entry.level}>
+                                  {entry.level} ({entry.count})
+                                </Text>
+                              );
+                            })}
+                          </Stack>
+                        )}
+                      </Stack>
+                    ) : null;
+                  })()}
 
-              {/* Recently classified pages — keep in sync with spaceSettings.jsx.
+                {/* Recently classified pages — keep in sync with spaceSettings.jsx.
                  Only show heading + table when there are entries to display. */}
-              {(auditData?.recentPages || []).length > 0 && (
-                <>
-                  <Heading size="small">{t('admin.audit.recent_changes')}</Heading>
-                  <DynamicTable
-                    head={{
-                      cells: [
-                        { key: 'title', content: t('admin.audit.page') },
-                        { key: 'space', content: t('admin.audit.space') },
-                      ],
-                    }}
-                    rows={auditData.recentPages.map((page, index) => ({
-                      key: page.id || String(index),
-                      cells: [
-                        { key: 'title', content: page.url
-                          ? <Link href={`/wiki${page.url}`}>{page.title}</Link>
-                          : <Text>{page.title}</Text> },
-                        { key: 'space', content: <Text>{page.spaceKey}</Text> },
-                      ],
-                    }))}
-                    rowsPerPage={20}
-                  />
-                </>
-              )}
-            </Stack>
+                {(auditData?.recentPages || []).length > 0 && (
+                  <>
+                    <Heading size="small">
+                      {t('admin.audit.recent_changes')}
+                    </Heading>
+                    <DynamicTable
+                      head={{
+                        cells: [
+                          { key: 'title', content: t('admin.audit.page') },
+                          { key: 'space', content: t('admin.audit.space') },
+                        ],
+                      }}
+                      rows={auditData.recentPages.map((page, index) => ({
+                        key: page.id || String(index),
+                        cells: [
+                          {
+                            key: 'title',
+                            content: page.url ? (
+                              <Link href={`/wiki${page.url}`}>
+                                {page.title}
+                              </Link>
+                            ) : (
+                              <Text>{page.title}</Text>
+                            ),
+                          },
+                          {
+                            key: 'space',
+                            content: <Text>{page.spaceKey}</Text>,
+                          },
+                        ],
+                      }))}
+                      rowsPerPage={20}
+                    />
+                  </>
+                )}
+              </Stack>
             </Box>
           </TabPanel>
 
           {/* Levels Tab */}
           <TabPanel>
             <Box xcss={tabPanelStyle}>
-            <Stack space="space.200">
-              <Inline space="space.200" alignBlock="center" spread="space-between">
-                <Heading size="medium">{t('admin.levels.title')}</Heading>
-                <Button appearance="primary" onClick={addLevel}>{t('admin.levels.add_button')}</Button>
-              </Inline>
+              <Stack space="space.200">
+                <Inline
+                  space="space.200"
+                  alignBlock="center"
+                  spread="space-between"
+                >
+                  <Heading size="medium">{t('admin.levels.title')}</Heading>
+                  <Button appearance="primary" onClick={addLevel}>
+                    {t('admin.levels.add_button')}
+                  </Button>
+                </Inline>
 
-              <DynamicTable
-                head={{
-                  cells: [
-                    { key: 'color', content: t('admin.levels.name') },
-                    { key: 'allowed', content: t('admin.levels.allowed') },
-                    { key: 'protection', content: t('admin.levels.requires_protection') },
-                    { key: 'actions', content: '' },
-                  ],
-                }}
-                rows={levelRows}
-                emptyView={<Text>No levels configured.</Text>}
-              />
-
-              {/* Default level selector */}
-              <Inline space="space.100" alignBlock="center">
-                <Label labelFor="default-level">{t('admin.levels.default_level')}</Label>
-                <Select
-                  inputId="default-level"
-                  value={config?.levels?.filter((l) => l.id === config.defaultLevelId).map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
-                  options={(config?.levels || [])
-                    .filter((l) => l.allowed)
-                    .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
-                  onChange={(option) => setConfig({ ...config, defaultLevelId: option.value })}
+                <DynamicTable
+                  head={{
+                    cells: [
+                      { key: 'color', content: t('admin.levels.name') },
+                      { key: 'allowed', content: t('admin.levels.allowed') },
+                      {
+                        key: 'protection',
+                        content: t('admin.levels.requires_protection'),
+                      },
+                      { key: 'actions', content: '' },
+                    ],
+                  }}
+                  rows={levelRows}
+                  emptyView={<Text>No levels configured.</Text>}
                 />
-              </Inline>
-            </Stack>
+
+                {/* Default level selector */}
+                <Inline space="space.100" alignBlock="center">
+                  <Label labelFor="default-level">
+                    {t('admin.levels.default_level')}
+                  </Label>
+                  <Select
+                    inputId="default-level"
+                    value={config?.levels
+                      ?.filter((l) => l.id === config.defaultLevelId)
+                      .map((l) => ({
+                        label: localize(l.name, 'en'),
+                        value: l.id,
+                      }))}
+                    options={(config?.levels || [])
+                      .filter((l) => l.allowed)
+                      .map((l) => ({
+                        label: localize(l.name, 'en'),
+                        value: l.id,
+                      }))}
+                    onChange={(option) =>
+                      setConfig({ ...config, defaultLevelId: option.value })
+                    }
+                  />
+                </Inline>
+              </Stack>
             </Box>
           </TabPanel>
 
           {/* Contacts Tab */}
           <TabPanel>
             <Box xcss={tabPanelStyle}>
-            <Stack space="space.200">
-              <Inline space="space.200" alignBlock="center" spread="space-between">
-                <Heading size="medium">{t('admin.contacts.title')}</Heading>
-                <Button appearance="primary" onClick={addContact}>{t('admin.contacts.add_button')}</Button>
-              </Inline>
+              <Stack space="space.200">
+                <Inline
+                  space="space.200"
+                  alignBlock="center"
+                  spread="space-between"
+                >
+                  <Heading size="medium">{t('admin.contacts.title')}</Heading>
+                  <Button appearance="primary" onClick={addContact}>
+                    {t('admin.contacts.add_button')}
+                  </Button>
+                </Inline>
 
-              <DynamicTable
-                head={{
-                  cells: [
-                    { key: 'type', content: t('admin.contacts.type') },
-                    { key: 'value', content: t('admin.contacts.value') },
-                    { key: 'role', content: t('admin.contacts.role') },
-                    { key: 'applies', content: t('admin.contacts.applies_to') },
-                    { key: 'actions', content: '' },
-                  ],
-                }}
-                rows={contactRows}
-                emptyView={<Text>{t('byline.no_contacts')}</Text>}
-              />
-            </Stack>
+                <DynamicTable
+                  head={{
+                    cells: [
+                      { key: 'type', content: t('admin.contacts.type') },
+                      { key: 'value', content: t('admin.contacts.value') },
+                      { key: 'role', content: t('admin.contacts.role') },
+                      {
+                        key: 'applies',
+                        content: t('admin.contacts.applies_to'),
+                      },
+                      { key: 'actions', content: '' },
+                    ],
+                  }}
+                  rows={contactRows}
+                  emptyView={<Text>{t('byline.no_contacts')}</Text>}
+                />
+              </Stack>
             </Box>
           </TabPanel>
 
           {/* Links Tab */}
           <TabPanel>
             <Box xcss={tabPanelStyle}>
-            <Stack space="space.200">
-              <Inline space="space.200" alignBlock="center" spread="space-between">
-                <Heading size="medium">{t('admin.links.title')}</Heading>
-                <Button appearance="primary" onClick={addLink}>{t('admin.links.add_button')}</Button>
-              </Inline>
+              <Stack space="space.200">
+                <Inline
+                  space="space.200"
+                  alignBlock="center"
+                  spread="space-between"
+                >
+                  <Heading size="medium">{t('admin.links.title')}</Heading>
+                  <Button appearance="primary" onClick={addLink}>
+                    {t('admin.links.add_button')}
+                  </Button>
+                </Inline>
 
-              <DynamicTable
-                head={{
-                  cells: [
-                    { key: 'type', content: t('admin.links.type') },
-                    { key: 'label', content: t('admin.links.label') },
-                    { key: 'url', content: t('admin.links.url') },
-                    { key: 'applies', content: t('admin.links.applies_to') },
-                    { key: 'actions', content: '' },
-                  ],
-                }}
-                rows={linkRows}
-                emptyView={<Text>{t('byline.no_links')}</Text>}
-              />
-            </Stack>
+                <DynamicTable
+                  head={{
+                    cells: [
+                      { key: 'type', content: t('admin.links.type') },
+                      { key: 'label', content: t('admin.links.label') },
+                      { key: 'url', content: t('admin.links.url') },
+                      { key: 'applies', content: t('admin.links.applies_to') },
+                      { key: 'actions', content: '' },
+                    ],
+                  }}
+                  rows={linkRows}
+                  emptyView={<Text>{t('byline.no_links')}</Text>}
+                />
+              </Stack>
             </Box>
           </TabPanel>
 
           {/* Languages Tab */}
           <TabPanel>
             <Box xcss={tabPanelStyle}>
-            <Stack space="space.200">
-              <Heading size="medium">{t('admin.languages.title')}</Heading>
-              <Text>{t('admin.languages.description')}</Text>
+              <Stack space="space.200">
+                <Heading size="medium">{t('admin.languages.title')}</Heading>
+                <Text>{t('admin.languages.description')}</Text>
 
-              {/* English is always first and cannot be removed */}
-              <Inline space="space.100" alignBlock="center">
-                <Lozenge appearance="success" isBold>{t('language_names.en')} (en)</Lozenge>
-                <Text>{t('admin.languages.english_required')}</Text>
-              </Inline>
+                {/* English is always first and cannot be removed */}
+                <Inline space="space.100" alignBlock="center">
+                  <Lozenge appearance="success" isBold>
+                    {t('language_names.en')} (en)
+                  </Lozenge>
+                  <Text>{t('admin.languages.english_required')}</Text>
+                </Inline>
 
-              {/* Additional languages */}
-              {(() => {
-                const extraLangs = (config?.languages || []).filter((l) => l.code !== 'en');
-                return extraLangs.length > 0 ? (
-                  <DynamicTable
-                    head={{
-                      cells: [
-                        { key: 'code', content: t('admin.languages.language') },
-                        { key: 'actions', content: '' },
-                      ],
-                    }}
-                    rows={extraLangs.map((lang, index) => ({
-                      key: lang.code,
-                      cells: [
-                        { key: 'code', content: <Text>{t(`language_names.${lang.code}`)} ({lang.code})</Text> },
-                        {
-                          key: 'actions',
-                          content: (
-                            <ButtonGroup>
-                              <Button
-                                appearance="subtle"
-                                onClick={() => {
-                                  setConfig((prev) => {
-                                    const langs = [...(prev?.languages || [])];
-                                    const realIndex = index + 1;
-                                    if (realIndex <= 1) return prev;
-                                    const [moved] = langs.splice(realIndex, 1);
-                                    langs.splice(realIndex - 1, 0, moved);
-                                    return { ...prev, languages: langs };
-                                  });
-                                }}
-                                isDisabled={index === 0}
-                              >
-                                {t('admin.levels.move_up')}
-                              </Button>
-                              <Button
-                                appearance="subtle"
-                                onClick={() => {
-                                  setConfig((prev) => {
-                                    const langs = [...(prev?.languages || [])];
-                                    const realIndex = index + 1;
-                                    if (realIndex >= langs.length - 1) return prev;
-                                    const [moved] = langs.splice(realIndex, 1);
-                                    langs.splice(realIndex + 1, 0, moved);
-                                    return { ...prev, languages: langs };
-                                  });
-                                }}
-                                isDisabled={index === extraLangs.length - 1}
-                              >
-                                {t('admin.levels.move_down')}
-                              </Button>
-                              <Button
-                                appearance="danger"
-                                onClick={() => {
-                                  const langs = (config?.languages || []).filter((l) => l.code !== lang.code);
-                                  setConfig({ ...config, languages: langs });
-                                }}
-                              >
-                                {t('admin.languages.remove_button')}
-                              </Button>
-                            </ButtonGroup>
+                {/* Additional languages */}
+                {(() => {
+                  const extraLangs = (config?.languages || []).filter(
+                    (l) => l.code !== 'en',
+                  );
+                  return extraLangs.length > 0 ? (
+                    <DynamicTable
+                      head={{
+                        cells: [
+                          {
+                            key: 'code',
+                            content: t('admin.languages.language'),
+                          },
+                          { key: 'actions', content: '' },
+                        ],
+                      }}
+                      rows={extraLangs.map((lang, index) => ({
+                        key: lang.code,
+                        cells: [
+                          {
+                            key: 'code',
+                            content: (
+                              <Text>
+                                {t(`language_names.${lang.code}`)} ({lang.code})
+                              </Text>
+                            ),
+                          },
+                          {
+                            key: 'actions',
+                            content: (
+                              <ButtonGroup>
+                                <Button
+                                  appearance="subtle"
+                                  onClick={() => {
+                                    setConfig((prev) => {
+                                      const langs = [
+                                        ...(prev?.languages || []),
+                                      ];
+                                      const realIndex = index + 1;
+                                      if (realIndex <= 1) return prev;
+                                      const [moved] = langs.splice(
+                                        realIndex,
+                                        1,
+                                      );
+                                      langs.splice(realIndex - 1, 0, moved);
+                                      return { ...prev, languages: langs };
+                                    });
+                                  }}
+                                  isDisabled={index === 0}
+                                >
+                                  {t('admin.levels.move_up')}
+                                </Button>
+                                <Button
+                                  appearance="subtle"
+                                  onClick={() => {
+                                    setConfig((prev) => {
+                                      const langs = [
+                                        ...(prev?.languages || []),
+                                      ];
+                                      const realIndex = index + 1;
+                                      if (realIndex >= langs.length - 1)
+                                        return prev;
+                                      const [moved] = langs.splice(
+                                        realIndex,
+                                        1,
+                                      );
+                                      langs.splice(realIndex + 1, 0, moved);
+                                      return { ...prev, languages: langs };
+                                    });
+                                  }}
+                                  isDisabled={index === extraLangs.length - 1}
+                                >
+                                  {t('admin.levels.move_down')}
+                                </Button>
+                                <Button
+                                  appearance="danger"
+                                  onClick={() => {
+                                    const langs = (
+                                      config?.languages || []
+                                    ).filter((l) => l.code !== lang.code);
+                                    setConfig({ ...config, languages: langs });
+                                  }}
+                                >
+                                  {t('admin.languages.remove_button')}
+                                </Button>
+                              </ButtonGroup>
+                            ),
+                          },
+                        ],
+                      }))}
+                    />
+                  ) : null;
+                })()}
+
+                {/* Add language dropdown */}
+                <Inline space="space.100" alignBlock="center">
+                  <Select
+                    inputId="add-language"
+                    placeholder={t('admin.languages.add_button')}
+                    options={Object.entries(SUPPORTED_LANGUAGES)
+                      .filter(
+                        ([code]) =>
+                          !(config?.languages || []).some(
+                            (l) => l.code === code,
                           ),
-                        },
-                      ],
-                    }))}
+                      )
+                      .map(([code]) => ({
+                        label: `${t(`language_names.${code}`)} (${code})`,
+                        value: code,
+                      }))}
+                    onChange={(option) => {
+                      if (!option) return;
+                      const existing = (config?.languages || []).some(
+                        (l) => l.code === option.value,
+                      );
+                      if (existing) return;
+                      setConfig({
+                        ...config,
+                        languages: [
+                          ...(config?.languages || []),
+                          {
+                            code: option.value,
+                            label:
+                              SUPPORTED_LANGUAGES[option.value] || option.value,
+                          },
+                        ],
+                      });
+                    }}
+                    value={null}
                   />
-                ) : null;
-              })()}
-
-              {/* Add language dropdown */}
-              <Inline space="space.100" alignBlock="center">
-                <Select
-                  inputId="add-language"
-                  placeholder={t('admin.languages.add_button')}
-                  options={Object.entries(SUPPORTED_LANGUAGES)
-                    .filter(([code]) => !(config?.languages || []).some((l) => l.code === code))
-                    .map(([code]) => ({ label: `${t(`language_names.${code}`)} (${code})`, value: code }))}
-                  onChange={(option) => {
-                    if (!option) return;
-                    const existing = (config?.languages || []).some((l) => l.code === option.value);
-                    if (existing) return;
-                    setConfig({
-                      ...config,
-                      languages: [...(config?.languages || []), { code: option.value, label: SUPPORTED_LANGUAGES[option.value] || option.value }],
-                    });
-                  }}
-                  value={null}
-                />
-              </Inline>
-            </Stack>
+                </Inline>
+              </Stack>
             </Box>
           </TabPanel>
 
           {/* Labels Tab — Import & Export as sub-tabs */}
           <TabPanel>
             <Box xcss={tabPanelStyle}>
-            <Tabs id="labels-subtabs">
-              <TabList>
-                <Tab>{t('admin.import.title')}</Tab>
-                <Tab>{t('admin.export.title')}</Tab>
-              </TabList>
+              <Tabs id="labels-subtabs">
+                <TabList>
+                  <Tab>{t('admin.import.title')}</Tab>
+                  <Tab>{t('admin.export.title')}</Tab>
+                </TabList>
 
-              {/* Import sub-tab */}
-              <TabPanel>
-              <Box xcss={tabPanelStyle}>
-              <Stack space="space.200">
-                <DynamicTable
-                  head={{
-                    cells: [
-                      { key: 'level', content: 'Level' },
-                      { key: 'labels', content: t('admin.import.labels_column') },
-                      { key: 'pages', content: (
-                        <Inline space="space.050" alignBlock="center">
-                          <Text>{t('admin.import.pages_column')}</Text>
-                          <Button appearance="subtle" spacing="compact" iconBefore="refresh" isLoading={importCountLoading} onClick={() => refreshImportCounts()}> </Button>
-                        </Inline>
-                      ) },
-                    ],
-                  }}
-                  rows={(config?.levels || []).filter((l) => l.allowed).map((level) => {
-                    const count = importCounts[level.id];
-                    const labelStr = importLabels[level.id] || '';
-                    const labels = labelStr.split(',').map((l) => l.trim()).filter(Boolean);
-                    const selectedKeys = importScopeAll ? [] : (importSpaceKeys || []).map((o) => o.value);
-                    const spaceFilter = selectedKeys.length === 0 ? '' : selectedKeys.length === 1 ? ` AND space="${selectedKeys[0]}"` : ` AND space in (${selectedKeys.map((k) => `"${k}"`).join(',')})`;
-                    const cql = labels.length > 0
-                      ? `type=page AND (${labels.map((l) => `label = "${l}"`).join(' OR ')})${spaceFilter}`
-                      : null;
-                    return {
-                      key: level.id,
-                      cells: [
-                        { key: 'level', content: <Lozenge isBold appearance={colorToLozenge(level.color)}>{level.id}</Lozenge> },
-                        {
-                          key: 'labels',
-                          content: (
-                            <Textfield
-                              value={labelStr}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setImportLabels((prev) => ({ ...prev, [level.id]: val }));
-                                refreshLevelCount(level.id, val);
+                {/* Import sub-tab */}
+                <TabPanel>
+                  <Box xcss={tabPanelStyle}>
+                    <Stack space="space.200">
+                      <DynamicTable
+                        head={{
+                          cells: [
+                            { key: 'level', content: 'Level' },
+                            {
+                              key: 'labels',
+                              content: t('admin.import.labels_column'),
+                            },
+                            {
+                              key: 'pages',
+                              content: (
+                                <Inline space="space.050" alignBlock="center">
+                                  <Text>{t('admin.import.pages_column')}</Text>
+                                  <Button
+                                    appearance="subtle"
+                                    spacing="compact"
+                                    iconBefore="refresh"
+                                    isLoading={importCountLoading}
+                                    onClick={() => refreshImportCounts()}
+                                  >
+                                    {' '}
+                                  </Button>
+                                </Inline>
+                              ),
+                            },
+                          ],
+                        }}
+                        rows={(config?.levels || [])
+                          .filter((l) => l.allowed)
+                          .map((level) => {
+                            const count = importCounts[level.id];
+                            const labelStr = importLabels[level.id] || '';
+                            const labels = labelStr
+                              .split(',')
+                              .map((l) => l.trim())
+                              .filter(Boolean);
+                            const selectedKeys = importScopeAll
+                              ? []
+                              : (importSpaceKeys || []).map((o) => o.value);
+                            const spaceFilter =
+                              selectedKeys.length === 0
+                                ? ''
+                                : selectedKeys.length === 1
+                                  ? ` AND space="${selectedKeys[0]}"`
+                                  : ` AND space in (${selectedKeys.map((k) => `"${k}"`).join(',')})`;
+                            const cql =
+                              labels.length > 0
+                                ? `type=page AND (${labels.map((l) => `label = "${l}"`).join(' OR ')})${spaceFilter}`
+                                : null;
+                            return {
+                              key: level.id,
+                              cells: [
+                                {
+                                  key: 'level',
+                                  content: (
+                                    <Lozenge
+                                      isBold
+                                      appearance={colorToLozenge(level.color)}
+                                    >
+                                      {level.id}
+                                    </Lozenge>
+                                  ),
+                                },
+                                {
+                                  key: 'labels',
+                                  content: (
+                                    <Textfield
+                                      value={labelStr}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setImportLabels((prev) => ({
+                                          ...prev,
+                                          [level.id]: val,
+                                        }));
+                                        refreshLevelCount(level.id, val);
+                                      }}
+                                    />
+                                  ),
+                                },
+                                {
+                                  key: 'pages',
+                                  content: importLevelLoading[level.id] ? (
+                                    <Spinner size="small" />
+                                  ) : count !== undefined && cql ? (
+                                    <Text>
+                                      <Link
+                                        href={`/wiki/search?cql=${encodeURIComponent(cql)}`}
+                                        openNewTab
+                                      >
+                                        {count}
+                                      </Link>
+                                    </Text>
+                                  ) : (
+                                    <Text>
+                                      {count !== undefined
+                                        ? String(count)
+                                        : '—'}
+                                    </Text>
+                                  ),
+                                },
+                              ],
+                            };
+                          })}
+                      />
+
+                      {/* Scope selector */}
+                      <Stack space="space.100">
+                        <Inline space="space.200" alignBlock="center">
+                          <Inline space="space.100" alignBlock="center">
+                            <Radio
+                              value="all"
+                              isChecked={importScopeAll}
+                              onChange={() => {
+                                setImportScopeAll(true);
+                                onScopeChange();
                               }}
+                              label=""
                             />
-                          ),
-                        },
-                        {
-                          key: 'pages',
-                          content: importLevelLoading[level.id]
-                            ? <Spinner size="small" />
-                            : count !== undefined && cql
-                              ? <Text><Link href={`/wiki/search?cql=${encodeURIComponent(cql)}`} openNewTab>{count}</Link></Text>
-                              : <Text>{count !== undefined ? String(count) : '—'}</Text>,
-                        },
-                      ],
-                    };
-                  })}
-                />
-
-                {/* Scope selector */}
-                <Stack space="space.100">
-                  <Inline space="space.200" alignBlock="center">
-                    <Inline space="space.100" alignBlock="center">
-                      <Radio value="all" isChecked={importScopeAll} onChange={() => { setImportScopeAll(true); onScopeChange(); }} label="" />
-                      <Text>{t('admin.import.scope_all')}</Text>
-                    </Inline>
-                    <Inline space="space.100" alignBlock="center">
-                      <Radio value="space" isChecked={!importScopeAll} onChange={() => { setImportScopeAll(false); onScopeChange(); }} label="" />
-                      <Text>{t('admin.import.scope_space')}</Text>
-                    </Inline>
-                  </Inline>
-                  {!importScopeAll && (
-                    <Select
-                      isMulti
-                      options={availableSpaces}
-                      value={importSpaceKeys}
-                      onChange={(selected) => { setImportSpaceKeys(selected || []); setTimeout(() => { importSpaceKeysRef.current = selected || []; refreshImportCounts(); }, 50); }}
-                      placeholder={t('admin.import.scope_empty')}
-                    />
-                  )}
-                </Stack>
-
-                {/* Remove labels option */}
-                <Inline space="space.100" alignBlock="center">
-                  <Toggle
-                    id="import-remove-labels"
-                    isChecked={importRemoveLabels}
-                    onChange={() => setImportRemoveLabels(!importRemoveLabels)}
-                  />
-                  <Label labelFor="import-remove-labels">{t('admin.import.remove_labels')}</Label>
-                </Inline>
-                <SectionMessage appearance="information">
-                  <Text>{t('admin.import.remove_labels_help')}</Text>
-                </SectionMessage>
-
-                {/* Actions */}
-                <Button appearance="primary" onClick={startImport} isDisabled={importStep === 'running' || exportLoading || Object.values(importCounts).reduce((s, c) => s + c, 0) === 0} isLoading={importStep === 'running'}>
-                  {t('admin.import.start_button')}
-                </Button>
-
-                {importStep === 'running' && importProgress && (
-                  <Stack space="space.050">
-                    <Text>{importProgress.classified || 0} / {importProgress.total || '?'}</Text>
-                    <ProgressBar value={importProgress.total > 0 ? (importProgress.classified || 0) / importProgress.total : 0} />
-                    {(importProgress.classified || 0) > 0 && importProgress.startedAt && (() => {
-                      const elapsed = Date.now() - importProgress.startedAt;
-                      const classified = importProgress.classified || 0;
-                      const remaining = Math.round(elapsed / classified * (importProgress.total - classified) / 1000);
-                      return <Text>{remaining >= 60
-                        ? interpolate(t('classify.async_eta_min'), { minutes: Math.ceil(remaining / 60) })
-                        : interpolate(t('classify.async_eta_sec'), { seconds: remaining })}</Text>;
-                    })()}
-                  </Stack>
-                )}
-                {importStep === 'done' && importProgress && (
-                  <SectionMessage appearance="confirmation">
-                    <Text>{interpolate(t('admin.import.complete'), { classified: importProgress.classified || 0 })}</Text>
-                  </SectionMessage>
-                )}
-
-                <SectionMessage appearance="information">
-                  <Text>{t('admin.import.never_weaken')}</Text>
-                </SectionMessage>
-                <Text>{t('admin.import.index_lag_hint')}</Text>
-              </Stack>
-              </Box>
-              </TabPanel>
-
-              {/* Export sub-tab */}
-              <TabPanel>
-              <Box xcss={tabPanelStyle}>
-              <Stack space="space.100">
-                <Text>{t('admin.export.description')}</Text>
-                <DynamicTable
-                  head={{
-                    cells: [
-                      { key: 'level', content: 'Level' },
-                      { key: 'label', content: t('admin.export.label_name') },
-                    ],
-                  }}
-                  rows={(config?.levels || []).map((level) => ({
-                    key: level.id,
-                    cells: [
-                      { key: 'level', content: <Lozenge isBold appearance={colorToLozenge(level.color)}>{level.id}</Lozenge> },
-                      {
-                        key: 'label',
-                        content: (
-                          <Textfield
-                            value={exportMappings[level.id] ?? level.id}
-                            onChange={(e) => setExportMappings((prev) => ({ ...prev, [level.id]: e.target.value }))}
+                            <Text>{t('admin.import.scope_all')}</Text>
+                          </Inline>
+                          <Inline space="space.100" alignBlock="center">
+                            <Radio
+                              value="space"
+                              isChecked={!importScopeAll}
+                              onChange={() => {
+                                setImportScopeAll(false);
+                                onScopeChange();
+                              }}
+                              label=""
+                            />
+                            <Text>{t('admin.import.scope_space')}</Text>
+                          </Inline>
+                        </Inline>
+                        {!importScopeAll && (
+                          <Select
+                            isMulti
+                            options={availableSpaces}
+                            value={importSpaceKeys}
+                            onChange={(selected) => {
+                              setImportSpaceKeys(selected || []);
+                              setTimeout(() => {
+                                importSpaceKeysRef.current = selected || [];
+                                refreshImportCounts();
+                              }, 50);
+                            }}
+                            placeholder={t('admin.import.scope_empty')}
                           />
-                        ),
-                      },
-                    ],
-                  }))}
-                />
+                        )}
+                      </Stack>
 
-                {/* Scope selector */}
-                <Stack space="space.100">
-                  <Inline space="space.200" alignBlock="center">
-                    <Inline space="space.100" alignBlock="center">
-                      <Radio value="all" isChecked={exportScopeAll} onChange={() => setExportScopeAll(true)} label="" />
-                      <Text>{t('admin.import.scope_all')}</Text>
-                    </Inline>
-                    <Inline space="space.100" alignBlock="center">
-                      <Radio value="space" isChecked={!exportScopeAll} onChange={() => setExportScopeAll(false)} label="" />
-                      <Text>{t('admin.import.scope_space')}</Text>
-                    </Inline>
-                  </Inline>
-                  {!exportScopeAll && (
-                    <Select
-                      isMulti
-                      options={availableSpaces}
-                      value={exportSpaceKeys}
-                      onChange={(selected) => setExportSpaceKeys(selected || [])}
-                      placeholder={t('admin.import.scope_empty')}
-                    />
-                  )}
-                </Stack>
+                      {/* Remove labels option */}
+                      <Inline space="space.100" alignBlock="center">
+                        <Toggle
+                          id="import-remove-labels"
+                          isChecked={importRemoveLabels}
+                          onChange={() =>
+                            setImportRemoveLabels(!importRemoveLabels)
+                          }
+                        />
+                        <Label labelFor="import-remove-labels">
+                          {t('admin.import.remove_labels')}
+                        </Label>
+                      </Inline>
+                      <SectionMessage appearance="information">
+                        <Text>{t('admin.import.remove_labels_help')}</Text>
+                      </SectionMessage>
 
-                <Button appearance="primary" onClick={startExport} isLoading={exportLoading} isDisabled={exportLoading || (exportProgress && !exportProgress.done)}>
-                  {t('admin.export.start_button')}
-                </Button>
-                {exportProgress && !exportProgress.done && (
-                  <Stack space="space.050">
-                    <Text>{exportProgress.classified || 0} / {exportProgress.total || '?'}</Text>
-                    <ProgressBar value={exportProgress.total > 0 ? (exportProgress.classified || 0) / exportProgress.total : 0} />
-                    {(exportProgress.classified || 0) > 0 && exportProgress.startedAt && (() => {
-                      const elapsed = Date.now() - exportProgress.startedAt;
-                      const classified = exportProgress.classified || 0;
-                      const remaining = Math.round(elapsed / classified * (exportProgress.total - classified) / 1000);
-                      return <Text>{remaining >= 60
-                        ? interpolate(t('classify.async_eta_min'), { minutes: Math.ceil(remaining / 60) })
-                        : interpolate(t('classify.async_eta_sec'), { seconds: remaining })}</Text>;
-                    })()}
-                  </Stack>
-                )}
-                {exportProgress && exportProgress.done && (
-                  <SectionMessage appearance="confirmation">
-                    <Text>{interpolate(t('admin.export.complete'), { exported: exportProgress.classified || 0 })}</Text>
-                  </SectionMessage>
-                )}
-              </Stack>
-              </Box>
-              </TabPanel>
-            </Tabs>
+                      {/* Actions */}
+                      <Button
+                        appearance="primary"
+                        onClick={startImport}
+                        isDisabled={
+                          importStep === 'running' ||
+                          exportLoading ||
+                          Object.values(importCounts).reduce(
+                            (s, c) => s + c,
+                            0,
+                          ) === 0
+                        }
+                        isLoading={importStep === 'running'}
+                      >
+                        {t('admin.import.start_button')}
+                      </Button>
+
+                      {importStep === 'running' && importProgress && (
+                        <Stack space="space.050">
+                          <Text>
+                            {importProgress.classified || 0} /{' '}
+                            {importProgress.total || '?'}
+                          </Text>
+                          <ProgressBar
+                            value={
+                              importProgress.total > 0
+                                ? (importProgress.classified || 0) /
+                                  importProgress.total
+                                : 0
+                            }
+                          />
+                          {(importProgress.classified || 0) > 0 &&
+                            importProgress.startedAt &&
+                            (() => {
+                              const elapsed =
+                                Date.now() - importProgress.startedAt;
+                              const classified = importProgress.classified || 0;
+                              const remaining = Math.round(
+                                ((elapsed / classified) *
+                                  (importProgress.total - classified)) /
+                                  1000,
+                              );
+                              return (
+                                <Text>
+                                  {remaining >= 60
+                                    ? interpolate(t('classify.async_eta_min'), {
+                                        minutes: Math.ceil(remaining / 60),
+                                      })
+                                    : interpolate(t('classify.async_eta_sec'), {
+                                        seconds: remaining,
+                                      })}
+                                </Text>
+                              );
+                            })()}
+                        </Stack>
+                      )}
+                      {importStep === 'done' && importProgress && (
+                        <SectionMessage appearance="confirmation">
+                          <Text>
+                            {interpolate(t('admin.import.complete'), {
+                              classified: importProgress.classified || 0,
+                            })}
+                          </Text>
+                        </SectionMessage>
+                      )}
+
+                      <SectionMessage appearance="information">
+                        <Text>{t('admin.import.never_weaken')}</Text>
+                      </SectionMessage>
+                      <Text>{t('admin.import.index_lag_hint')}</Text>
+                    </Stack>
+                  </Box>
+                </TabPanel>
+
+                {/* Export sub-tab */}
+                <TabPanel>
+                  <Box xcss={tabPanelStyle}>
+                    <Stack space="space.100">
+                      <Text>{t('admin.export.description')}</Text>
+                      <DynamicTable
+                        head={{
+                          cells: [
+                            { key: 'level', content: 'Level' },
+                            {
+                              key: 'label',
+                              content: t('admin.export.label_name'),
+                            },
+                          ],
+                        }}
+                        rows={(config?.levels || []).map((level) => ({
+                          key: level.id,
+                          cells: [
+                            {
+                              key: 'level',
+                              content: (
+                                <Lozenge
+                                  isBold
+                                  appearance={colorToLozenge(level.color)}
+                                >
+                                  {level.id}
+                                </Lozenge>
+                              ),
+                            },
+                            {
+                              key: 'label',
+                              content: (
+                                <Textfield
+                                  value={exportMappings[level.id] ?? level.id}
+                                  onChange={(e) =>
+                                    setExportMappings((prev) => ({
+                                      ...prev,
+                                      [level.id]: e.target.value,
+                                    }))
+                                  }
+                                />
+                              ),
+                            },
+                          ],
+                        }))}
+                      />
+
+                      {/* Scope selector */}
+                      <Stack space="space.100">
+                        <Inline space="space.200" alignBlock="center">
+                          <Inline space="space.100" alignBlock="center">
+                            <Radio
+                              value="all"
+                              isChecked={exportScopeAll}
+                              onChange={() => setExportScopeAll(true)}
+                              label=""
+                            />
+                            <Text>{t('admin.import.scope_all')}</Text>
+                          </Inline>
+                          <Inline space="space.100" alignBlock="center">
+                            <Radio
+                              value="space"
+                              isChecked={!exportScopeAll}
+                              onChange={() => setExportScopeAll(false)}
+                              label=""
+                            />
+                            <Text>{t('admin.import.scope_space')}</Text>
+                          </Inline>
+                        </Inline>
+                        {!exportScopeAll && (
+                          <Select
+                            isMulti
+                            options={availableSpaces}
+                            value={exportSpaceKeys}
+                            onChange={(selected) =>
+                              setExportSpaceKeys(selected || [])
+                            }
+                            placeholder={t('admin.import.scope_empty')}
+                          />
+                        )}
+                      </Stack>
+
+                      <Button
+                        appearance="primary"
+                        onClick={startExport}
+                        isLoading={exportLoading}
+                        isDisabled={
+                          exportLoading ||
+                          (exportProgress && !exportProgress.done)
+                        }
+                      >
+                        {t('admin.export.start_button')}
+                      </Button>
+                      {exportProgress && !exportProgress.done && (
+                        <Stack space="space.050">
+                          <Text>
+                            {exportProgress.classified || 0} /{' '}
+                            {exportProgress.total || '?'}
+                          </Text>
+                          <ProgressBar
+                            value={
+                              exportProgress.total > 0
+                                ? (exportProgress.classified || 0) /
+                                  exportProgress.total
+                                : 0
+                            }
+                          />
+                          {(exportProgress.classified || 0) > 0 &&
+                            exportProgress.startedAt &&
+                            (() => {
+                              const elapsed =
+                                Date.now() - exportProgress.startedAt;
+                              const classified = exportProgress.classified || 0;
+                              const remaining = Math.round(
+                                ((elapsed / classified) *
+                                  (exportProgress.total - classified)) /
+                                  1000,
+                              );
+                              return (
+                                <Text>
+                                  {remaining >= 60
+                                    ? interpolate(t('classify.async_eta_min'), {
+                                        minutes: Math.ceil(remaining / 60),
+                                      })
+                                    : interpolate(t('classify.async_eta_sec'), {
+                                        seconds: remaining,
+                                      })}
+                                </Text>
+                              );
+                            })()}
+                        </Stack>
+                      )}
+                      {exportProgress && exportProgress.done && (
+                        <SectionMessage appearance="confirmation">
+                          <Text>
+                            {interpolate(t('admin.export.complete'), {
+                              exported: exportProgress.classified || 0,
+                            })}
+                          </Text>
+                        </SectionMessage>
+                      )}
+                    </Stack>
+                  </Box>
+                </TabPanel>
+              </Tabs>
             </Box>
           </TabPanel>
         </Tabs>
@@ -1192,7 +1685,9 @@ const App = () => {
         {activeTab > 0 && activeTab < 5 && (
           <>
             {message && (
-              <SectionMessage appearance={message.type === 'error' ? 'error' : 'confirmation'}>
+              <SectionMessage
+                appearance={message.type === 'error' ? 'error' : 'confirmation'}
+              >
                 <Text>{message.text}</Text>
               </SectionMessage>
             )}
@@ -1203,7 +1698,12 @@ const App = () => {
               </SectionMessage>
             )}
 
-            <Button appearance="primary" onClick={handleSave} isLoading={saving} isDisabled={!isDirty}>
+            <Button
+              appearance="primary"
+              onClick={handleSave}
+              isLoading={saving}
+              isDisabled={!isDirty}
+            >
               {t('admin.save_button')}
             </Button>
           </>
@@ -1229,28 +1729,51 @@ const App = () => {
           <Modal onClose={() => setDeleteConfirm(null)}>
             <ModalHeader>
               <ModalTitle>{t('admin.levels.delete_confirm_title')}</ModalTitle>
-              <Button appearance="subtle" onClick={() => setDeleteConfirm(null)}>✕</Button>
+              <Button
+                appearance="subtle"
+                onClick={() => setDeleteConfirm(null)}
+              >
+                ✕
+              </Button>
             </ModalHeader>
             <ModalBody>
               <Stack space="space.200">
                 <SectionMessage appearance="warning">
-                  <Text>{interpolate(t('admin.levels.delete_confirm_message'), { count: deleteConfirm.pageCount, level: deleteConfirm.levelName })}</Text>
+                  <Text>
+                    {interpolate(t('admin.levels.delete_confirm_message'), {
+                      count: deleteConfirm.pageCount,
+                      level: deleteConfirm.levelName,
+                    })}
+                  </Text>
                 </SectionMessage>
                 <Stack space="space.050">
-                  <Label labelFor="reclassify-select">{t('admin.levels.delete_reclassify_label')}</Label>
+                  <Label labelFor="reclassify-select">
+                    {t('admin.levels.delete_reclassify_label')}
+                  </Label>
                   <Select
                     inputId="reclassify-select"
                     options={(config?.levels || [])
                       .filter((l) => l.id !== deleteConfirm.levelId)
-                      .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
-                    onChange={(option) => setDeleteConfirm((prev) => ({ ...prev, reclassifyTo: option?.value || null }))}
+                      .map((l) => ({
+                        label: localize(l.name, 'en'),
+                        value: l.id,
+                      }))}
+                    onChange={(option) =>
+                      setDeleteConfirm((prev) => ({
+                        ...prev,
+                        reclassifyTo: option?.value || null,
+                      }))
+                    }
                   />
                 </Stack>
               </Stack>
             </ModalBody>
             <ModalFooter>
               <ButtonGroup>
-                <Button appearance="subtle" onClick={() => setDeleteConfirm(null)}>
+                <Button
+                  appearance="subtle"
+                  onClick={() => setDeleteConfirm(null)}
+                >
                   {t('classify.cancel_button')}
                 </Button>
                 <Button
@@ -1308,15 +1831,32 @@ const App = () => {
 /**
  * Renders a translatable field (Textfield or TextArea) for each configured language.
  */
-const TranslatableField = ({ languages, label, obj, onChange, multiline, t }) => (
+const TranslatableField = ({
+  languages,
+  label,
+  obj,
+  onChange,
+  multiline,
+  t,
+}) => (
   <>
     {languages.map(({ code }) => (
       <Stack space="space.050" key={code}>
-        <Label labelFor={`${label}-${code}`}>{label} ({t(`language_names.${code}`)}){code === 'en' ? ' *' : ''}</Label>
+        <Label labelFor={`${label}-${code}`}>
+          {label} ({t(`language_names.${code}`)}){code === 'en' ? ' *' : ''}
+        </Label>
         {multiline ? (
-          <TextArea id={`${label}-${code}`} value={obj?.[code] || ''} onChange={(e) => onChange(code, e.target.value)} />
+          <TextArea
+            id={`${label}-${code}`}
+            value={obj?.[code] || ''}
+            onChange={(e) => onChange(code, e.target.value)}
+          />
         ) : (
-          <Textfield id={`${label}-${code}`} value={obj?.[code] || ''} onChange={(e) => onChange(code, e.target.value)} />
+          <Textfield
+            id={`${label}-${code}`}
+            value={obj?.[code] || ''}
+            onChange={(e) => onChange(code, e.target.value)}
+          />
         )}
       </Stack>
     ))}
@@ -1333,7 +1873,11 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
   return (
     <Modal onClose={onClose}>
       <ModalHeader>
-        <ModalTitle>{data.id ? t('admin.levels.edit_button') : t('admin.levels.add_button')}</ModalTitle>
+        <ModalTitle>
+          {data.id
+            ? t('admin.levels.edit_button')
+            : t('admin.levels.add_button')}
+        </ModalTitle>
       </ModalHeader>
       <ModalBody>
         <Stack space="space.200">
@@ -1341,21 +1885,30 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
             languages={languages}
             label={t('admin.levels.name')}
             obj={data.name}
-            onChange={(code, value) => update('name', { ...data.name, [code]: value })}
+            onChange={(code, value) =>
+              update('name', { ...data.name, [code]: value })
+            }
             t={t}
           />
           <Stack space="space.050">
             <Label labelFor="level-color">{t('admin.levels.color')}</Label>
             <Select
               inputId="level-color"
-              value={COLOR_OPTIONS.find((c) => c.value === data.color) || { label: data.color, value: data.color }}
+              value={
+                COLOR_OPTIONS.find((c) => c.value === data.color) || {
+                  label: data.color,
+                  value: data.color,
+                }
+              }
               options={COLOR_OPTIONS}
               onChange={(option) => update('color', option.value)}
             />
             {data.name?.en && (
               <Inline space="space.100" alignBlock="center">
                 <Text>{t('admin.levels.color_preview')}:</Text>
-                <Lozenge isBold appearance={colorToLozenge(data.color)}>{data.name.en}</Lozenge>
+                <Lozenge isBold appearance={colorToLozenge(data.color)}>
+                  {data.name.en}
+                </Lozenge>
               </Inline>
             )}
           </Stack>
@@ -1363,24 +1916,43 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
             languages={languages}
             label={t('admin.levels.description')}
             obj={data.description}
-            onChange={(code, value) => update('description', { ...data.description, [code]: value })}
+            onChange={(code, value) =>
+              update('description', { ...data.description, [code]: value })
+            }
             multiline
             t={t}
           />
           <Inline space="space.100" alignBlock="center">
-            <Toggle id="level-allowed" isChecked={data.allowed} onChange={() => update('allowed', !data.allowed)} />
+            <Toggle
+              id="level-allowed"
+              isChecked={data.allowed}
+              onChange={() => update('allowed', !data.allowed)}
+            />
             <Label labelFor="level-allowed">{t('admin.levels.allowed')}</Label>
           </Inline>
           <Inline space="space.100" alignBlock="center">
-            <Toggle id="level-protection" isChecked={data.requiresProtection} onChange={() => update('requiresProtection', !data.requiresProtection)} />
-            <Label labelFor="level-protection">{t('admin.levels.requires_protection')}</Label>
+            <Toggle
+              id="level-protection"
+              isChecked={data.requiresProtection}
+              onChange={() =>
+                update('requiresProtection', !data.requiresProtection)
+              }
+            />
+            <Label labelFor="level-protection">
+              {t('admin.levels.requires_protection')}
+            </Label>
           </Inline>
           {!data.allowed && (
             <TranslatableField
               languages={languages}
               label={t('admin.levels.error_message')}
               obj={data.errorMessage}
-              onChange={(code, value) => update('errorMessage', { ...(data.errorMessage || {}), [code]: value })}
+              onChange={(code, value) =>
+                update('errorMessage', {
+                  ...(data.errorMessage || {}),
+                  [code]: value,
+                })
+              }
               multiline
               t={t}
             />
@@ -1389,8 +1961,14 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
       </ModalBody>
       <ModalFooter>
         <ButtonGroup>
-          <Button appearance="subtle" onClick={onClose}>{t('classify.cancel_button')}</Button>
-          <Button appearance="primary" onClick={() => onSave(data)} isDisabled={!data.name?.en}>
+          <Button appearance="subtle" onClick={onClose}>
+            {t('classify.cancel_button')}
+          </Button>
+          <Button
+            appearance="primary"
+            onClick={() => onSave(data)}
+            isDisabled={!data.name?.en}
+          >
             {t('classify.apply_button')}
           </Button>
         </ButtonGroup>
@@ -1417,7 +1995,10 @@ const ContactModal = ({ contact, levels, languages, onSave, onClose, t }) => {
             <Label labelFor="contact-type">{t('admin.contacts.type')}</Label>
             <Select
               inputId="contact-type"
-              value={{ label: t(`admin.contacts.type_${data.type}`), value: data.type }}
+              value={{
+                label: t(`admin.contacts.type_${data.type}`),
+                value: data.type,
+              }}
               options={[
                 { label: t('admin.contacts.type_user'), value: 'user' },
                 { label: t('admin.contacts.type_email'), value: 'email' },
@@ -1438,7 +2019,9 @@ const ContactModal = ({ contact, levels, languages, onSave, onClose, t }) => {
                 id="contact-value"
                 value={data.value || ''}
                 onChange={(e) => update('value', e.target.value)}
-                placeholder={data.type === 'email' ? 'email@example.com' : 'Security Team'}
+                placeholder={
+                  data.type === 'email' ? 'email@example.com' : 'Security Team'
+                }
               />
             )}
           </Stack>
@@ -1446,17 +2029,31 @@ const ContactModal = ({ contact, levels, languages, onSave, onClose, t }) => {
             languages={languages}
             label={t('admin.contacts.role')}
             obj={data.role}
-            onChange={(code, value) => update('role', { ...data.role, [code]: value })}
+            onChange={(code, value) =>
+              update('role', { ...data.role, [code]: value })
+            }
             t={t}
           />
           <Stack space="space.050">
-            <Label labelFor="contact-levels">{t('admin.contacts.applies_to')}</Label>
+            <Label labelFor="contact-levels">
+              {t('admin.contacts.applies_to')}
+            </Label>
             <Select
               inputId="contact-levels"
               isMulti
-              value={levels.filter((l) => data.levelIds?.includes(l.id)).map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
-              options={levels.map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
-              onChange={(options) => update('levelIds', (options || []).map((o) => o.value))}
+              value={levels
+                .filter((l) => data.levelIds?.includes(l.id))
+                .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
+              options={levels.map((l) => ({
+                label: localize(l.name, 'en'),
+                value: l.id,
+              }))}
+              onChange={(options) =>
+                update(
+                  'levelIds',
+                  (options || []).map((o) => o.value),
+                )
+              }
               placeholder={t('admin.contacts.applies_to_all')}
             />
           </Stack>
@@ -1464,8 +2061,14 @@ const ContactModal = ({ contact, levels, languages, onSave, onClose, t }) => {
       </ModalBody>
       <ModalFooter>
         <ButtonGroup>
-          <Button appearance="subtle" onClick={onClose}>{t('classify.cancel_button')}</Button>
-          <Button appearance="primary" onClick={() => onSave(data)} isDisabled={!data.value}>
+          <Button appearance="subtle" onClick={onClose}>
+            {t('classify.cancel_button')}
+          </Button>
+          <Button
+            appearance="primary"
+            onClick={() => onSave(data)}
+            isDisabled={!data.value}
+          >
             {t('classify.apply_button')}
           </Button>
         </ButtonGroup>
@@ -1500,7 +2103,7 @@ const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
       try {
         const cql = `type=page AND title~"${inputValue.replace(/"/g, '\\"')}*"`;
         const response = await requestConfluence(
-          `/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&limit=10&expand=space`
+          `/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&limit=10&expand=space`,
         );
         if (response.ok) {
           const json = await response.json();
@@ -1509,7 +2112,7 @@ const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
               label: `${p.title}${p.space?.name ? ` — ${p.space.name}` : ''}`,
               value: `${json._links?.base || ''}${p._links?.webui || ''}`,
               pageTitle: p.title,
-            }))
+            })),
           );
         }
       } catch (err) {
@@ -1531,14 +2134,22 @@ const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
             <Label labelFor="link-type">{t('admin.links.type')}</Label>
             <Select
               inputId="link-type"
-              value={{ label: t(`admin.links.type_${data.type || 'external'}`), value: data.type || 'external' }}
+              value={{
+                label: t(`admin.links.type_${data.type || 'external'}`),
+                value: data.type || 'external',
+              }}
               options={[
                 { label: t('admin.links.type_page'), value: 'page' },
                 { label: t('admin.links.type_external'), value: 'external' },
               ]}
               onChange={(option) => {
                 update('type', option.value);
-                setData((prev) => ({ ...prev, type: option.value, url: '', label: prev.label }));
+                setData((prev) => ({
+                  ...prev,
+                  type: option.value,
+                  url: '',
+                  label: prev.label,
+                }));
                 setPageOptions([]);
               }}
             />
@@ -1547,7 +2158,9 @@ const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
             languages={languages}
             label={t('admin.links.label')}
             obj={data.label}
-            onChange={(code, value) => update('label', { ...data.label, [code]: value })}
+            onChange={(code, value) =>
+              update('label', { ...data.label, [code]: value })
+            }
             t={t}
           />
           <Stack space="space.050">
@@ -1555,12 +2168,20 @@ const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
             {(data.type || 'external') === 'page' ? (
               <>
                 {data.url ? (
-                  <Inline space="space.100" alignBlock="center" spread="space-between">
+                  <Inline
+                    space="space.100"
+                    alignBlock="center"
+                    spread="space-between"
+                  >
                     <Text>{data.pageTitle || data.url}</Text>
                     <Button
                       appearance="subtle"
                       onClick={() => {
-                        setData((prev) => ({ ...prev, url: '', pageTitle: '' }));
+                        setData((prev) => ({
+                          ...prev,
+                          url: '',
+                          pageTitle: '',
+                        }));
                         setPageOptions([]);
                         setPageSearchQuery('');
                       }}
@@ -1603,9 +2224,11 @@ const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
                         ))}
                       </Stack>
                     )}
-                    {pageSearchQuery.length >= 2 && !pageSearchLoading && pageOptions.length === 0 && (
-                      <Text>{t('admin.links.search_page_empty')}</Text>
-                    )}
+                    {pageSearchQuery.length >= 2 &&
+                      !pageSearchLoading &&
+                      pageOptions.length === 0 && (
+                        <Text>{t('admin.links.search_page_empty')}</Text>
+                      )}
                   </>
                 )}
               </>
@@ -1623,9 +2246,19 @@ const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
             <Select
               inputId="link-levels"
               isMulti
-              value={levels.filter((l) => data.levelIds?.includes(l.id)).map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
-              options={levels.map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
-              onChange={(options) => update('levelIds', (options || []).map((o) => o.value))}
+              value={levels
+                .filter((l) => data.levelIds?.includes(l.id))
+                .map((l) => ({ label: localize(l.name, 'en'), value: l.id }))}
+              options={levels.map((l) => ({
+                label: localize(l.name, 'en'),
+                value: l.id,
+              }))}
+              onChange={(options) =>
+                update(
+                  'levelIds',
+                  (options || []).map((o) => o.value),
+                )
+              }
               placeholder={t('admin.links.applies_to_all')}
             />
           </Stack>
@@ -1633,8 +2266,14 @@ const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
       </ModalBody>
       <ModalFooter>
         <ButtonGroup>
-          <Button appearance="subtle" onClick={onClose}>{t('classify.cancel_button')}</Button>
-          <Button appearance="primary" onClick={() => onSave(data)} isDisabled={!data.url || !data.label?.en}>
+          <Button appearance="subtle" onClick={onClose}>
+            {t('classify.cancel_button')}
+          </Button>
+          <Button
+            appearance="primary"
+            onClick={() => onSave(data)}
+            isDisabled={!data.url || !data.label?.en}
+          >
             {t('classify.apply_button')}
           </Button>
         </ButtonGroup>
@@ -1646,5 +2285,5 @@ const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
 ForgeReconciler.render(
   <I18nProvider>
     <App />
-  </I18nProvider>
+  </I18nProvider>,
 );

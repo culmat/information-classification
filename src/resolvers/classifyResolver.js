@@ -5,12 +5,23 @@
 
 import { Queue } from '@forge/events';
 import { kvs } from '@forge/kvs';
-import { getPageClassification, classifyPage, findDescendantsToClassify } from '../services/classificationService';
+import {
+  getPageClassification,
+  classifyPage,
+  findDescendantsToClassify,
+} from '../services/classificationService';
 import { ASYNC_THRESHOLD, asyncJobKey } from '../shared/constants';
 import { getEffectiveConfig } from '../storage/configStore';
 import { getSpaceConfig } from '../storage/spaceConfigStore';
-import { getClassification, getHistory } from '../services/contentPropertyService';
-import { successResponse, errorResponse, validationError } from '../utils/responseHelper';
+import {
+  getClassification,
+  getHistory,
+} from '../services/contentPropertyService';
+import {
+  successResponse,
+  errorResponse,
+  validationError,
+} from '../utils/responseHelper';
 
 /**
  * Helper to resolve a localized string from a { lang: text } object.
@@ -83,7 +94,11 @@ export async function getClassificationResolver(req) {
       getHistory(String(pageId)),
       kvs.get(asyncJobKey(String(pageId))),
     ]);
-    return successResponse({ ...result, history, activeJob: activeJob || null });
+    return successResponse({
+      ...result,
+      history,
+      activeJob: activeJob || null,
+    });
   } catch (error) {
     console.error('Error getting classification:', error);
     return errorResponse('Failed to get classification', 500);
@@ -97,7 +112,14 @@ export async function getClassificationResolver(req) {
  * Expected payload: { pageId, spaceKey, levelId, recursive, locale }
  */
 export async function setClassificationResolver(req) {
-  const { pageId, spaceKey, levelId, recursive, locale, descendantsToClassify } = req.payload;
+  const {
+    pageId,
+    spaceKey,
+    levelId,
+    recursive,
+    locale,
+    descendantsToClassify: _descendantsToClassify,
+  } = req.payload;
   const accountId = req.context.accountId;
 
   if (!pageId || !spaceKey || !levelId) {
@@ -114,7 +136,11 @@ export async function setClassificationResolver(req) {
     // Do a fresh server-side count for the threshold decision.
     let toClassify = 0;
     if (recursive) {
-      const { totalSize } = await findDescendantsToClassify(String(pageId), levelId, 0);
+      const { totalSize } = await findDescendantsToClassify(
+        String(pageId),
+        levelId,
+        0,
+      );
       toClassify = totalSize;
     }
 
@@ -136,7 +162,14 @@ export async function setClassificationResolver(req) {
       // Push descendant classification to async queue
       const queue = new Queue({ key: 'classification-queue' });
       const { jobId } = await queue.push({
-        body: { pageId: String(pageId), spaceKey, levelId, accountId, locale: locale || 'en', totalToClassify: toClassify },
+        body: {
+          pageId: String(pageId),
+          spaceKey,
+          levelId,
+          accountId,
+          locale: locale || 'en',
+          totalToClassify: toClassify,
+        },
         concurrency: { key: `classify-${pageId}`, limit: 1 },
       });
 
@@ -198,7 +231,10 @@ export async function countDescendantsResolver(req) {
       findDescendantsToClassify(pageId, levelId, 0),
       findDescendantsToClassify(pageId, '__none__', 0), // __none__ matches no level, so != returns all pages
     ]);
-    return successResponse({ toClassify: filtered.totalSize, totalDescendants: all.totalSize });
+    return successResponse({
+      toClassify: filtered.totalSize,
+      totalDescendants: all.totalSize,
+    });
   } catch (error) {
     console.error('Error counting descendants:', error);
     return errorResponse('Failed to count descendants', 500);

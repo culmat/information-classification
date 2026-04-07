@@ -81,8 +81,6 @@ const historyEntryStyle = xcss({
   borderBottomStyle: 'solid',
 });
 
-
-
 /**
  * Main byline app component.
  * Wrapped in I18nProvider for translation support.
@@ -121,39 +119,52 @@ const App = () => {
   // Load (or reload) classification data from the server.
   // When showLoading is false (e.g. after a classify action inside the modal)
   // we skip the loading spinner to avoid a re-mount that flickers the modal.
-  const loadClassification = useCallback(async (showLoading = true) => {
-    if (!pageId || !spaceKey) return;
-    if (showLoading) setLoading(true);
-    try {
-      const result = await invoke('getClassification', { pageId, spaceKey });
-      if (result.success) {
-        setClassification(result.classification);
-        setConfig(result.config);
-        setRestrictionWarning(result.restrictionWarning);
-        setHistory(result.history || { truncated: false, entries: [] });
+  const loadClassification = useCallback(
+    async (showLoading = true) => {
+      if (!pageId || !spaceKey) return;
+      if (showLoading) setLoading(true);
+      try {
+        const result = await invoke('getClassification', { pageId, spaceKey });
+        if (result.success) {
+          setClassification(result.classification);
+          setConfig(result.config);
+          setRestrictionWarning(result.restrictionWarning);
+          setHistory(result.history || { truncated: false, entries: [] });
 
-        // Resume active async job if one exists (e.g. after page reload)
-        if (result.activeJob) {
-          setAsyncJob({ jobId: result.activeJob.jobId, total: result.activeJob.total, startedAt: result.activeJob.startedAt });
-          setAsyncProgress({ classified: result.activeJob.classified || 0, failed: result.activeJob.failed || 0, total: result.activeJob.total, done: false });
-          setSaving(true);
-          setShowModal(true);
+          // Resume active async job if one exists (e.g. after page reload)
+          if (result.activeJob) {
+            setAsyncJob({
+              jobId: result.activeJob.jobId,
+              total: result.activeJob.total,
+              startedAt: result.activeJob.startedAt,
+            });
+            setAsyncProgress({
+              classified: result.activeJob.classified || 0,
+              failed: result.activeJob.failed || 0,
+              total: result.activeJob.total,
+              done: false,
+            });
+            setSaving(true);
+            setShowModal(true);
+          }
         }
+      } catch (error) {
+        console.error('Failed to load classification:', error);
+      } finally {
+        if (showLoading) setLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to load classification:', error);
-    } finally {
-      if (showLoading) setLoading(false);
-    }
-  }, [pageId, spaceKey]);
+    },
+    [pageId, spaceKey],
+  );
 
   useEffect(() => {
     loadClassification();
   }, [loadClassification]);
 
-
   // Fetch descendant count when recursive toggle is on and level changes
-  const selectedLevelAllowed = config?.levels?.find((l) => l.id === selectedLevel)?.allowed;
+  const selectedLevelAllowed = config?.levels?.find(
+    (l) => l.id === selectedLevel,
+  )?.allowed;
   useEffect(() => {
     if (!recursive || !selectedLevel || !pageId || !selectedLevelAllowed) {
       setDescendantCount(null);
@@ -169,46 +180,64 @@ const App = () => {
           setTotalDescendants(result.totalDescendants);
         }
       })
-      .catch(() => { if (!cancelled) { setDescendantCount(null); setTotalDescendants(null); } })
-      .finally(() => { if (!cancelled) setCountLoading(false); });
-    return () => { cancelled = true; };
+      .catch(() => {
+        if (!cancelled) {
+          setDescendantCount(null);
+          setTotalDescendants(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCountLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [recursive, selectedLevel, selectedLevelAllowed, pageId]);
 
   // Subscribe to Realtime progress when an async job is active
   useEffect(() => {
     if (!asyncJob || !pageId) return;
     let subscription = null;
-    realtime.subscribeGlobal(`classification-progress:${pageId}`, (data) => {
-      setAsyncProgress(data);
-      if (data.done) {
-        setAsyncJob(null);
-        setSaving(false);
-        loadClassification(false);
-        setDescendantCount(0);
-        setShowModal(false);
-        showFlag({
-          id: 'classify-success',
-          title: interpolate(t('classify.async_complete'), { classified: data.classified }),
-          type: 'success',
-          isAutoDismiss: true,
-        });
-      }
-    }).then((sub) => { subscription = sub; });
-    return () => { if (subscription) subscription.unsubscribe(); };
+    realtime
+      .subscribeGlobal(`classification-progress:${pageId}`, (data) => {
+        setAsyncProgress(data);
+        if (data.done) {
+          setAsyncJob(null);
+          setSaving(false);
+          loadClassification(false);
+          setDescendantCount(0);
+          setShowModal(false);
+          showFlag({
+            id: 'classify-success',
+            title: interpolate(t('classify.async_complete'), {
+              classified: data.classified,
+            }),
+            type: 'success',
+            isAutoDismiss: true,
+          });
+        }
+      })
+      .then((sub) => {
+        subscription = sub;
+      });
+    return () => {
+      if (subscription) subscription.unsubscribe();
+    };
   }, [asyncJob, pageId, loadClassification]);
 
   // Find the current level definition from config
   const currentLevel = config?.levels?.find(
-    (l) => l.id === (classification?.level || config?.defaultLevelId)
+    (l) => l.id === (classification?.level || config?.defaultLevelId),
   );
-  const currentLevelId = currentLevel?.id || config?.defaultLevelId || 'internal';
+  const currentLevelId =
+    currentLevel?.id || config?.defaultLevelId || 'internal';
 
   // Filter contacts and links relevant to the current level
   const relevantContacts = (config?.contacts || []).filter(
-    (c) => c.levelIds?.length === 0 || c.levelIds?.includes(currentLevelId)
+    (c) => c.levelIds?.length === 0 || c.levelIds?.includes(currentLevelId),
   );
   const relevantLinks = (config?.links || []).filter(
-    (l) => l.levelIds?.length === 0 || l.levelIds?.includes(currentLevelId)
+    (l) => l.levelIds?.length === 0 || l.levelIds?.includes(currentLevelId),
   );
 
   // Handle classification change submission
@@ -229,9 +258,23 @@ const App = () => {
       if (result.success) {
         // Async path — large tree pushed to background queue
         if (result.asyncJobId) {
-          setAsyncJob({ jobId: result.asyncJobId, total: result.totalToClassify, startedAt: Date.now() });
-          setAsyncProgress({ classified: 0, failed: 0, total: result.totalToClassify, done: false });
-          setMessage({ type: 'info', text: interpolate(t('classify.async_started'), { total: result.totalToClassify }) });
+          setAsyncJob({
+            jobId: result.asyncJobId,
+            total: result.totalToClassify,
+            startedAt: Date.now(),
+          });
+          setAsyncProgress({
+            classified: 0,
+            failed: 0,
+            total: result.totalToClassify,
+            done: false,
+          });
+          setMessage({
+            type: 'info',
+            text: interpolate(t('classify.async_started'), {
+              total: result.totalToClassify,
+            }),
+          });
           // Don't close modal or stop saving — Realtime subscription handles completion
           return;
         }
@@ -241,7 +284,10 @@ const App = () => {
         if (result.recursiveResult) {
           const { classified, failed, timedOut } = result.recursiveResult;
           if (timedOut || failed > 0) {
-            msg = interpolate(t('classify.success_recursive_partial'), { classified, failed });
+            msg = interpolate(t('classify.success_recursive_partial'), {
+              classified,
+              failed,
+            });
           } else {
             msg = interpolate(t('classify.success_recursive'), { classified });
           }
@@ -263,7 +309,10 @@ const App = () => {
         setDescendantCount(0);
         view.refresh();
       } else {
-        setMessage({ type: 'error', text: result.error || t('classify.error') });
+        setMessage({
+          type: 'error',
+          text: result.error || t('classify.error'),
+        });
       }
     } catch (error) {
       console.error('Failed to classify:', error);
@@ -271,7 +320,15 @@ const App = () => {
     } finally {
       setSaving(false);
     }
-  }, [pageId, spaceKey, selectedLevel, recursive, locale, t, loadClassification]);
+  }, [
+    pageId,
+    spaceKey,
+    selectedLevel,
+    recursive,
+    locale,
+    t,
+    loadClassification,
+  ]);
 
   // Open the classification modal
   const openModal = useCallback(async () => {
@@ -287,12 +344,23 @@ const App = () => {
     try {
       const result = await invoke('getClassification', { pageId, spaceKey });
       if (result.success && result.activeJob) {
-        setAsyncJob({ jobId: result.activeJob.jobId, total: result.activeJob.total, startedAt: result.activeJob.startedAt });
-        setAsyncProgress({ classified: result.activeJob.classified || 0, failed: result.activeJob.failed || 0, total: result.activeJob.total, done: false });
+        setAsyncJob({
+          jobId: result.activeJob.jobId,
+          total: result.activeJob.total,
+          startedAt: result.activeJob.startedAt,
+        });
+        setAsyncProgress({
+          classified: result.activeJob.classified || 0,
+          failed: result.activeJob.failed || 0,
+          total: result.activeJob.total,
+          done: false,
+        });
         setSaving(true);
         return;
       }
-    } catch (_) { /* ignore */ }
+    } catch (_) {
+      /* ignore */
+    }
     // No active job — clear async state
     setAsyncJob(null);
     setAsyncProgress(null);
@@ -326,7 +394,12 @@ const App = () => {
   // Helper: compact date+time format for history entries
   const formatDate = (dateStr) => {
     const d = new Date(dateStr);
-    const opts = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+    const opts = {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    };
     if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
     return d.toLocaleString(undefined, opts);
   };
@@ -346,111 +419,135 @@ const App = () => {
         {/* Classification Tab */}
         <TabPanel>
           <Box xcss={sectionStyle}>
-          <Stack space="space.150">
-            {/* Current classification level with colored tag */}
-            {currentLevel && (
-              <Inline space="space.100" alignBlock="center">
-                <Lozenge isBold appearance={colorToLozenge(currentLevel.color)}>{localize(currentLevel.name, locale)}</Lozenge>
-              </Inline>
-            )}
+            <Stack space="space.150">
+              {/* Current classification level with colored tag */}
+              {currentLevel && (
+                <Inline space="space.100" alignBlock="center">
+                  <Lozenge
+                    isBold
+                    appearance={colorToLozenge(currentLevel.color)}
+                  >
+                    {localize(currentLevel.name, locale)}
+                  </Lozenge>
+                </Inline>
+              )}
 
-            {/* Level description */}
-            {currentLevel?.description && (
-              <Box xcss={sectionStyle}>
-                <Text>{localize(currentLevel.description, locale)}</Text>
-              </Box>
-            )}
+              {/* Level description */}
+              {currentLevel?.description && (
+                <Box xcss={sectionStyle}>
+                  <Text>{localize(currentLevel.description, locale)}</Text>
+                </Box>
+              )}
 
-            {/* Restriction mismatch warning */}
-            {restrictionWarning === 'requires_protection' && (
-              <SectionMessage appearance="warning">
-                <Text>{t('classify.requires_protection')}</Text>
-                <Text>{t('classify.requires_protection_share')}</Text>
-              </SectionMessage>
-            )}
-            {restrictionWarning === 'has_unnecessary_protection' && (
-              <SectionMessage appearance="warning">
-                <Text>{t('classify.has_unnecessary_protection')}</Text>
-              </SectionMessage>
-            )}
+              {/* Restriction mismatch warning */}
+              {restrictionWarning === 'requires_protection' && (
+                <SectionMessage appearance="warning">
+                  <Text>{t('classify.requires_protection')}</Text>
+                  <Text>{t('classify.requires_protection_share')}</Text>
+                </SectionMessage>
+              )}
+              {restrictionWarning === 'has_unnecessary_protection' && (
+                <SectionMessage appearance="warning">
+                  <Text>{t('classify.has_unnecessary_protection')}</Text>
+                </SectionMessage>
+              )}
 
-            {/* Change classification button (editors only) */}
-            {canEdit && (
-              <Box xcss={sectionStyle}>
-                <Button appearance="default" onClick={openModal}>
-                  {t('byline.change_button')}
-                </Button>
-              </Box>
-            )}
-
-          </Stack>
+              {/* Change classification button (editors only) */}
+              {canEdit && (
+                <Box xcss={sectionStyle}>
+                  <Button appearance="default" onClick={openModal}>
+                    {t('byline.change_button')}
+                  </Button>
+                </Box>
+              )}
+            </Stack>
           </Box>
         </TabPanel>
 
         {/* Resources Tab */}
         <TabPanel>
           <Box xcss={sectionStyle}>
-          <Stack space="space.150">
-            {/* Contacts section */}
-            {relevantContacts.length > 0 && (
-              <Box xcss={sectionStyle}>
-                <Heading size="xsmall">{t('byline.contacts')}</Heading>
-                <Stack space="space.050">
-                  {relevantContacts.map((contact) => (
-                    <ContactItem key={contact.id} contact={contact} locale={locale} />
-                  ))}
-                </Stack>
-              </Box>
-            )}
+            <Stack space="space.150">
+              {/* Contacts section */}
+              {relevantContacts.length > 0 && (
+                <Box xcss={sectionStyle}>
+                  <Heading size="xsmall">{t('byline.contacts')}</Heading>
+                  <Stack space="space.050">
+                    {relevantContacts.map((contact) => (
+                      <ContactItem
+                        key={contact.id}
+                        contact={contact}
+                        locale={locale}
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              )}
 
-            {/* Links section */}
-            {relevantLinks.length > 0 && (
-              <Box xcss={sectionStyle}>
-                <Heading size="xsmall">{t('byline.links')}</Heading>
-                <Stack space="space.050">
-                  {relevantLinks.map((link) => (
-                    <Link key={link.id} href={link.url} openNewTab>
-                      {localize(link.label, locale)}
-                    </Link>
-                  ))}
-                </Stack>
-              </Box>
-            )}
+              {/* Links section */}
+              {relevantLinks.length > 0 && (
+                <Box xcss={sectionStyle}>
+                  <Heading size="xsmall">{t('byline.links')}</Heading>
+                  <Stack space="space.050">
+                    {relevantLinks.map((link) => (
+                      <Link key={link.id} href={link.url} openNewTab>
+                        {localize(link.label, locale)}
+                      </Link>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
 
-            {relevantContacts.length === 0 && relevantLinks.length === 0 && (
-              <Text>{t('byline.no_resources')}</Text>
-            )}
-          </Stack>
+              {relevantContacts.length === 0 && relevantLinks.length === 0 && (
+                <Text>{t('byline.no_resources')}</Text>
+              )}
+            </Stack>
           </Box>
         </TabPanel>
 
         {/* History Tab */}
         <TabPanel>
           <Box xcss={sectionStyle}>
-          <Stack space="space.100">
-            {history.truncated && (
-              <Text>{t('byline.history_truncated')}</Text>
-            )}
-            {historyEntries.length === 0 && (
-              <Text>{t('byline.no_history')}</Text>
-            )}
-            {/* History entries use short property names: { from, to, by, at }.
+            <Stack space="space.100">
+              {history.truncated && (
+                <Text>{t('byline.history_truncated')}</Text>
+              )}
+              {historyEntries.length === 0 && (
+                <Text>{t('byline.no_history')}</Text>
+              )}
+              {/* History entries use short property names: { from, to, by, at }.
                Keep in sync with appendHistory() calls in classificationService.js. */}
-            {historyEntries.map((entry, index) => (
-              <Box key={entry.id || index} xcss={index < historyEntries.length - 1 ? historyEntryStyle : undefined}>
-                <Inline space="space.050" alignBlock="center">
-                  {entry.from && (
-                    <>
-                      <Lozenge isBold appearance={levelAppearance(entry.from)}>{entry.from}</Lozenge>
-                      <Text> → </Text>
-                    </>
-                  )}
-                  <Lozenge isBold appearance={levelAppearance(entry.to)}>{entry.to}</Lozenge>
-                </Inline>
-                <Text><User accountId={entry.by} /> · {formatDate(entry.at)}</Text>
-              </Box>
-            ))}
-          </Stack>
+              {historyEntries.map((entry, index) => (
+                <Box
+                  key={entry.id || index}
+                  xcss={
+                    index < historyEntries.length - 1
+                      ? historyEntryStyle
+                      : undefined
+                  }
+                >
+                  <Inline space="space.050" alignBlock="center">
+                    {entry.from && (
+                      <>
+                        <Lozenge
+                          isBold
+                          appearance={levelAppearance(entry.from)}
+                        >
+                          {entry.from}
+                        </Lozenge>
+                        <Text> → </Text>
+                      </>
+                    )}
+                    <Lozenge isBold appearance={levelAppearance(entry.to)}>
+                      {entry.to}
+                    </Lozenge>
+                  </Inline>
+                  <Text>
+                    <User accountId={entry.by} /> · {formatDate(entry.at)}
+                  </Text>
+                </Box>
+              ))}
+            </Stack>
           </Box>
         </TabPanel>
       </Tabs>
@@ -461,7 +558,9 @@ const App = () => {
           <Modal onClose={closeModal}>
             <ModalHeader>
               <ModalTitle>{t('classify.title')}</ModalTitle>
-              <Button appearance="subtle" onClick={closeModal}>✕</Button>
+              <Button appearance="subtle" onClick={closeModal}>
+                ✕
+              </Button>
             </ModalHeader>
             <ModalBody>
               <Stack space="space.200">
@@ -473,7 +572,11 @@ const App = () => {
                  */}
                 <Stack space="space.075">
                   {(config?.levels || []).map((level) => (
-                    <Inline key={level.id} space="space.100" alignBlock="center">
+                    <Inline
+                      key={level.id}
+                      space="space.100"
+                      alignBlock="center"
+                    >
                       <Radio
                         value={level.id}
                         isChecked={selectedLevel === level.id}
@@ -484,30 +587,35 @@ const App = () => {
                       <Lozenge isBold appearance={colorToLozenge(level.color)}>
                         {localize(level.name, locale)}
                       </Lozenge>
-                      {!level.allowed && <Text>({t('classify.not_allowed')})</Text>}
+                      {!level.allowed && (
+                        <Text>({t('classify.not_allowed')})</Text>
+                      )}
                     </Inline>
                   ))}
                 </Stack>
 
                 {/* Show description for selected level */}
-                {selectedLevel && (() => {
-                  const level = config?.levels?.find((l) => l.id === selectedLevel);
-                  if (!level) return null;
-
-                  if (!level.allowed && level.errorMessage) {
-                    return (
-                      <SectionMessage appearance="error">
-                        <Text>{localize(level.errorMessage, locale)}</Text>
-                      </SectionMessage>
+                {selectedLevel &&
+                  (() => {
+                    const level = config?.levels?.find(
+                      (l) => l.id === selectedLevel,
                     );
-                  }
+                    if (!level) return null;
 
-                  if (level.description) {
-                    return <Text>{localize(level.description, locale)}</Text>;
-                  }
+                    if (!level.allowed && level.errorMessage) {
+                      return (
+                        <SectionMessage appearance="error">
+                          <Text>{localize(level.errorMessage, locale)}</Text>
+                        </SectionMessage>
+                      );
+                    }
 
-                  return null;
-                })()}
+                    if (level.description) {
+                      return <Text>{localize(level.description, locale)}</Text>;
+                    }
+
+                    return null;
+                  })()}
 
                 {/* Recursive toggle with descendant count */}
                 <Stack space="space.050">
@@ -526,50 +634,91 @@ const App = () => {
                   {recursive && !countLoading && totalDescendants === 0 && (
                     <Text>{t('classify.no_subpages')}</Text>
                   )}
-                  {recursive && !countLoading && totalDescendants > 0 && descendantCount === 0 && (
-                    <Text>{t('classify.all_subpages_classified')}</Text>
-                  )}
-                  {recursive && !countLoading && descendantCount > 0 && !asyncJob && (
-                    saving
-                      ? <Inline space="space.100" alignBlock="center">
-                          <Spinner size="small" />
-                          <Text>{t('classify.sync_progress')}</Text>
-                        </Inline>
-                      : <Text>{interpolate(t('classify.apply_recursive_count'), { count: descendantCount })}</Text>
-                  )}
+                  {recursive &&
+                    !countLoading &&
+                    totalDescendants > 0 &&
+                    descendantCount === 0 && (
+                      <Text>{t('classify.all_subpages_classified')}</Text>
+                    )}
+                  {recursive &&
+                    !countLoading &&
+                    descendantCount > 0 &&
+                    !asyncJob &&
+                    (saving ? (
+                      <Inline space="space.100" alignBlock="center">
+                        <Spinner size="small" />
+                        <Text>{t('classify.sync_progress')}</Text>
+                      </Inline>
+                    ) : (
+                      <Text>
+                        {interpolate(t('classify.apply_recursive_count'), {
+                          count: descendantCount,
+                        })}
+                      </Text>
+                    ))}
                 </Stack>
 
                 {/* Async progress bar */}
                 {asyncJob && asyncProgress && (
                   <Stack space="space.100">
-                    <Text>{interpolate(t('classify.async_progress'), { classified: asyncProgress.classified || 0, total: asyncJob.total })}</Text>
-                    <ProgressBar value={asyncJob.total > 0 ? (asyncProgress.classified || 0) / asyncJob.total : 0} />
-                    {(asyncProgress.classified || 0) > 0 && asyncJob.startedAt && (() => {
-                      const elapsed = Date.now() - asyncJob.startedAt;
-                      const classified = asyncProgress.classified || 0;
-                      const remaining = Math.round(elapsed / classified * (asyncJob.total - classified) / 1000);
-                      const eta = remaining >= 60
-                        ? interpolate(t('classify.async_eta_min'), { minutes: Math.ceil(remaining / 60) })
-                        : interpolate(t('classify.async_eta_sec'), { seconds: remaining });
-                      return <Text>{eta}</Text>;
-                    })()}
+                    <Text>
+                      {interpolate(t('classify.async_progress'), {
+                        classified: asyncProgress.classified || 0,
+                        total: asyncJob.total,
+                      })}
+                    </Text>
+                    <ProgressBar
+                      value={
+                        asyncJob.total > 0
+                          ? (asyncProgress.classified || 0) / asyncJob.total
+                          : 0
+                      }
+                    />
+                    {(asyncProgress.classified || 0) > 0 &&
+                      asyncJob.startedAt &&
+                      (() => {
+                        const elapsed = Date.now() - asyncJob.startedAt;
+                        const classified = asyncProgress.classified || 0;
+                        const remaining = Math.round(
+                          ((elapsed / classified) *
+                            (asyncJob.total - classified)) /
+                            1000,
+                        );
+                        const eta =
+                          remaining >= 60
+                            ? interpolate(t('classify.async_eta_min'), {
+                                minutes: Math.ceil(remaining / 60),
+                              })
+                            : interpolate(t('classify.async_eta_sec'), {
+                                seconds: remaining,
+                              });
+                        return <Text>{eta}</Text>;
+                      })()}
                     <Text>{t('classify.async_close_hint')}</Text>
                   </Stack>
                 )}
 
                 {/* Error and info messages stay inside the modal.
                    Success uses showFlag toast. Info is hidden when async progress bar is visible. */}
-                {message && message.type !== 'success' && !(message.type === 'info' && asyncJob) && (
-                  <SectionMessage appearance={message.type === 'error' ? 'error' : 'information'}>
-                    <Text>{message.text}</Text>
-                  </SectionMessage>
-                )}
+                {message &&
+                  message.type !== 'success' &&
+                  !(message.type === 'info' && asyncJob) && (
+                    <SectionMessage
+                      appearance={
+                        message.type === 'error' ? 'error' : 'information'
+                      }
+                    >
+                      <Text>{message.text}</Text>
+                    </SectionMessage>
+                  )}
               </Stack>
             </ModalBody>
             <ModalFooter>
               <ButtonGroup>
                 <Button appearance="subtle" onClick={closeModal}>
-                  {asyncJob ? t('classify.close_button') : t('classify.cancel_button')}
+                  {asyncJob
+                    ? t('classify.close_button')
+                    : t('classify.cancel_button')}
                 </Button>
                 <Button
                   appearance="primary"
@@ -581,7 +730,10 @@ const App = () => {
                     saving ||
                     !selectedLevelAllowed ||
                     (selectedLevel === currentLevelId && !recursive) ||
-                    (recursive && !countLoading && (descendantCount === 0 || totalDescendants === 0) && selectedLevel === currentLevelId)
+                    (recursive &&
+                      !countLoading &&
+                      (descendantCount === 0 || totalDescendants === 0) &&
+                      selectedLevel === currentLevelId)
                   }
                 >
                   {t('classify.apply_button')}
@@ -623,7 +775,8 @@ const ContactItem = ({ contact, locale }) => {
   // Free text
   return (
     <Text>
-      {contact.value}{role ? ` — ${role}` : ''}
+      {contact.value}
+      {role ? ` — ${role}` : ''}
     </Text>
   );
 };
@@ -632,5 +785,5 @@ const ContactItem = ({ contact, locale }) => {
 ForgeReconciler.render(
   <I18nProvider>
     <App />
-  </I18nProvider>
+  </I18nProvider>,
 );

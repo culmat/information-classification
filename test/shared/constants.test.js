@@ -25,11 +25,20 @@ describe('constants', () => {
 
   it('should build space config keys correctly', () => {
     expect(spaceConfigKey('DEV')).toBe(`${SPACE_CONFIG_KEY_PREFIX}DEV`);
-    expect(spaceConfigKey('my-space')).toBe(`${SPACE_CONFIG_KEY_PREFIX}my-space`);
+    expect(spaceConfigKey('my-space')).toBe(
+      `${SPACE_CONFIG_KEY_PREFIX}my-space`,
+    );
   });
 
   it('should have valid lozenge appearances for all lozenge-mapped colors', () => {
-    const validAppearances = ['default', 'inprogress', 'moved', 'new', 'removed', 'success'];
+    const validAppearances = [
+      'default',
+      'inprogress',
+      'moved',
+      'new',
+      'removed',
+      'success',
+    ];
     for (const color of Object.keys(COLOR_TO_LOZENGE)) {
       expect(validAppearances).toContain(COLOR_TO_LOZENGE[color]);
     }

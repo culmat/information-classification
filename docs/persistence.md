@@ -6,10 +6,10 @@ Three storage tiers, each serving a distinct purpose.
 
 Stores the current classification per page via REST API v2. Two property keys:
 
-| Key | Purpose |
-|-----|---------|
-| `culmat_page_classification` | Authoritative data (level, classifiedBy, classifiedAt). Indexed for CQL search. |
-| `culmat_page_classification_byline` | Display data (title, tooltip) for the byline badge. |
+| Key                                 | Purpose                                                                         |
+| ----------------------------------- | ------------------------------------------------------------------------------- |
+| `culmat_page_classification`        | Authoritative data (level, classifiedBy, classifiedAt). Indexed for CQL search. |
+| `culmat_page_classification_byline` | Display data (title, tooltip) for the byline badge.                             |
 
 **Key files:** `src/services/contentPropertyService.js`, `manifest.yml` (content property schema at lines 31-48).
 
@@ -19,9 +19,9 @@ Stores the current classification per page via REST API v2. Two property keys:
 
 Stores global and space-level configuration via `@forge/kvs`.
 
-| Key pattern | Content |
-|-------------|---------|
-| `config:global` | Levels, default level, contacts, links, languages |
+| Key pattern               | Content                                             |
+| ------------------------- | --------------------------------------------------- |
+| `config:global`           | Levels, default level, contacts, links, languages   |
 | `config:space:{spaceKey}` | Allowed level subset + space-level default override |
 
 **Key files:** `src/storage/configStore.js`, `src/storage/spaceConfigStore.js`, `src/shared/constants.js` (key definitions).

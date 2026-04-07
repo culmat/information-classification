@@ -7,9 +7,13 @@
 import api, { route } from '@forge/api';
 import { Queue } from '@forge/events';
 import { kvs } from '@forge/kvs';
-import { getGlobalConfig, setGlobalConfig, getEffectiveConfig } from '../storage/configStore';
-import { findPagesByLevel, classifySinglePage } from '../services/classificationService';
-import { successResponse, errorResponse, validationError } from '../utils/responseHelper';
+import { getGlobalConfig, setGlobalConfig } from '../storage/configStore';
+import { findPagesByLevel } from '../services/classificationService';
+import {
+  successResponse,
+  errorResponse,
+  validationError,
+} from '../utils/responseHelper';
 import { VALID_COLORS, asyncJobKey } from '../shared/constants';
 
 /**
@@ -56,10 +60,12 @@ export async function setConfigResolver(req) {
  * Runs a CQL search and returns { totalSize, results }.
  */
 async function cqlSearch(cql, limit = 0) {
-  const response = await api.asUser().requestConfluence(
-    route`/wiki/rest/api/search?cql=${cql}&limit=${limit}&expand=content.space`,
-    { headers: { Accept: 'application/json' } }
-  );
+  const response = await api
+    .asUser()
+    .requestConfluence(
+      route`/wiki/rest/api/search?cql=${cql}&limit=${limit}&expand=content.space`,
+      { headers: { Accept: 'application/json' } },
+    );
   if (!response.ok) return { totalSize: 0, results: [] };
   const data = await response.json();
   return {
@@ -87,13 +93,16 @@ export async function getAuditDataResolver(req) {
 
     // Count pages per level + total pages in parallel
     const countPromises = levels.map((l) =>
-      cqlSearch(`type=page${spaceFilter} AND culmat_classification_level="${l.id}"`)
-        .then(({ totalSize }) => ({ level: l.id, count: totalSize }))
+      cqlSearch(
+        `type=page${spaceFilter} AND culmat_classification_level="${l.id}"`,
+      ).then(({ totalSize }) => ({ level: l.id, count: totalSize })),
     );
     const totalPagesPromise = cqlSearch(`type=page${spaceFilter}`);
     // Build an OR query for all configured levels instead of "is not null",
     // which is not reliably supported by content property search aliases.
-    const levelFilter = levels.map((l) => `culmat_classification_level="${l.id}"`).join(' OR ');
+    const levelFilter = levels
+      .map((l) => `culmat_classification_level="${l.id}"`)
+      .join(' OR ');
     const recentCql = levelFilter
       ? `type=page${spaceFilter} AND (${levelFilter}) ORDER BY lastModified DESC`
       : `type=page${spaceFilter}`;
@@ -129,33 +138,55 @@ export async function getAuditDataResolver(req) {
 function validateConfig(config) {
   // Validate languages — English is always hardcoded at position 0
   if (!Array.isArray(config.languages) || config.languages.length === 0) {
-    return { valid: false, error: 'At least one content language is required.' };
+    return {
+      valid: false,
+      error: 'At least one content language is required.',
+    };
   }
   const langCodes = config.languages.map((l) => l.code);
   if (new Set(langCodes).size !== langCodes.length) {
     return { valid: false, error: 'Duplicate language codes are not allowed.' };
   }
   for (const lang of config.languages) {
-    if (!lang.code || typeof lang.code !== 'string' || !lang.label || typeof lang.label !== 'string') {
-      return { valid: false, error: 'Each language must have a code and label.' };
+    if (
+      !lang.code ||
+      typeof lang.code !== 'string' ||
+      !lang.label ||
+      typeof lang.label !== 'string'
+    ) {
+      return {
+        valid: false,
+        error: 'Each language must have a code and label.',
+      };
     }
   }
 
   // Must have levels array
   if (!Array.isArray(config.levels) || config.levels.length === 0) {
-    return { valid: false, error: 'At least one classification level is required.' };
+    return {
+      valid: false,
+      error: 'At least one classification level is required.',
+    };
   }
 
   // At least one level must be allowed
   const allowedLevels = config.levels.filter((l) => l.allowed);
   if (allowedLevels.length === 0) {
-    return { valid: false, error: 'At least one classification level must be allowed.' };
+    return {
+      valid: false,
+      error: 'At least one classification level must be allowed.',
+    };
   }
 
   // Default level must exist and be allowed
-  const defaultLevel = config.levels.find((l) => l.id === config.defaultLevelId);
+  const defaultLevel = config.levels.find(
+    (l) => l.id === config.defaultLevelId,
+  );
   if (!defaultLevel) {
-    return { valid: false, error: 'Default level must reference an existing level.' };
+    return {
+      valid: false,
+      error: 'Default level must reference an existing level.',
+    };
   }
   if (!defaultLevel.allowed) {
     return { valid: false, error: 'Default level must be an allowed level.' };
@@ -173,13 +204,22 @@ function validateConfig(config) {
       return { valid: false, error: 'Each level must have a string ID.' };
     }
     if (!level.name || typeof level.name !== 'object') {
-      return { valid: false, error: `Level "${level.id}" must have a name object with language keys.` };
+      return {
+        valid: false,
+        error: `Level "${level.id}" must have a name object with language keys.`,
+      };
     }
     if (!level.name.en) {
-      return { valid: false, error: `Level "${level.id}" must have an English name.` };
+      return {
+        valid: false,
+        error: `Level "${level.id}" must have an English name.`,
+      };
     }
     if (!VALID_COLORS.includes(level.color)) {
-      return { valid: false, error: `Level "${level.id}" has invalid color "${level.color}". Valid: ${VALID_COLORS.join(', ')}` };
+      return {
+        valid: false,
+        error: `Level "${level.id}" has invalid color "${level.color}". Valid: ${VALID_COLORS.join(', ')}`,
+      };
     }
   }
 
@@ -222,8 +262,10 @@ export async function reclassifyLevelResolver(req) {
   const accountId = req.context.accountId;
   const locale = req.context.locale || 'en';
 
-  if (!fromLevelId || !toLevelId) return validationError('fromLevelId and toLevelId are required');
-  if (fromLevelId === toLevelId) return validationError('fromLevelId and toLevelId must differ');
+  if (!fromLevelId || !toLevelId)
+    return validationError('fromLevelId and toLevelId are required');
+  if (fromLevelId === toLevelId)
+    return validationError('fromLevelId and toLevelId must differ');
 
   try {
     const { totalSize } = await findPagesByLevel(fromLevelId, 0);
@@ -231,7 +273,13 @@ export async function reclassifyLevelResolver(req) {
 
     const queue = new Queue({ key: 'classification-queue' });
     const { jobId } = await queue.push({
-      body: { fromLevelId, toLevelId, accountId, locale, totalToClassify: totalSize },
+      body: {
+        fromLevelId,
+        toLevelId,
+        accountId,
+        locale,
+        totalToClassify: totalSize,
+      },
       concurrency: { key: `reclassify-${fromLevelId}`, limit: 1 },
     });
 

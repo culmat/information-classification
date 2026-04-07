@@ -30,18 +30,18 @@ await page.waitForSelector('text=Classification', { timeout: 15000 });
 
 ### Key URLs
 
-| Page | URL pattern |
-|------|-------------|
+| Page                  | URL pattern                                                                 |
+| --------------------- | --------------------------------------------------------------------------- |
 | Admin global settings | `https://<site>/wiki/admin/forge/apps/<appId>/<envId>/classification-admin` |
-| Confluence page | `https://<site>/wiki/spaces/<spaceKey>/pages/<pageId>` |
+| Confluence page       | `https://<site>/wiki/spaces/<spaceKey>/pages/<pageId>`                      |
 
 **Sites and environment IDs:**
 
-| Environment | Site | Env ID |
-|-------------|------|--------|
+| Environment | Site                  | Env ID                               |
+| ----------- | --------------------- | ------------------------------------ |
 | development | dev-cul.atlassian.net | 1cce4528-e46b-42cd-8c6f-8743d1389cde |
-| staging | sta-cul.atlassian.net | 5681e13c-eafa-40cd-aa57-902a374e7c1c |
-| production | cul.atlassian.net | 3d50e48b-4570-47f4-9558-6232d11661ef |
+| staging     | sta-cul.atlassian.net | 5681e13c-eafa-40cd-aa57-902a374e7c1c |
+| production  | cul.atlassian.net     | 3d50e48b-4570-47f4-9558-6232d11661ef |
 
 App ID: `c5452f23-8798-4ee2-b33c-ee3d3a792547`.
 

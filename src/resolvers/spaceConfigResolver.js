@@ -4,9 +4,17 @@
  * and set a different default level.
  */
 
-import { getSpaceConfig, setSpaceConfig, deleteSpaceConfig } from '../storage/spaceConfigStore';
+import {
+  getSpaceConfig,
+  setSpaceConfig,
+  deleteSpaceConfig,
+} from '../storage/spaceConfigStore';
 import { getGlobalConfig } from '../storage/configStore';
-import { successResponse, errorResponse, validationError } from '../utils/responseHelper';
+import {
+  successResponse,
+  errorResponse,
+  validationError,
+} from '../utils/responseHelper';
 
 /**
  * Resolver: getSpaceConfig
@@ -59,11 +67,11 @@ export async function setSpaceConfigResolver(req) {
 
   // Space can only include levels that are globally allowed
   const invalidIds = (config.allowedLevelIds || []).filter(
-    (id) => !globalAllowedIds.includes(id)
+    (id) => !globalAllowedIds.includes(id),
   );
   if (invalidIds.length > 0) {
     return validationError(
-      `Cannot enable levels that are not globally allowed: ${invalidIds.join(', ')}`
+      `Cannot enable levels that are not globally allowed: ${invalidIds.join(', ')}`,
     );
   }
 
@@ -71,7 +79,9 @@ export async function setSpaceConfigResolver(req) {
   if (config.defaultLevelId) {
     const effectiveAllowed = config.allowedLevelIds || globalAllowedIds;
     if (!effectiveAllowed.includes(config.defaultLevelId)) {
-      return validationError('Default level must be one of the allowed levels.');
+      return validationError(
+        'Default level must be one of the allowed levels.',
+      );
     }
   }
 
@@ -99,7 +109,9 @@ export async function resetSpaceConfigResolver(req) {
 
   try {
     await deleteSpaceConfig(spaceKey);
-    return successResponse({ message: 'Space configuration reset to global defaults.' });
+    return successResponse({
+      message: 'Space configuration reset to global defaults.',
+    });
   } catch (error) {
     console.error('Error resetting space config:', error);
     return errorResponse('Failed to reset space configuration', 500);

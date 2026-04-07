@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { successResponse, errorResponse, validationError } from '../../src/utils/responseHelper';
+import {
+  successResponse,
+  errorResponse,
+  validationError,
+} from '../../src/utils/responseHelper';
 
 describe('successResponse', () => {
   it('should return success: true with no extra data', () => {

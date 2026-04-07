@@ -9,25 +9,28 @@ export default [
       sourceType: 'module',
       parserOptions: {
         ecmaFeatures: {
-          jsx: true
-        }
+          jsx: true,
+        },
       },
       globals: {
         console: 'readonly',
         crypto: 'readonly',
         TextEncoder: 'readonly',
         Buffer: 'readonly',
-        URL: 'readonly'
-      }
+        URL: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        structuredClone: 'readonly',
+      },
     },
     plugins: {
-      'react': react,
-      'react-hooks': reactHooks
+      react: react,
+      'react-hooks': reactHooks,
     },
     settings: {
       react: {
-        version: '18.2'
-      }
+        version: '18.2',
+      },
     },
     rules: {
       'react/jsx-uses-react': 'error',
@@ -35,7 +38,14 @@ export default [
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
 
-      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
       'no-undef': 'error',
       'no-unreachable': 'error',
       'no-constant-condition': 'error',
@@ -47,15 +57,21 @@ export default [
 
       'prefer-const': 'error',
       'no-var': 'error',
-      'eqeqeq': ['error', 'always'],
+      eqeqeq: ['error', 'always'],
 
       'no-console': ['warn', { allow: ['log', 'error', 'warn'] }],
 
-      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
-      'max-lines-per-function': ['warn', { max: 300, skipBlankLines: true, skipComments: true }],
-      'complexity': ['warn', 35],
+      'max-lines': [
+        'warn',
+        { max: 400, skipBlankLines: true, skipComments: true },
+      ],
+      'max-lines-per-function': [
+        'warn',
+        { max: 300, skipBlankLines: true, skipComments: true },
+      ],
+      complexity: ['warn', 35],
       'max-depth': ['warn', 4],
-      'max-params': ['warn', 4]
-    }
-  }
+      'max-params': ['warn', 4],
+    },
+  },
 ];

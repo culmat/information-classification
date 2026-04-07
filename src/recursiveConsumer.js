@@ -9,9 +9,17 @@
 
 import { publishGlobal } from '@forge/realtime';
 import { kvs } from '@forge/kvs';
-import { findDescendantsToClassify, findPagesByLevel, classifySinglePage } from './services/classificationService';
+import {
+  findDescendantsToClassify,
+  findPagesByLevel,
+  classifySinglePage,
+} from './services/classificationService';
 import { getClassification } from './services/contentPropertyService';
-import { findPagesByLabel, removeLabelFromPage, addLabelToPage } from './services/labelService';
+import {
+  findPagesByLabel,
+  removeLabelFromPage,
+  addLabelToPage,
+} from './services/labelService';
 import { asyncJobKey } from './shared/constants';
 import { getEffectiveConfig } from './storage/configStore';
 import { getSpaceConfig } from './storage/spaceConfigStore';
@@ -28,10 +36,10 @@ export async function handler(event) {
   const { mode, fromLevelId } = event.body;
 
   if (mode === 'import') {
-    return handleImport(event);
+    return await handleImport(event);
   }
   if (mode === 'export') {
-    return handleExport(event);
+    return await handleExport(event);
   }
   if (fromLevelId) {
     return handleReclassify(event);
@@ -43,11 +51,14 @@ export async function handler(event) {
  * Recursive mode: classify descendants of a specific page.
  */
 async function handleRecursive(event) {
-  const { pageId, spaceKey, levelId, accountId, locale, totalToClassify } = event.body;
+  const { pageId, spaceKey, levelId, accountId, locale, totalToClassify } =
+    event.body;
   const channel = `classification-progress:${pageId}`;
   const jobKey = asyncJobKey(pageId);
 
-  console.log(`Async classification started: pageId=${pageId}, levelId=${levelId}, total=${totalToClassify}`);
+  console.log(
+    `Async classification started: pageId=${pageId}, levelId=${levelId}, total=${totalToClassify}`,
+  );
 
   const jobState = await kvs.get(jobKey);
   const startedAt = jobState?.startedAt || Date.now();
@@ -59,26 +70,47 @@ async function handleRecursive(event) {
   if (!level) {
     console.error(`Level ${levelId} not found in config`);
     await Promise.all([
-      publishGlobal(channel, { classified: 0, failed: 0, total: totalToClassify, done: true, error: 'Level not found' }),
+      publishGlobal(channel, {
+        classified: 0,
+        failed: 0,
+        total: totalToClassify,
+        done: true,
+        error: 'Level not found',
+      }),
       kvs.delete(jobKey),
     ]);
     return;
   }
 
-  const fetchBatch = () => findDescendantsToClassify(pageId, levelId, BATCH_SIZE, 0, { asApp: true });
+  const fetchBatch = () =>
+    findDescendantsToClassify(pageId, levelId, BATCH_SIZE, 0, { asApp: true });
 
-  await processPages({ channel, jobKey, startedAt, totalToClassify, levelId, spaceKey, accountId, locale, level, fetchBatch });
+  await processPages({
+    channel,
+    jobKey,
+    startedAt,
+    totalToClassify,
+    levelId,
+    spaceKey,
+    accountId,
+    locale,
+    level,
+    fetchBatch,
+  });
 }
 
 /**
  * Reclassify mode: move all pages from one level to another.
  */
 async function handleReclassify(event) {
-  const { fromLevelId, toLevelId, accountId, locale, totalToClassify } = event.body;
+  const { fromLevelId, toLevelId, accountId, locale, totalToClassify } =
+    event.body;
   const channel = `classification-progress:reclassify-${fromLevelId}`;
   const jobKey = asyncJobKey(`reclassify-${fromLevelId}`);
 
-  console.log(`Reclassify started: ${fromLevelId} → ${toLevelId}, total=${totalToClassify}`);
+  console.log(
+    `Reclassify started: ${fromLevelId} → ${toLevelId}, total=${totalToClassify}`,
+  );
 
   const jobState = await kvs.get(jobKey);
   const startedAt = jobState?.startedAt || Date.now();
@@ -90,28 +122,55 @@ async function handleReclassify(event) {
   if (!level) {
     console.error(`Target level ${toLevelId} not found in config`);
     await Promise.all([
-      publishGlobal(channel, { classified: 0, failed: 0, total: totalToClassify, done: true, error: 'Level not found' }),
+      publishGlobal(channel, {
+        classified: 0,
+        failed: 0,
+        total: totalToClassify,
+        done: true,
+        error: 'Level not found',
+      }),
       kvs.delete(jobKey),
     ]);
     return;
   }
 
   // Pages with fromLevelId — they drop out of CQL results once reclassified
-  const fetchBatch = () => findPagesByLevel(fromLevelId, BATCH_SIZE, 0, { asApp: true });
+  const fetchBatch = () =>
+    findPagesByLevel(fromLevelId, BATCH_SIZE, 0, { asApp: true });
 
   // Reclassify pages need a spaceKey per page — we pass null and classifySinglePage handles it
-  await processPages({ channel, jobKey, startedAt, totalToClassify, levelId: toLevelId, spaceKey: null, accountId, locale, level, fetchBatch });
+  await processPages({
+    channel,
+    jobKey,
+    startedAt,
+    totalToClassify,
+    levelId: toLevelId,
+    spaceKey: null,
+    accountId,
+    locale,
+    level,
+    fetchBatch,
+  });
 }
 
 /**
  * Import mode: classify pages based on label→level mappings, optionally remove labels.
  */
 async function handleImport(event) {
-  const { mappings, removeLabels, spaceKey, accountId, locale, totalToClassify } = event.body;
+  const {
+    mappings,
+    removeLabels,
+    spaceKey,
+    accountId,
+    locale,
+    totalToClassify,
+  } = event.body;
   const channel = 'classification-progress:label-import';
   const jobKey = asyncJobKey('label-import');
 
-  console.log(`Label import started: ${mappings.length} mappings, total=${totalToClassify}, removeLabels=${removeLabels}`);
+  console.log(
+    `Label import started: ${mappings.length} mappings, total=${totalToClassify}, removeLabels=${removeLabels}`,
+  );
 
   const jobState = await kvs.get(jobKey);
   const startedAt = jobState?.startedAt || Date.now();
@@ -134,8 +193,9 @@ async function handleImport(event) {
 
   // Sort mappings so most restrictive levels are processed last (highest index last).
   // This means the final classification for a conflicting page is always the most restrictive.
-  const sortedMappings = [...mappings].sort((a, b) =>
-    (levelIndex.get(a.levelId) ?? 0) - (levelIndex.get(b.levelId) ?? 0)
+  const sortedMappings = [...mappings].sort(
+    (a, b) =>
+      (levelIndex.get(a.levelId) ?? 0) - (levelIndex.get(b.levelId) ?? 0),
   );
 
   for (const mapping of sortedMappings) {
@@ -148,10 +208,20 @@ async function handleImport(event) {
 
     for (const labelName of mapping.labels) {
       // Fetch all pages with this label at once (CQL offset doesn't work reliably with label index lag)
-      const { totalSize } = await findPagesByLabel(labelName, 0, 0, spaceKey, { asApp: true });
+      const { totalSize } = await findPagesByLabel(labelName, 0, 0, spaceKey, {
+        asApp: true,
+      });
       if (totalSize === 0) continue;
-      const { results } = await findPagesByLabel(labelName, totalSize, 0, spaceKey, { asApp: true });
-      console.log(`[import] ${mapping.levelId}/${labelName}: ${results.length} pages`);
+      const { results } = await findPagesByLabel(
+        labelName,
+        totalSize,
+        0,
+        spaceKey,
+        { asApp: true },
+      );
+      console.log(
+        `[import] ${mapping.levelId}/${labelName}: ${results.length} pages`,
+      );
 
       for (const page of results) {
         if (pageLevel.has(page.id)) {
@@ -161,7 +231,9 @@ async function handleImport(event) {
         }
         try {
           const existing = await getClassification(page.id, { asApp: true });
-          const existingIdx = existing?.level ? (levelIndex.get(existing.level) ?? -1) : -1;
+          const existingIdx = existing?.level
+            ? (levelIndex.get(existing.level) ?? -1)
+            : -1;
           if (existingIdx >= thisLevelIdx) {
             // Already at same or more restrictive level — don't reclassify
             pageLevel.set(page.id, existingIdx);
@@ -196,8 +268,18 @@ async function handleImport(event) {
 
         if ((classified + failed) % PROGRESS_INTERVAL === 0) {
           await Promise.all([
-            publishGlobal(channel, { classified, failed, total: totalToClassify, done: false }),
-            kvs.set(jobKey, { total: totalToClassify, startedAt, classified, failed }),
+            publishGlobal(channel, {
+              classified,
+              failed,
+              total: totalToClassify,
+              done: false,
+            }),
+            kvs.set(jobKey, {
+              total: totalToClassify,
+              startedAt,
+              classified,
+              failed,
+            }),
           ]);
         }
       }
@@ -215,11 +297,18 @@ async function handleImport(event) {
   });
 
   await Promise.all([
-    publishGlobal(channel, { classified, failed, total: totalToClassify, done: true }),
+    publishGlobal(channel, {
+      classified,
+      failed,
+      total: totalToClassify,
+      done: true,
+    }),
     kvs.delete(jobKey),
   ]);
 
-  console.log(`Label import complete: classified=${classified}, failed=${failed}`);
+  console.log(
+    `Label import complete: classified=${classified}, failed=${failed}`,
+  );
 }
 
 /**
@@ -230,7 +319,9 @@ async function handleExport(event) {
   const channel = 'classification-progress:label-export';
   const jobKey = asyncJobKey('label-export');
 
-  console.log(`Label export started: ${mappings.length} mappings, total=${totalToExport}`);
+  console.log(
+    `Label export started: ${mappings.length} mappings, total=${totalToExport}`,
+  );
 
   const jobState = await kvs.get(jobKey);
   const startedAt = jobState?.startedAt || Date.now();
@@ -243,9 +334,15 @@ async function handleExport(event) {
     const { levelId, labelName } = mapping;
 
     // Fetch total count, then all pages in one call (CQL start offset doesn't work with content property aliases)
-    const { totalSize } = await findPagesByLevel(levelId, 0, 0, { asApp: true, spaceKey });
+    const { totalSize } = await findPagesByLevel(levelId, 0, 0, {
+      asApp: true,
+      spaceKey,
+    });
     if (totalSize === 0) continue;
-    const { results } = await findPagesByLevel(levelId, totalSize, 0, { asApp: true, spaceKey });
+    const { results } = await findPagesByLevel(levelId, totalSize, 0, {
+      asApp: true,
+      spaceKey,
+    });
     console.log(`[export] ${levelId}/${labelName}: ${results.length} pages`);
 
     for (const page of results) {
@@ -265,15 +362,30 @@ async function handleExport(event) {
 
       if ((exported + failed) % PROGRESS_INTERVAL === 0) {
         await Promise.all([
-          publishGlobal(channel, { classified: exported, failed, total: totalToExport, done: false }),
-          kvs.set(jobKey, { total: totalToExport, startedAt, classified: exported, failed }),
+          publishGlobal(channel, {
+            classified: exported,
+            failed,
+            total: totalToExport,
+            done: false,
+          }),
+          kvs.set(jobKey, {
+            total: totalToExport,
+            startedAt,
+            classified: exported,
+            failed,
+          }),
         ]);
       }
     }
   }
 
   await Promise.all([
-    publishGlobal(channel, { classified: exported, failed, total: totalToExport, done: true }),
+    publishGlobal(channel, {
+      classified: exported,
+      failed,
+      total: totalToExport,
+      done: true,
+    }),
     kvs.delete(jobKey),
   ]);
 
@@ -283,7 +395,18 @@ async function handleExport(event) {
 /**
  * Shared processing loop for recursive and reclassify modes.
  */
-async function processPages({ channel, jobKey, startedAt, totalToClassify, levelId, spaceKey, accountId, locale, level, fetchBatch }) {
+async function processPages({
+  channel,
+  jobKey,
+  startedAt,
+  totalToClassify,
+  levelId,
+  spaceKey,
+  accountId,
+  locale,
+  level,
+  fetchBatch,
+}) {
   let classified = 0;
   let failed = 0;
   const processed = new Set();
@@ -297,7 +420,15 @@ async function processPages({ channel, jobKey, startedAt, totalToClassify, level
 
     for (const page of unprocessed) {
       try {
-        const success = await classifySinglePage({ childPageId: page.id, spaceKey, levelId, accountId, locale, level, asApp: true });
+        const success = await classifySinglePage({
+          childPageId: page.id,
+          spaceKey,
+          levelId,
+          accountId,
+          locale,
+          level,
+          asApp: true,
+        });
         if (success) {
           classified++;
         } else {
@@ -311,17 +442,35 @@ async function processPages({ channel, jobKey, startedAt, totalToClassify, level
 
       if ((classified + failed) % PROGRESS_INTERVAL === 0) {
         await Promise.all([
-          publishGlobal(channel, { classified, failed, total: totalToClassify, done: false }),
-          kvs.set(jobKey, { levelId, total: totalToClassify, startedAt, classified, failed }),
+          publishGlobal(channel, {
+            classified,
+            failed,
+            total: totalToClassify,
+            done: false,
+          }),
+          kvs.set(jobKey, {
+            levelId,
+            total: totalToClassify,
+            startedAt,
+            classified,
+            failed,
+          }),
         ]);
       }
     }
   }
 
   await Promise.all([
-    publishGlobal(channel, { classified, failed, total: totalToClassify, done: true }),
+    publishGlobal(channel, {
+      classified,
+      failed,
+      total: totalToClassify,
+      done: true,
+    }),
     kvs.delete(jobKey),
   ]);
 
-  console.log(`Classification complete: classified=${classified}, failed=${failed}`);
+  console.log(
+    `Classification complete: classified=${classified}, failed=${failed}`,
+  );
 }

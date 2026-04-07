@@ -44,7 +44,11 @@ export async function getPageClassification(pageId, spaceKey) {
     if (level.requiresProtection && !isProtected) {
       // Confidential page without restrictions
       restrictionWarning = 'requires_protection';
-    } else if (!level.requiresProtection && isProtected && levelId !== 'confidential') {
+    } else if (
+      !level.requiresProtection &&
+      isProtected &&
+      levelId !== 'confidential'
+    ) {
       // Non-confidential page (e.g. Internal, Public) WITH restrictions — mismatch
       restrictionWarning = 'has_unnecessary_protection';
     }
@@ -85,7 +89,11 @@ export async function classifyPage({
   // Find the requested level in the effective config
   const level = effectiveConfig.levels.find((l) => l.id === levelId);
   if (!level) {
-    return { success: false, error: 'invalid_level', message: 'Unknown classification level.' };
+    return {
+      success: false,
+      error: 'invalid_level',
+      message: 'Unknown classification level.',
+    };
   }
 
   // Check if the level is allowed
@@ -125,9 +133,17 @@ export async function classifyPage({
 
   // Only write + log the parent page if the level actually changed
   if (previousLevel !== levelId) {
-    const writeSuccess = await setClassification(pageId, classificationData, bylineData);
+    const writeSuccess = await setClassification(
+      pageId,
+      classificationData,
+      bylineData,
+    );
     if (!writeSuccess) {
-      return { success: false, error: 'write_failed', message: 'Failed to save classification.' };
+      return {
+        success: false,
+        error: 'write_failed',
+        message: 'Failed to save classification.',
+      };
     }
 
     await appendHistory(pageId, {
@@ -181,17 +197,28 @@ export async function classifyPage({
  * @param {number} startIndex - pagination offset
  * @returns {Promise<{results: Array, totalSize: number}>}
  */
-export async function findDescendantsToClassify(pageId, levelId, limit = 0, startIndex = 0, { asApp: useApp = false } = {}) {
+export async function findDescendantsToClassify(
+  pageId,
+  levelId,
+  limit = 0,
+  startIndex = 0,
+  { asApp: useApp = false } = {},
+) {
   const cql = `ancestor=${pageId} AND type=page AND culmat_classification_level != "${levelId}"`;
-  return cqlPageSearch(cql, limit, startIndex, useApp);
+  return await cqlPageSearch(cql, limit, startIndex, useApp);
 }
 
 /**
  * Finds all pages classified with a specific level (for reclassification / deletion warning).
  */
-export async function findPagesByLevel(levelId, limit = 0, startIndex = 0, { asApp: useApp = false, spaceKey = null } = {}) {
+export async function findPagesByLevel(
+  levelId,
+  limit = 0,
+  startIndex = 0,
+  { asApp: useApp = false, spaceKey = null } = {},
+) {
   const cql = `type=page AND culmat_classification_level = "${levelId}"${buildSpaceFilter(spaceKey)}`;
-  return cqlPageSearch(cql, limit, startIndex, useApp);
+  return await cqlPageSearch(cql, limit, startIndex, useApp);
 }
 
 /**
@@ -201,12 +228,15 @@ async function cqlPageSearch(cql, limit, startIndex, useApp) {
   const requester = useApp ? api.asApp() : api.asUser();
   const response = await requester.requestConfluence(
     route`/wiki/rest/api/search?cql=${cql}&limit=${limit}&start=${startIndex}`,
-    { headers: { Accept: 'application/json' } }
+    { headers: { Accept: 'application/json' } },
   );
   if (!response.ok) return { results: [], totalSize: 0 };
   const data = await response.json();
   return {
-    results: (data.results || []).map((r) => ({ id: String(r.content.id), title: r.content.title })),
+    results: (data.results || []).map((r) => ({
+      id: String(r.content.id),
+      title: r.content.title,
+    })),
     totalSize: data.totalSize || 0,
   };
 }
@@ -218,7 +248,15 @@ async function cqlPageSearch(cql, limit, startIndex, useApp) {
  * @param {Object} params
  * @returns {Promise<boolean>} true if successful
  */
-export async function classifySinglePage({ childPageId, spaceKey, levelId, accountId, locale, level, asApp: useApp = false }) {
+export async function classifySinglePage({
+  childPageId,
+  spaceKey: _spaceKey,
+  levelId,
+  accountId,
+  locale,
+  level,
+  asApp: useApp = false,
+}) {
   const lang = (locale || 'en').substring(0, 2);
   const levelName = level.name?.[lang] || level.name?.en || levelId;
   const now = new Date().toISOString();
@@ -235,15 +273,24 @@ export async function classifySinglePage({ childPageId, spaceKey, levelId, accou
   };
   const bylineData = { title: levelName, tooltip: levelName };
 
-  const success = await setClassification(childPageId, classificationData, bylineData, opts);
+  const success = await setClassification(
+    childPageId,
+    classificationData,
+    bylineData,
+    opts,
+  );
   if (!success) return false;
 
-  await appendHistory(childPageId, {
-    from: previousLevel,
-    to: levelId,
-    by: accountId,
-    at: now,
-  }, opts);
+  await appendHistory(
+    childPageId,
+    {
+      from: previousLevel,
+      to: levelId,
+      by: accountId,
+      at: now,
+    },
+    opts,
+  );
 
   return true;
 }
@@ -255,7 +302,15 @@ export async function classifySinglePage({ childPageId, spaceKey, levelId, accou
  * @param {Object} params
  * @returns {Promise<Object>} { classified, failed, timedOut }
  */
-async function classifyDescendants({ pageId, spaceKey, levelId, accountId, locale, level, startTime }) {
+async function classifyDescendants({
+  pageId,
+  spaceKey,
+  levelId,
+  accountId,
+  locale,
+  level,
+  startTime,
+}) {
   const MAX_DURATION_MS = 20000; // Stop 5 seconds before the 25s Forge timeout
 
   let classified = 0;
@@ -269,7 +324,9 @@ async function classifyDescendants({ pageId, spaceKey, levelId, accountId, local
   // out of the CQL result set once the index catches up.
   while (true) {
     if (Date.now() - startTime > MAX_DURATION_MS) {
-      console.warn(`Recursive classification timed out after ${classified} descendants`);
+      console.warn(
+        `Recursive classification timed out after ${classified} descendants`,
+      );
       return { classified, failed, timedOut: true };
     }
 
@@ -285,7 +342,14 @@ async function classifyDescendants({ pageId, spaceKey, levelId, accountId, local
 
       processed.add(page.id);
       try {
-        const success = await classifySinglePage({ childPageId: page.id, spaceKey, levelId, accountId, locale, level });
+        const success = await classifySinglePage({
+          childPageId: page.id,
+          spaceKey,
+          levelId,
+          accountId,
+          locale,
+          level,
+        });
         if (success) {
           classified++;
         } else {
