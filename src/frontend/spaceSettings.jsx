@@ -189,10 +189,28 @@ const App = () => {
     loadStats();
   }, [loadStats]);
 
+  // License check: only enforce in production where Marketplace injects license info.
+  const licensed =
+    context?.environmentType !== 'PRODUCTION' ||
+    context?.license?.active === true;
+
   if (loading) {
     return (
       <Box xcss={containerStyle}>
         <Spinner size="large" />
+      </Box>
+    );
+  }
+
+  if (!licensed) {
+    return (
+      <Box xcss={containerStyle}>
+        <SectionMessage
+          appearance="warning"
+          title={t('license.inactive_title')}
+        >
+          <Text>{t('license.inactive_message')}</Text>
+        </SectionMessage>
       </Box>
     );
   }

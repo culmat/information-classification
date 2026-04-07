@@ -364,8 +364,27 @@ const App = () => {
     view.refresh();
   }, [asyncJob, t]);
 
+  // License check: only enforce in production where Marketplace injects license info.
+  // Dev/staging always return license: null, so skip enforcement there.
+  const licensed =
+    context?.environmentType !== 'PRODUCTION' ||
+    context?.license?.active === true;
+
   if (loading) {
     return <Spinner size="small" />;
+  }
+
+  if (!licensed) {
+    return (
+      <Box xcss={popupContentStyle}>
+        <SectionMessage
+          appearance="warning"
+          title={t('license.inactive_title')}
+        >
+          <Text>{t('license.inactive_message')}</Text>
+        </SectionMessage>
+      </Box>
+    );
   }
 
   // Helper: look up a level's lozenge appearance from config

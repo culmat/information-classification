@@ -10,6 +10,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ForgeReconciler, {
+  useProductContext,
   useTranslation,
   I18nProvider,
   Box,
@@ -75,6 +76,7 @@ const containerStyle = xcss({ padding: 'space.400', maxWidth: '960px' });
 const tabPanelStyle = xcss({ paddingTop: 'space.100' });
 
 const App = () => {
+  const context = useProductContext();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -653,10 +655,28 @@ const App = () => {
     setConfig({ ...config, links });
   };
 
+  // License check: only enforce in production where Marketplace injects license info.
+  const licensed =
+    context?.environmentType !== 'PRODUCTION' ||
+    context?.license?.active === true;
+
   if (loading) {
     return (
       <Box xcss={containerStyle}>
         <Spinner size="large" />
+      </Box>
+    );
+  }
+
+  if (!licensed) {
+    return (
+      <Box xcss={containerStyle}>
+        <SectionMessage
+          appearance="warning"
+          title={t('license.inactive_title')}
+        >
+          <Text>{t('license.inactive_message')}</Text>
+        </SectionMessage>
       </Box>
     );
   }
