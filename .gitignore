@@ -26,7 +26,6 @@ coverage/
 /tmp
 
 CLAUDE.md
-package-lock.json
 test-results
 tunnel-sync.sh
 
