@@ -52,5 +52,6 @@ slug: index
 
 |                                  |                                                             |
 | -------------------------------- | ----------------------------------------------------------- |
+| [Trust Center](Trust-Center)     | Security practices, certifications, and data handling       |
 | [Privacy Policy](Privacy-Policy) | What data is collected, where it is stored, and GDPR rights |
 | [Terms](Terms)                   | End user terms, governing law, and support terms            |
