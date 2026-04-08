@@ -55,4 +55,6 @@ jobs:
             production)  SITE="cul.atlassian.net" ;;
           esac
           npx @forge/cli@12 deploy --non-interactive -e "$ENV"
-          npx @forge/cli@12 install --non-interactive --upgrade --site "$SITE" --product confluence -e "$ENV"
+          if [ "$ENV" != "production" ]; then
+            npx @forge/cli@12 install --non-interactive --upgrade --site "$SITE" --product confluence -e "$ENV"
+          fi
