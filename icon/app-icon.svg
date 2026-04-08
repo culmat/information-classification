@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Marketplace app icon -->
+  <rect width="128" height="128" rx="16" fill="#F7F8F9"/>
+
+  <!-- Folder 1: Secret (red tab, back, top-right) -->
+  <path d="M20 38 H68 V24 Q68 20 72 20 H94 Q98 20 98 24 V38 H104 Q108 38 108 42 V102 Q108 106 104 106 H20 Q16 106 16 102 V42 Q16 38 20 38Z"
+        fill="#E2E2E2" stroke="#C1C7D0" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M68 38 V24 Q68 20 72 20 H94 Q98 20 98 24 V38Z" fill="#DE350B"/>
+
+  <!-- Folder 2: Confidential (orange tab, center-right) -->
+  <path d="M20 46 H50 V32 Q50 28 54 28 H76 Q80 28 80 32 V46 H104 Q108 46 108 50 V102 Q108 106 104 106 H20 Q16 106 16 102 V50 Q16 46 20 46Z"
+        fill="#EAEAEA" stroke="#C1C7D0" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M50 46 V32 Q50 28 54 28 H76 Q80 28 80 32 V46Z" fill="#FF8B00"/>
+
+  <!-- Folder 3: Internal (yellow tab, center-left) -->
+  <path d="M20 54 H32 V40 Q32 36 36 36 H58 Q62 36 62 40 V54 H104 Q108 54 108 58 V102 Q108 106 104 106 H20 Q16 106 16 102 V58 Q16 54 20 54Z"
+        fill="#F2F2F2" stroke="#C1C7D0" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M32 54 V40 Q32 36 36 36 H58 Q62 36 62 40 V54Z" fill="#FFC400"/>
+
+  <!-- Folder 4: Public (green tab, front, far-left) -->
+  <path d="M16 62 V48 Q16 44 20 44 H42 Q46 44 46 48 V62 H104 Q108 62 108 66 V102 Q108 106 104 106 H20 Q16 106 16 102Z"
+        fill="#FFFFFF" stroke="#C1C7D0" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M16 62 V48 Q16 44 20 44 H42 Q46 44 46 48 V62Z" fill="#36B37E"/>
+
+  <!-- Shield with checkmark on front folder -->
+  <g transform="translate(48 70)">
+    <path d="M14 2 L24 6 V14 C24 20 19 25 14 27 C9 25 4 20 4 14 V6Z"
+          fill="#0065FF" fill-opacity="0.15" stroke="#0065FF" stroke-width="1.5" stroke-linejoin="round"/>
+    <polyline points="9,15 12,18 19,11" fill="none" stroke="#0065FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

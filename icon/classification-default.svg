@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- 4 stacked folder dividers with colored classification tabs -->
+  <!-- Tabs use straight vertical sides, rounded top corners, no diagonal cuts -->
+
+  <!-- Folder 1: Secret (red tab, back, top-right) -->
+  <path d="M18 34 H72 V20 Q72 16 76 16 H98 Q102 16 102 20 V34 H110 Q114 34 114 38 V106 Q114 110 110 110 H18 Q14 110 14 106 V38 Q14 34 18 34Z"
+        fill="#E2E2E2" stroke="#BDBDBD" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M72 34 V20 Q72 16 76 16 H98 Q102 16 102 20 V34Z" fill="#DE350B"/>
+
+  <!-- Folder 2: Confidential (orange tab, center-right) -->
+  <path d="M18 42 H52 V28 Q52 24 56 24 H78 Q82 24 82 28 V42 H110 Q114 42 114 46 V106 Q114 110 110 110 H18 Q14 110 14 106 V46 Q14 42 18 42Z"
+        fill="#EAEAEA" stroke="#BDBDBD" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M52 42 V28 Q52 24 56 24 H78 Q82 24 82 28 V42Z" fill="#FF8B00"/>
+
+  <!-- Folder 3: Internal (yellow tab, center-left) -->
+  <path d="M18 50 H32 V36 Q32 32 36 32 H58 Q62 32 62 36 V50 H110 Q114 50 114 54 V106 Q114 110 110 110 H18 Q14 110 14 106 V54 Q14 50 18 50Z"
+        fill="#F2F2F2" stroke="#BDBDBD" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M32 50 V36 Q32 32 36 32 H58 Q62 32 62 36 V50Z" fill="#FFC400"/>
+
+  <!-- Folder 4: Public (green tab, front, far-left) -->
+  <path d="M14 58 V44 Q14 40 18 40 H40 Q44 40 44 44 V58 H110 Q114 58 114 62 V106 Q114 110 110 110 H18 Q14 110 14 106Z"
+        fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M14 58 V44 Q14 40 18 40 H40 Q44 40 44 44 V58Z" fill="#36B37E"/>
+
+  <!-- Shield with checkmark on front folder -->
+  <g transform="translate(50 68)">
+    <path d="M14 2 L24 6 V14 C24 20 19 25 14 27 C9 25 4 20 4 14 V6Z"
+          fill="#0065FF" fill-opacity="0.15" stroke="#0065FF" stroke-width="1.5" stroke-linejoin="round"/>
+    <polyline points="9,15 12,18 19,11" fill="none" stroke="#0065FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
