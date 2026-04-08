@@ -3,5 +3,19 @@ title: Information Classification for Confluence
 items:
   - slug: index
     title: Home
+  - slug: installation
+    title: Installation
   - slug: configuration
     title: Configuration
+  - slug: space-settings
+    title: Space Settings
+  - slug: classification
+    title: Classification
+  - slug: recursive-classification
+    title: Recursive Classification
+  - slug: labels-and-search
+    title: Labels and Search
+  - slug: privacy-policy
+    title: Privacy Policy
+  - slug: terms
+    title: Terms
