@@ -44,7 +44,7 @@
     "@forge/react": "11.7.0",
     "@forge/realtime": "^0.3.2",
     "@forge/resolver": "1.7.1",
-    "react": "^18.2.0"
+    "react": "^19.2.5"
   },
   "overrides": {
     "@atlaskit/analytics-next-stable-react-context": {
