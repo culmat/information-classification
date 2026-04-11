@@ -151,4 +151,6 @@ Produce a Markdown report with this structure:
 
 Be context-aware: Forge provides built-in protections (tenant isolation, signed context, CSRF protection). Do not flag standard Forge patterns as vulnerabilities. Focus on application-level security issues specific to this information classification use case — particularly around authorization model correctness, classification integrity, and data exposure.
 
-Do NOT make any code changes — this is a read-only review.
+## Apply changes
+
+After completing the review, implement all fixes from the "Critical / Errors" and "Warnings" sections. Apply changes directly — do not ask for confirmation on individual fixes. Run `npx vitest run` after all changes to verify nothing is broken.
