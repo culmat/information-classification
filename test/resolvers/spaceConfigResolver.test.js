@@ -16,6 +16,11 @@ vi.mock('../../src/storage/configStore', () => ({
   getGlobalConfig: (...args) => mockGetGlobalConfig(...args),
 }));
 
+// Mock admin auth — all test callers are treated as space admins
+vi.mock('../../src/utils/adminAuth', () => ({
+  isSpaceAdmin: vi.fn().mockResolvedValue(true),
+}));
+
 const {
   getSpaceConfigResolver,
   setSpaceConfigResolver,

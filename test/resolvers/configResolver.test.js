@@ -21,6 +21,11 @@ vi.mock('@forge/api', () => ({
     strings.reduce((acc, str, i) => acc + str + (values[i] || ''), ''),
 }));
 
+// Mock admin auth — all test callers are treated as admins
+vi.mock('../../src/utils/adminAuth', () => ({
+  isConfluenceAdmin: vi.fn().mockResolvedValue(true),
+}));
+
 const { getConfigResolver, setConfigResolver } =
   await import('../../src/resolvers/configResolver');
 

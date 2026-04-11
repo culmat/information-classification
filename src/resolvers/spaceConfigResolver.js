@@ -2,6 +2,7 @@
  * Resolvers for space-level configuration overrides.
  * Space admins can restrict which globally-allowed levels are available in their space
  * and set a different default level.
+ * Runtime space-admin check enforced as defense-in-depth (all modules share one resolver).
  */
 
 import {
@@ -15,6 +16,7 @@ import {
   errorResponse,
   validationError,
 } from '../utils/responseHelper';
+import { isSpaceAdmin } from '../utils/adminAuth';
 
 /**
  * Resolver: getSpaceConfig
@@ -57,6 +59,12 @@ export async function setSpaceConfigResolver(req) {
 
   if (!spaceKey || !config) {
     return validationError('spaceKey and config are required');
+  }
+
+  // Verify the caller is a space admin (or Confluence admin)
+  const accountId = req.context.accountId;
+  if (!accountId || !(await isSpaceAdmin(accountId, spaceKey))) {
+    return errorResponse('Space admin access required', 403);
   }
 
   // Validate against global config
@@ -105,6 +113,12 @@ export async function resetSpaceConfigResolver(req) {
 
   if (!spaceKey) {
     return validationError('spaceKey is required');
+  }
+
+  // Verify the caller is a space admin (or Confluence admin)
+  const accountId = req.context.accountId;
+  if (!accountId || !(await isSpaceAdmin(accountId, spaceKey))) {
+    return errorResponse('Space admin access required', 403);
   }
 
   try {

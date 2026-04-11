@@ -24,8 +24,21 @@ export const spaceConfigKey = (spaceKey) =>
 export const ASYNC_THRESHOLD = 50;
 
 /**
+ * Validates a single Confluence space key.
+ * Space keys are uppercase alphanumeric with optional underscores/hyphens/tildes.
+ * Rejects anything that could contain CQL operators or special characters.
+ *
+ * @param {string} key - a single space key
+ * @returns {boolean} true if the key looks safe
+ */
+export function isValidSpaceKey(key) {
+  return typeof key === 'string' && /^[A-Za-z0-9_~-]+$/.test(key);
+}
+
+/**
  * Builds a CQL space filter from a comma-separated space key string.
  * Returns '' for null/empty, ' AND space="X"' for single, ' AND space in ("X","Y")' for multiple.
+ * Validates each key to prevent CQL injection.
  */
 export function buildSpaceFilter(spaceKey) {
   if (!spaceKey) return '';
@@ -34,6 +47,15 @@ export function buildSpaceFilter(spaceKey) {
     .map((k) => k.trim())
     .filter(Boolean);
   if (keys.length === 0) return '';
+
+  // Reject any key that doesn't match the expected format
+  for (const k of keys) {
+    if (!isValidSpaceKey(k)) {
+      console.warn(`Invalid space key rejected: ${k}`);
+      return '';
+    }
+  }
+
   if (keys.length === 1) return ` AND space="${keys[0]}"`;
   return ` AND space in (${keys.map((k) => `"${k}"`).join(',')})`;
 }

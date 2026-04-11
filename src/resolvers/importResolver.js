@@ -1,6 +1,7 @@
 /**
  * Resolvers for the label import/export wizards.
  * Discovers labels, matches them to levels, and starts import/export jobs.
+ * Runtime admin check enforced as defense-in-depth (all modules share one resolver).
  */
 
 import api, { route } from '@forge/api';
@@ -10,12 +11,19 @@ import { findPagesByLabel } from '../services/labelService';
 import { findPagesByLevel } from '../services/classificationService';
 import { asyncJobKey } from '../shared/constants';
 import { successResponse, errorResponse } from '../utils/responseHelper';
+import { isConfluenceAdmin } from '../utils/adminAuth';
+import { getGlobalConfig } from '../storage/configStore';
 
 /**
  * Resolver: listSpaces
  * Returns all spaces for the space picker.
  */
-export async function listSpacesResolver(_req) {
+export async function listSpacesResolver(req) {
+  const accountId = req.context.accountId;
+  if (!accountId || !(await isConfluenceAdmin(accountId))) {
+    return errorResponse('Admin access required', 403);
+  }
+
   try {
     const response = await api
       .asUser()
@@ -40,6 +48,11 @@ export async function listSpacesResolver(_req) {
  * Returns the number of pages with a given label.
  */
 export async function countLabelPagesResolver(req) {
+  const accountId = req.context.accountId;
+  if (!accountId || !(await isConfluenceAdmin(accountId))) {
+    return errorResponse('Admin access required', 403);
+  }
+
   const { label, spaceKey } = req.payload || {};
   if (!label) return successResponse({ count: 0 });
 
@@ -59,12 +72,41 @@ export async function countLabelPagesResolver(req) {
  * Payload: { mappings: [{ levelId, labels: string[] }], removeLabels: boolean, spaceKey?: string }
  */
 export async function startLabelImportResolver(req) {
-  const { mappings, removeLabels, spaceKey } = req.payload || {};
   const accountId = req.context.accountId;
+  if (!accountId || !(await isConfluenceAdmin(accountId))) {
+    return errorResponse('Admin access required', 403);
+  }
+
+  const { mappings, removeLabels, spaceKey } = req.payload || {};
   const locale = req.context.locale || 'en';
 
   if (!mappings || !Array.isArray(mappings) || mappings.length === 0) {
     return errorResponse('No mappings provided', 400);
+  }
+
+  // Validate each mapping: levelId must exist and be allowed, labels must be non-empty strings
+  const config = await getGlobalConfig();
+  const allowedIds = new Set(
+    config.levels.filter((l) => l.allowed).map((l) => l.id),
+  );
+  for (const mapping of mappings) {
+    if (!mapping.levelId || !allowedIds.has(mapping.levelId)) {
+      return errorResponse(
+        `Invalid or disallowed level: ${mapping.levelId}`,
+        400,
+      );
+    }
+    if (!Array.isArray(mapping.labels) || mapping.labels.length === 0) {
+      return errorResponse(
+        `Mapping for level "${mapping.levelId}" must have at least one label`,
+        400,
+      );
+    }
+    for (const label of mapping.labels) {
+      if (!label || typeof label !== 'string') {
+        return errorResponse('Each label must be a non-empty string', 400);
+      }
+    }
   }
 
   try {
@@ -117,11 +159,30 @@ export async function startLabelImportResolver(req) {
  * Payload: { mappings: [{ levelId, labelName }], spaceKey?: string }
  */
 export async function startLabelExportResolver(req) {
-  const { mappings, spaceKey } = req.payload || {};
   const accountId = req.context.accountId;
+  if (!accountId || !(await isConfluenceAdmin(accountId))) {
+    return errorResponse('Admin access required', 403);
+  }
+
+  const { mappings, spaceKey } = req.payload || {};
 
   if (!mappings || !Array.isArray(mappings) || mappings.length === 0) {
     return errorResponse('No mappings provided', 400);
+  }
+
+  // Validate each mapping: levelId must exist, labelName must be a non-empty string
+  const config = await getGlobalConfig();
+  const knownIds = new Set(config.levels.map((l) => l.id));
+  for (const mapping of mappings) {
+    if (!mapping.levelId || !knownIds.has(mapping.levelId)) {
+      return errorResponse(`Unknown level: ${mapping.levelId}`, 400);
+    }
+    if (!mapping.labelName || typeof mapping.labelName !== 'string') {
+      return errorResponse(
+        `Mapping for level "${mapping.levelId}" must have a labelName string`,
+        400,
+      );
+    }
   }
 
   try {

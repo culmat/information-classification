@@ -86,8 +86,22 @@ export async function getClassificationResolver(req) {
       getHistory(String(pageId)),
       kvs.get(asyncJobKey(String(pageId))),
     ]);
+
+    // Strip fields the byline doesn't need — minimize data sent to all users.
+    // Keep: levels (picker), contacts (policy info), links (policy info),
+    //        defaultLevelId, restrictionWarning, classification.
+    // Remove: languages (admin-only), level errorMessages (shown by classifyPage).
+    const config = { ...result.config };
+    delete config.languages;
+    if (config.levels) {
+      config.levels = config.levels.map(
+        ({ errorMessage: _errorMessage, ...level }) => level,
+      );
+    }
+
     return successResponse({
       ...result,
+      config,
       history,
       activeJob: activeJob || null,
     });
