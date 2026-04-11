@@ -6,6 +6,10 @@ on:
       - 'site/**'
   workflow_dispatch:
 
+concurrency:
+  group: sync-site
+  cancel-in-progress: true
+
 jobs:
   sync:
     runs-on: ubuntu-latest

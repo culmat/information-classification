@@ -14,9 +14,17 @@ on:
           - staging
           - production
 
+concurrency:
+  group: forge-deploy-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+env:
+  FORGE_CLI: '@forge/cli@12'
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -27,13 +35,19 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npx vitest run --coverage
-      - run: npx @forge/cli@12 settings set usage-analytics true
-      - run: npx @forge/cli@12 lint
-        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
+      - run: npx ${{ env.FORGE_CLI }} settings set usage-analytics true
+      - run: npx ${{ env.FORGE_CLI }} lint
 
   deploy:
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     concurrency:
       group: forge-deploy-${{ github.event_name == 'push' && 'development' || inputs.environment }}
     environment: ${{ github.event_name == 'push' && 'development' || inputs.environment }}
@@ -47,9 +61,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx @forge/cli@12 settings set usage-analytics true
+      - run: npx ${{ env.FORGE_CLI }} settings set usage-analytics true
       - name: Build
-        run: npx @forge/cli@12 build -t "$GITHUB_SHA" --non-interactive --no-verify
+        run: npx ${{ env.FORGE_CLI }} build -t "$GITHUB_SHA" --non-interactive --no-verify
       - name: Deploy and install
         id: deploy
         run: |
@@ -59,13 +73,13 @@ jobs:
             staging)     SITE="sta-cul.atlassian.net" ;;
             production)  SITE="cul.atlassian.net" ;;
           esac
-          DEPLOY_OUTPUT=$(npx @forge/cli@12 deploy -t "$GITHUB_SHA" --non-interactive -e "$ENV" 2>&1)
+          DEPLOY_OUTPUT=$(npx ${{ env.FORGE_CLI }} deploy -t "$GITHUB_SHA" --non-interactive -e "$ENV" 2>&1)
           echo "$DEPLOY_OUTPUT"
           VERSION=$(echo "$DEPLOY_OUTPUT" | grep -oP '\[\K[0-9]+\.[0-9]+\.[0-9]+')
           echo "env=$ENV" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           if [ "$ENV" != "production" ]; then
-            npx @forge/cli@12 install --non-interactive --upgrade --site "$SITE" --product confluence -e "$ENV"
+            npx ${{ env.FORGE_CLI }} install --non-interactive --upgrade --site "$SITE" --product confluence -e "$ENV"
           fi
       - name: Tag deployment
         if: steps.deploy.outputs.env != 'development' && steps.deploy.outputs.version != ''
