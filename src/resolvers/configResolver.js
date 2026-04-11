@@ -6,8 +6,6 @@
  */
 
 import api, { route } from '@forge/api';
-import { Queue } from '@forge/events';
-import { kvs } from '@forge/kvs';
 import { getGlobalConfig, setGlobalConfig } from '../storage/configStore';
 import { isConfluenceAdmin } from '../utils/adminAuth';
 import { findPagesByLevel } from '../services/classificationService';
@@ -16,11 +14,8 @@ import {
   errorResponse,
   validationError,
 } from '../utils/responseHelper';
-import {
-  VALID_COLORS,
-  asyncJobKey,
-  isValidSpaceKey,
-} from '../shared/constants';
+import { VALID_COLORS, isValidSpaceKey } from '../shared/constants';
+import { enqueueJob } from '../utils/jobQueue';
 
 /**
  * Resolver: getConfig
@@ -311,26 +306,18 @@ export async function reclassifyLevelResolver(req) {
     const { totalSize } = await findPagesByLevel(fromLevelId, 0);
     if (totalSize === 0) return successResponse({ count: 0 });
 
-    const queue = new Queue({ key: 'classification-queue' });
-    const { jobId } = await queue.push({
-      body: {
+    const { jobId } = await enqueueJob(
+      `reclassify-${fromLevelId}`,
+      {
         fromLevelId,
         toLevelId,
         accountId,
         locale,
         totalToClassify: totalSize,
       },
-      concurrency: { key: `reclassify-${fromLevelId}`, limit: 1 },
-    });
-
-    await kvs.set(asyncJobKey(`reclassify-${fromLevelId}`), {
-      jobId,
-      levelId: toLevelId,
-      total: totalSize,
-      startedAt: Date.now(),
-      classified: 0,
-      failed: 0,
-    });
+      `reclassify-${fromLevelId}`,
+      totalSize,
+    );
 
     return successResponse({ count: totalSize, asyncJobId: jobId });
   } catch (error) {

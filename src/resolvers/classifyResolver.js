@@ -11,6 +11,7 @@ import {
   findDescendantsToClassify,
 } from '../services/classificationService';
 import { ASYNC_THRESHOLD, asyncJobKey } from '../shared/constants';
+import { enqueueJob } from '../utils/jobQueue';
 import { getEffectiveConfig } from '../storage/configStore';
 import { getSpaceConfig } from '../storage/spaceConfigStore';
 import {
@@ -159,9 +160,9 @@ export async function setClassificationResolver(req) {
       }
 
       // Push descendant classification to async queue
-      const queue = new Queue({ key: 'classification-queue' });
-      const { jobId } = await queue.push({
-        body: {
+      const { jobId } = await enqueueJob(
+        String(pageId),
+        {
           pageId: String(pageId),
           spaceKey,
           levelId,
@@ -169,18 +170,9 @@ export async function setClassificationResolver(req) {
           locale: locale || 'en',
           totalToClassify: toClassify,
         },
-        concurrency: { key: `classify-${pageId}`, limit: 1 },
-      });
-
-      // Persist active job state so the frontend can resume after reload
-      await kvs.set(asyncJobKey(String(pageId)), {
-        jobId,
-        levelId,
-        total: toClassify,
-        startedAt: Date.now(),
-        classified: 0,
-        failed: 0,
-      });
+        `classify-${pageId}`,
+        toClassify,
+      );
 
       return successResponse({
         ...result,

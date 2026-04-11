@@ -6,6 +6,7 @@
 
 import api, { route } from '@forge/api';
 import { buildSpaceFilter } from '../shared/constants';
+import { getRequester } from '../utils/requester';
 
 /**
  * Finds pages with a specific label via CQL.
@@ -20,7 +21,7 @@ export async function findPagesByLabel(
   { asApp: useApp = false } = {},
 ) {
   const cql = `type=page AND label = "${labelName}"${buildSpaceFilter(spaceKey)}`;
-  const requester = useApp ? api.asApp() : api.asUser();
+  const requester = getRequester(useApp);
   const response = await requester.requestConfluence(
     route`/wiki/rest/api/search?cql=${cql}&limit=${limit}&start=${startIndex}`,
     { headers: { Accept: 'application/json' } },
@@ -41,7 +42,7 @@ export async function findPagesByLabel(
  * Returns true on success.
  */
 export async function removeLabelFromPage(pageId, labelName, useApp = false) {
-  const requester = useApp ? api.asApp() : api.asUser();
+  const requester = getRequester(useApp);
   const response = await requester.requestConfluence(
     route`/wiki/rest/api/content/${pageId}/label?name=${labelName}`,
     { method: 'DELETE' },
@@ -54,7 +55,7 @@ export async function removeLabelFromPage(pageId, labelName, useApp = false) {
  * Returns true on success.
  */
 export async function addLabelToPage(pageId, labelName, useApp = false) {
-  const requester = useApp ? api.asApp() : api.asUser();
+  const requester = getRequester(useApp);
   const response = await requester.requestConfluence(
     route`/wiki/rest/api/content/${pageId}/label`,
     {

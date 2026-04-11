@@ -7,21 +7,14 @@
  * 2. culmat_page_classification_byline — display data (title, tooltip) for byline rendering
  */
 
-import api, { route } from '@forge/api';
+import { route } from '@forge/api';
 import {
   CONTENT_PROPERTY_KEY,
   BYLINE_PROPERTY_KEY,
   HISTORY_PROPERTY_KEY,
   MAX_HISTORY_ENTRIES,
 } from '../shared/constants';
-
-/**
- * Returns the appropriate API requester.
- * Queue consumers have no user context — pass { asApp: true } to use app permissions.
- */
-function getRequester(useApp) {
-  return useApp ? api.asApp() : api.asUser();
-}
+import { getRequester } from '../utils/requester';
 
 /**
  * Reads the classification content property from a page.

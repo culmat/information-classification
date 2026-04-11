@@ -28,6 +28,37 @@ const BATCH_SIZE = 25;
 const PROGRESS_INTERVAL = 10; // publish progress every N pages
 
 /**
+ * Publishes progress to the Realtime channel and persists state in KVS.
+ * Called periodically during batch processing.
+ */
+async function reportProgress(
+  channel,
+  jobKey,
+  { classified, failed, total, startedAt, levelId },
+) {
+  await Promise.all([
+    publishGlobal(channel, { classified, failed, total, done: false }),
+    kvs.set(jobKey, {
+      total,
+      startedAt,
+      classified,
+      failed,
+      ...(levelId !== undefined && { levelId }),
+    }),
+  ]);
+}
+
+/**
+ * Publishes final completion event and removes the KVS job key.
+ */
+async function completeJob(channel, jobKey, { classified, failed, total }) {
+  await Promise.all([
+    publishGlobal(channel, { classified, failed, total, done: true }),
+    kvs.delete(jobKey),
+  ]);
+}
+
+/**
  * Consumer handler — invoked by Forge async events queue.
  *
  * @param {Object} event - { body, jobId, retryContext }
@@ -260,20 +291,12 @@ async function handleImport(event) {
         }
 
         if ((classified + failed) % PROGRESS_INTERVAL === 0) {
-          await Promise.all([
-            publishGlobal(channel, {
-              classified,
-              failed,
-              total: totalToClassify,
-              done: false,
-            }),
-            kvs.set(jobKey, {
-              total: totalToClassify,
-              startedAt,
-              classified,
-              failed,
-            }),
-          ]);
+          await reportProgress(channel, jobKey, {
+            classified,
+            failed,
+            total: totalToClassify,
+            startedAt,
+          });
         }
       }
     }
@@ -289,15 +312,11 @@ async function handleImport(event) {
     totalFailed: failed,
   });
 
-  await Promise.all([
-    publishGlobal(channel, {
-      classified,
-      failed,
-      total: totalToClassify,
-      done: true,
-    }),
-    kvs.delete(jobKey),
-  ]);
+  await completeJob(channel, jobKey, {
+    classified,
+    failed,
+    total: totalToClassify,
+  });
 
   console.log(
     `Label import complete: classified=${classified}, failed=${failed}`,
@@ -350,33 +369,21 @@ async function handleExport(event) {
       processed.add(page.id);
 
       if ((exported + failed) % PROGRESS_INTERVAL === 0) {
-        await Promise.all([
-          publishGlobal(channel, {
-            classified: exported,
-            failed,
-            total: totalToExport,
-            done: false,
-          }),
-          kvs.set(jobKey, {
-            total: totalToExport,
-            startedAt,
-            classified: exported,
-            failed,
-          }),
-        ]);
+        await reportProgress(channel, jobKey, {
+          classified: exported,
+          failed,
+          total: totalToExport,
+          startedAt,
+        });
       }
     }
   }
 
-  await Promise.all([
-    publishGlobal(channel, {
-      classified: exported,
-      failed,
-      total: totalToExport,
-      done: true,
-    }),
-    kvs.delete(jobKey),
-  ]);
+  await completeJob(channel, jobKey, {
+    classified: exported,
+    failed,
+    total: totalToExport,
+  });
 
   console.log(`Label export complete: exported=${exported}, failed=${failed}`);
 }
@@ -430,34 +437,22 @@ async function processPages({
       processed.add(page.id);
 
       if ((classified + failed) % PROGRESS_INTERVAL === 0) {
-        await Promise.all([
-          publishGlobal(channel, {
-            classified,
-            failed,
-            total: totalToClassify,
-            done: false,
-          }),
-          kvs.set(jobKey, {
-            levelId,
-            total: totalToClassify,
-            startedAt,
-            classified,
-            failed,
-          }),
-        ]);
+        await reportProgress(channel, jobKey, {
+          classified,
+          failed,
+          total: totalToClassify,
+          startedAt,
+          levelId,
+        });
       }
     }
   }
 
-  await Promise.all([
-    publishGlobal(channel, {
-      classified,
-      failed,
-      total: totalToClassify,
-      done: true,
-    }),
-    kvs.delete(jobKey),
-  ]);
+  await completeJob(channel, jobKey, {
+    classified,
+    failed,
+    total: totalToClassify,
+  });
 
   console.log(
     `Classification complete: classified=${classified}, failed=${failed}`,

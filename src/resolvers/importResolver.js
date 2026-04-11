@@ -5,14 +5,12 @@
  */
 
 import api, { route } from '@forge/api';
-import { Queue } from '@forge/events';
-import { kvs } from '@forge/kvs';
 import { findPagesByLabel } from '../services/labelService';
 import { findPagesByLevel } from '../services/classificationService';
-import { asyncJobKey } from '../shared/constants';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 import { isConfluenceAdmin } from '../utils/adminAuth';
 import { getGlobalConfig } from '../storage/configStore';
+import { enqueueJob } from '../utils/jobQueue';
 
 /**
  * Resolver: listSpaces
@@ -123,9 +121,9 @@ export async function startLabelImportResolver(req) {
       return successResponse({ count: 0 });
     }
 
-    const queue = new Queue({ key: 'classification-queue' });
-    const { jobId } = await queue.push({
-      body: {
+    const { jobId } = await enqueueJob(
+      'label-import',
+      {
         mode: 'import',
         mappings,
         removeLabels: removeLabels || false,
@@ -134,16 +132,9 @@ export async function startLabelImportResolver(req) {
         locale,
         totalToClassify,
       },
-      concurrency: { key: 'label-import', limit: 1 },
-    });
-
-    await kvs.set(asyncJobKey('label-import'), {
-      jobId,
-      total: totalToClassify,
-      startedAt: Date.now(),
-      classified: 0,
-      failed: 0,
-    });
+      'label-import',
+      totalToClassify,
+    );
 
     return successResponse({ count: totalToClassify, asyncJobId: jobId });
   } catch (error) {
@@ -199,25 +190,18 @@ export async function startLabelExportResolver(req) {
       return successResponse({ count: 0 });
     }
 
-    const queue = new Queue({ key: 'classification-queue' });
-    const { jobId } = await queue.push({
-      body: {
+    const { jobId } = await enqueueJob(
+      'label-export',
+      {
         mode: 'export',
         mappings,
         spaceKey: spaceKey || null,
         accountId,
         totalToExport,
       },
-      concurrency: { key: 'label-export', limit: 1 },
-    });
-
-    await kvs.set(asyncJobKey('label-export'), {
-      jobId,
-      total: totalToExport,
-      startedAt: Date.now(),
-      classified: 0,
-      failed: 0,
-    });
+      'label-export',
+      totalToExport,
+    );
 
     return successResponse({ count: totalToExport, asyncJobId: jobId });
   } catch (error) {

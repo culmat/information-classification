@@ -10,8 +10,9 @@
  * - Check and warn about restriction mismatches
  */
 
-import api, { route } from '@forge/api';
+import { route } from '@forge/api';
 import { buildSpaceFilter } from '../shared/constants';
+import { getRequester } from '../utils/requester';
 import { getEffectiveConfig } from '../storage/configStore';
 import { getSpaceConfig } from '../storage/spaceConfigStore';
 import {
@@ -221,7 +222,7 @@ export async function findPagesByLevel(
  * Shared CQL page search helper.
  */
 async function cqlPageSearch(cql, limit, startIndex, useApp) {
-  const requester = useApp ? api.asApp() : api.asUser();
+  const requester = getRequester(useApp);
   const response = await requester.requestConfluence(
     route`/wiki/rest/api/search?cql=${cql}&limit=${limit}&start=${startIndex}`,
     { headers: { Accept: 'application/json' } },
