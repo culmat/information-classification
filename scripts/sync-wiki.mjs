@@ -16,19 +16,19 @@
  * stays a clean mirror.
  */
 
-import fs from "node:fs";
-import path from "node:path";
+import fs from 'node:fs';
+import path from 'node:path';
 
-const SITE_DIR = path.resolve(import.meta.dirname, "..", "site");
-const SKIP_FILES = new Set(["nav.yml"]);
+const SITE_DIR = path.resolve(import.meta.dirname, '..', 'site');
+const SKIP_FILES = new Set(['nav.yml']);
 
 function wikiName(siteFile) {
-  if (siteFile === "index.md") return "Home.md";
+  if (siteFile === 'index.md') return 'Home.md';
   return siteFile;
 }
 
 function siteName(wikiFile) {
-  if (wikiFile === "Home.md") return "index.md";
+  if (wikiFile === 'Home.md') return 'index.md';
   return wikiFile;
 }
 
@@ -36,7 +36,7 @@ function parseArgs() {
   const args = process.argv.slice(2);
   let wikiDir = process.env.WIKI_DIR ?? null;
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--wiki-dir" && args[i + 1]) {
+    if (args[i] === '--wiki-dir' && args[i + 1]) {
       wikiDir = args[++i];
     }
   }
@@ -47,7 +47,7 @@ const { wikiDir } = parseArgs();
 
 if (!wikiDir) {
   console.error(
-    "Error: provide --wiki-dir <path> or set the WIKI_DIR environment variable."
+    'Error: provide --wiki-dir <path> or set the WIKI_DIR environment variable.',
   );
   process.exit(1);
 }
@@ -67,23 +67,23 @@ if (!fs.existsSync(SITE_DIR)) {
 // Strip YAML frontmatter (--- ... ---) before writing to the wiki.
 // GitHub Wiki renders frontmatter as plain text instead of ignoring it.
 function stripFrontmatter(content) {
-  if (!content.startsWith("---")) return content;
-  const end = content.indexOf("\n---", 3);
+  if (!content.startsWith('---')) return content;
+  const end = content.indexOf('\n---', 3);
   if (end === -1) return content;
-  return content.slice(end + 4).replace(/^\n/, "");
+  return content.slice(end + 4).replace(/^\n/, '');
 }
 
 // --- Copy site/ → wiki ---
 
 const siteFiles = fs
   .readdirSync(SITE_DIR)
-  .filter((f) => f.endsWith(".md") && !SKIP_FILES.has(f));
+  .filter((f) => f.endsWith('.md') && !SKIP_FILES.has(f));
 
 for (const siteFile of siteFiles) {
   const src = path.join(SITE_DIR, siteFile);
   const dst = path.join(resolvedWikiDir, wikiName(siteFile));
-  const content = fs.readFileSync(src, "utf8");
-  fs.writeFileSync(dst, stripFrontmatter(content), "utf8");
+  const content = fs.readFileSync(src, 'utf8');
+  fs.writeFileSync(dst, stripFrontmatter(content), 'utf8');
   console.log(`copied: ${siteFile} → ${path.basename(dst)}`);
 }
 
@@ -93,7 +93,7 @@ const expectedWikiFiles = new Set(siteFiles.map(wikiName));
 
 const wikiFiles = fs
   .readdirSync(resolvedWikiDir)
-  .filter((f) => f.endsWith(".md"));
+  .filter((f) => f.endsWith('.md'));
 
 for (const wikiFile of wikiFiles) {
   if (!expectedWikiFiles.has(wikiFile)) {
@@ -102,11 +102,11 @@ for (const wikiFile of wikiFiles) {
     // We identify synced files as those whose site-name counterpart would be
     // a plain .md file (i.e. not something exotic like a sidebar).
     const counterpart = siteName(wikiFile);
-    if (counterpart.endsWith(".md")) {
+    if (counterpart.endsWith('.md')) {
       fs.rmSync(path.join(resolvedWikiDir, wikiFile));
       console.log(`removed stale: ${wikiFile}`);
     }
   }
 }
 
-console.log("Wiki sync complete.");
+console.log('Wiki sync complete.');
