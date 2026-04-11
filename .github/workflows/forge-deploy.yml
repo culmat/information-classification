@@ -3,6 +3,17 @@ name: Forge Deploy
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - 'e2e/**'
+      - 'icon/**'
+      - 'manifest.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'eslint.config.mjs'
+      - 'vitest.config.js'
+      - '.github/workflows/forge-deploy.yml'
   workflow_dispatch:
     inputs:
       environment:
