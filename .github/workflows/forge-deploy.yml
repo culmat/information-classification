@@ -42,7 +42,11 @@ jobs:
           path: coverage/
           retention-days: 14
       - run: npx ${{ env.FORGE_CLI }} settings set usage-analytics true
-      - run: npx ${{ env.FORGE_CLI }} lint
+      - name: Forge lint
+        run: npx ${{ env.FORGE_CLI }} lint
+        env:
+          FORGE_EMAIL: ${{ secrets.FORGE_EMAIL }}
+          FORGE_API_TOKEN: ${{ secrets.FORGE_API_TOKEN }}
 
   deploy:
     needs: test
