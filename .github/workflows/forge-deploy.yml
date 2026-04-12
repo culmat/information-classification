@@ -61,6 +61,8 @@ jobs:
 
   deploy:
     needs: test
+    permissions:
+      contents: write
     uses: culmat/forge-ci/.github/workflows/forge-deploy.yml@main
     with:
       target-environment: ${{ github.event_name == 'push' && 'development' || inputs.environment }}
