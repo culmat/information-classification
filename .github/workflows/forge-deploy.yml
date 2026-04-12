@@ -29,38 +29,8 @@ concurrency:
   group: forge-deploy-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'push' }}
 
-env:
-  FORGE_CLI: '@forge/cli@12'
-
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npx vitest run --coverage
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-report
-          path: coverage/
-          retention-days: 14
-      - run: npx ${{ env.FORGE_CLI }} settings set usage-analytics true
-      - name: Forge lint
-        run: npx ${{ env.FORGE_CLI }} lint
-        env:
-          FORGE_EMAIL: ${{ secrets.FORGE_EMAIL }}
-          FORGE_API_TOKEN: ${{ secrets.FORGE_API_TOKEN }}
-
   deploy:
-    needs: test
     permissions:
       contents: write
     uses: culmat/forge-ci/.github/workflows/forge-deploy.yml@main
@@ -69,6 +39,7 @@ jobs:
       site-development: dev-cul.atlassian.net
       site-staging: sta-cul.atlassian.net
       site-production: cul.atlassian.net
+      pre-build-command: npm run lint && npm run format:check && npx vitest run --coverage
     secrets:
       FORGE_EMAIL: ${{ secrets.FORGE_EMAIL }}
       FORGE_API_TOKEN: ${{ secrets.FORGE_API_TOKEN }}
