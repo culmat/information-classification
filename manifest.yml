@@ -95,7 +95,6 @@ permissions:
     - write:content.property:confluence
     - read:content.metadata:confluence
     - read:content.restriction:confluence
-    - read:content.permission:confluence
     - read:user:confluence
     - read:confluence-content.all
     - write:confluence-content

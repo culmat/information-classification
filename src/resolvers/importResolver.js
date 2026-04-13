@@ -11,6 +11,7 @@ import { successResponse, errorResponse } from '../utils/responseHelper';
 import { isConfluenceAdmin } from '../utils/adminAuth';
 import { getGlobalConfig } from '../storage/configStore';
 import { enqueueJob } from '../utils/jobQueue';
+import { isValidLabel } from '../shared/constants';
 
 /**
  * Resolver: listSpaces
@@ -53,6 +54,7 @@ export async function countLabelPagesResolver(req) {
 
   const { label, spaceKey } = req.payload || {};
   if (!label) return successResponse({ count: 0 });
+  if (!isValidLabel(label)) return errorResponse('Invalid label format', 400);
 
   try {
     const { totalSize } = await findPagesByLabel(label, 0, 0, spaceKey);
@@ -101,8 +103,8 @@ export async function startLabelImportResolver(req) {
       );
     }
     for (const label of mapping.labels) {
-      if (!label || typeof label !== 'string') {
-        return errorResponse('Each label must be a non-empty string', 400);
+      if (!isValidLabel(label)) {
+        return errorResponse(`Invalid label format: ${label}`, 400);
       }
     }
   }
@@ -168,9 +170,9 @@ export async function startLabelExportResolver(req) {
     if (!mapping.levelId || !knownIds.has(mapping.levelId)) {
       return errorResponse(`Unknown level: ${mapping.levelId}`, 400);
     }
-    if (!mapping.labelName || typeof mapping.labelName !== 'string') {
+    if (!isValidLabel(mapping.labelName)) {
       return errorResponse(
-        `Mapping for level "${mapping.levelId}" must have a labelName string`,
+        `Mapping for level "${mapping.levelId}" has invalid labelName: ${mapping.labelName}`,
         400,
       );
     }

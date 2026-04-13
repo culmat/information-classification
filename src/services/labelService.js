@@ -5,7 +5,7 @@
  */
 
 import api, { route } from '@forge/api';
-import { buildSpaceFilter } from '../shared/constants';
+import { buildSpaceFilter, isValidLabel } from '../shared/constants';
 import { getRequester } from '../utils/requester';
 
 /**
@@ -20,6 +20,13 @@ export async function findPagesByLabel(
   spaceKey = null,
   { asApp: useApp = false } = {},
 ) {
+  // Defence-in-depth: reject labels containing characters that could break out
+  // of the CQL string literal. Confluence's own label rules already forbid
+  // these, but validating here makes the guarantee explicit.
+  if (!isValidLabel(labelName)) {
+    console.warn(`Invalid label rejected: ${labelName}`);
+    return { results: [], totalSize: 0 };
+  }
   const cql = `type=page AND label = "${labelName}"${buildSpaceFilter(spaceKey)}`;
   const requester = getRequester(useApp);
   const response = await requester.requestConfluence(

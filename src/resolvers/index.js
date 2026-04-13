@@ -31,58 +31,31 @@ import {
 
 const resolver = new Resolver();
 
-let siteUrlLogged = false;
-
-/**
- * Logs the connected site URL on first resolver call (helps with debugging)
- */
-function logConnectedSite(context) {
-  if (!siteUrlLogged && context?.siteUrl) {
-    console.log('=====================================');
-    console.log(`Connected to: ${context.siteUrl}`);
-    console.log('=====================================');
-    siteUrlLogged = true;
-  }
-}
-
-function wrapResolver(resolverFn) {
-  return async (req) => {
-    logConnectedSite(req.context);
-    return await resolverFn(req);
-  };
-}
-
 // Classification operations (used by byline frontend)
-resolver.define('getClassification', wrapResolver(getClassificationResolver));
-resolver.define('setClassification', wrapResolver(setClassificationResolver));
-resolver.define('countDescendants', wrapResolver(countDescendantsResolver));
-resolver.define(
-  'getClassificationProgress',
-  wrapResolver(getClassificationProgressResolver),
-);
+resolver.define('getClassification', getClassificationResolver);
+resolver.define('setClassification', setClassificationResolver);
+resolver.define('countDescendants', countDescendantsResolver);
+resolver.define('getClassificationProgress', getClassificationProgressResolver);
 
 // Dynamic properties — called by Confluence to set byline title/icon before popup opens
-resolver.define(
-  'getDynamicProperties',
-  wrapResolver(getDynamicPropertiesResolver),
-);
+resolver.define('getDynamicProperties', getDynamicPropertiesResolver);
 
 // Global admin config operations (used by admin frontend)
-resolver.define('getConfig', wrapResolver(getConfigResolver));
-resolver.define('setConfig', wrapResolver(setConfigResolver));
-resolver.define('getAuditData', wrapResolver(getAuditDataResolver));
-resolver.define('countLevelUsage', wrapResolver(countLevelUsageResolver));
-resolver.define('reclassifyLevel', wrapResolver(reclassifyLevelResolver));
+resolver.define('getConfig', getConfigResolver);
+resolver.define('setConfig', setConfigResolver);
+resolver.define('getAuditData', getAuditDataResolver);
+resolver.define('countLevelUsage', countLevelUsageResolver);
+resolver.define('reclassifyLevel', reclassifyLevelResolver);
 
 // Space config operations (used by space settings frontend)
-resolver.define('getSpaceConfig', wrapResolver(getSpaceConfigResolver));
-resolver.define('setSpaceConfig', wrapResolver(setSpaceConfigResolver));
-resolver.define('resetSpaceConfig', wrapResolver(resetSpaceConfigResolver));
+resolver.define('getSpaceConfig', getSpaceConfigResolver);
+resolver.define('setSpaceConfig', setSpaceConfigResolver);
+resolver.define('resetSpaceConfig', resetSpaceConfigResolver);
 
 // Label import wizard (used by admin frontend)
-resolver.define('listSpaces', wrapResolver(listSpacesResolver));
-resolver.define('countLabelPages', wrapResolver(countLabelPagesResolver));
-resolver.define('startLabelImport', wrapResolver(startLabelImportResolver));
-resolver.define('startLabelExport', wrapResolver(startLabelExportResolver));
+resolver.define('listSpaces', listSpacesResolver);
+resolver.define('countLabelPages', countLabelPagesResolver);
+resolver.define('startLabelImport', startLabelImportResolver);
+resolver.define('startLabelExport', startLabelExportResolver);
 
 export const handler = resolver.getDefinitions();

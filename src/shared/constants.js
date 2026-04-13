@@ -36,6 +36,25 @@ export function isValidSpaceKey(key) {
 }
 
 /**
+ * Validates a Confluence page label.
+ * Confluence labels accept Unicode letters/digits plus `_ . : -` (colon is used
+ * for prefixes like "global:foo"). Quotes, backslashes, and whitespace are
+ * rejected to prevent CQL string-delimiter injection when the label is
+ * interpolated into a CQL query like `label = "${labelName}"`.
+ *
+ * @param {string} label - a single label name
+ * @returns {boolean} true if the label looks safe
+ */
+export function isValidLabel(label) {
+  return (
+    typeof label === 'string' &&
+    label.length > 0 &&
+    label.length <= 255 &&
+    /^[\p{L}\p{N}_.:-]+$/u.test(label)
+  );
+}
+
+/**
  * Builds a CQL space filter from a comma-separated space key string.
  * Returns '' for null/empty, ' AND space="X"' for single, ' AND space in ("X","Y")' for multiple.
  * Validates each key to prevent CQL injection.
