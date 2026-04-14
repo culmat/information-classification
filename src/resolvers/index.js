@@ -24,6 +24,7 @@ import {
 } from './spaceConfigResolver';
 import {
   listSpacesResolver,
+  listLabelsResolver,
   countLabelPagesResolver,
   startLabelImportResolver,
   startLabelExportResolver,
@@ -54,6 +55,7 @@ resolver.define('resetSpaceConfig', resetSpaceConfigResolver);
 
 // Label import wizard (used by admin frontend)
 resolver.define('listSpaces', listSpacesResolver);
+resolver.define('listLabels', listLabelsResolver);
 resolver.define('countLabelPages', countLabelPagesResolver);
 resolver.define('startLabelImport', startLabelImportResolver);
 resolver.define('startLabelExport', startLabelExportResolver);

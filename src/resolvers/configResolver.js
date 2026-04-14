@@ -272,11 +272,13 @@ export async function countLevelUsageResolver(req) {
     return errorResponse('Admin access required', 403);
   }
 
-  const { levelId } = req.payload || {};
+  const { levelId, spaceKey } = req.payload || {};
   if (!levelId) return validationError('levelId is required');
 
   try {
-    const { totalSize } = await findPagesByLevel(levelId, 0);
+    const { totalSize } = await findPagesByLevel(levelId, 0, 0, {
+      spaceKey: spaceKey || null,
+    });
     return successResponse({ count: totalSize });
   } catch (error) {
     console.error('Error counting level usage:', error);

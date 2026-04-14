@@ -5,7 +5,7 @@
  */
 
 import api, { route } from '@forge/api';
-import { findPagesByLabel } from '../services/labelService';
+import { findPagesByLabel, getAllLabels } from '../services/labelService';
 import { findPagesByLevel } from '../services/classificationService';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 import { isConfluenceAdmin } from '../utils/adminAuth';
@@ -39,6 +39,25 @@ export async function listSpacesResolver(req) {
   } catch (error) {
     console.error('Error listing spaces:', error);
     return successResponse({ spaces: [] });
+  }
+}
+
+/**
+ * Resolver: listLabels
+ * Returns all global labels from the instance for the label chooser.
+ */
+export async function listLabelsResolver(req) {
+  const accountId = req.context.accountId;
+  if (!accountId || !(await isConfluenceAdmin(accountId))) {
+    return errorResponse('Admin access required', 403);
+  }
+
+  try {
+    const labels = await getAllLabels();
+    return successResponse({ labels });
+  } catch (error) {
+    console.error('Error listing labels:', error);
+    return successResponse({ labels: [] });
   }
 }
 
