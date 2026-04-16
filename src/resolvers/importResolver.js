@@ -5,7 +5,11 @@
  */
 
 import api, { route } from '@forge/api';
-import { findPagesByLabel, getAllLabels } from '../services/labelService';
+import {
+  findPagesByLabel,
+  countPagesByLabels,
+  getAllLabels,
+} from '../services/labelService';
 import { findPagesByLevel } from '../services/classificationService';
 import { successResponse, errorResponse } from '../utils/responseHelper';
 import { isConfluenceAdmin } from '../utils/adminAuth';
@@ -63,7 +67,10 @@ export async function listLabelsResolver(req) {
 
 /**
  * Resolver: countLabelPages
- * Returns the number of pages with a given label.
+ * Returns the number of unique pages matching one or more labels.
+ * Accepts { label } (single string) or { labels } (array) — the array
+ * form builds one CQL OR query so pages with multiple matching labels
+ * are not double-counted.
  */
 export async function countLabelPagesResolver(req) {
   const accountId = req.context.accountId;
@@ -71,12 +78,18 @@ export async function countLabelPagesResolver(req) {
     return errorResponse('Admin access required', 403);
   }
 
-  const { label, spaceKey } = req.payload || {};
-  if (!label) return successResponse({ count: 0 });
-  if (!isValidLabel(label)) return errorResponse('Invalid label format', 400);
+  const { label, labels, spaceKey } = req.payload || {};
+
+  // Normalise to an array; accept either single label or labels array
+  const labelList = labels || (label ? [label] : []);
+  if (labelList.length === 0) return successResponse({ count: 0 });
+  for (const l of labelList) {
+    if (!isValidLabel(l))
+      return errorResponse(`Invalid label format: ${l}`, 400);
+  }
 
   try {
-    const { totalSize } = await findPagesByLabel(label, 0, 0, spaceKey);
+    const { totalSize } = await countPagesByLabels(labelList, spaceKey);
     return successResponse({ count: totalSize });
   } catch (error) {
     console.error('Error counting label pages:', error);

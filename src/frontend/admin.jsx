@@ -339,26 +339,24 @@ const App = () => {
       return;
     }
     const counts = {};
-    const allLabels = [];
     const source = labelsOverride || importLabels;
-    for (const level of allowedLevels) {
-      const selected = source[level.id] || [];
-      const labels = selected.map((o) => o.value).filter(Boolean);
-      allLabels.push(...labels.map((l) => ({ level: level.id, label: l })));
-    }
-    // Count all labels in parallel
+    // One call per level with all its labels — CQL OR deduplicates pages
     const results = await Promise.all(
-      allLabels.map(async ({ level, label }) => {
+      allowedLevels.map(async (level) => {
+        const labels = (source[level.id] || [])
+          .map((o) => o.value)
+          .filter(Boolean);
+        if (labels.length === 0) return { level: level.id, count: 0 };
         try {
-          const result = await invoke('countLabelPages', { label, spaceKey });
-          return { level, count: result.success ? result.count : 0 };
+          const result = await invoke('countLabelPages', { labels, spaceKey });
+          return { level: level.id, count: result.success ? result.count : 0 };
         } catch (_) {
-          return { level, count: 0 };
+          return { level: level.id, count: 0 };
         }
       }),
     );
     for (const { level, count } of results) {
-      counts[level] = (counts[level] || 0) + count;
+      counts[level] = count;
     }
     setImportCounts(counts);
     setImportCountLoading(false);
@@ -386,13 +384,16 @@ const App = () => {
       const labels = (selectedOptions || [])
         .map((o) => o.value)
         .filter(Boolean);
-      let total = 0;
-      for (const label of labels) {
-        try {
-          const result = await invoke('countLabelPages', { label, spaceKey });
-          total += result.success ? result.count : 0;
-        } catch (_) {}
+      if (labels.length === 0) {
+        setImportCounts((prev) => ({ ...prev, [levelId]: 0 }));
+        setImportLevelLoading((prev) => ({ ...prev, [levelId]: false }));
+        return;
       }
+      let total = 0;
+      try {
+        const result = await invoke('countLabelPages', { labels, spaceKey });
+        total = result.success ? result.count : 0;
+      } catch (_) {}
       setImportCounts((prev) => ({ ...prev, [levelId]: total }));
       setImportLevelLoading((prev) => ({ ...prev, [levelId]: false }));
     }, 600);

@@ -45,6 +45,34 @@ export async function findPagesByLabel(
 }
 
 /**
+ * Counts unique pages matching ANY of the given labels via a single CQL OR query.
+ * Avoids double-counting pages that carry more than one of the listed labels.
+ * Returns { totalSize }.
+ */
+export async function countPagesByLabels(
+  labelNames,
+  spaceKey = null,
+  { asApp: useApp = false } = {},
+) {
+  const valid = (labelNames || []).filter(isValidLabel);
+  if (valid.length === 0) return { totalSize: 0 };
+
+  const labelClause =
+    valid.length === 1
+      ? `label = "${valid[0]}"`
+      : `(${valid.map((l) => `label = "${l}"`).join(' OR ')})`;
+  const cql = `type=page AND ${labelClause}${buildSpaceFilter(spaceKey)}`;
+  const requester = getRequester(useApp);
+  const response = await requester.requestConfluence(
+    route`/wiki/rest/api/search?cql=${cql}&limit=${0}&start=${0}`,
+    { headers: { Accept: 'application/json' } },
+  );
+  if (!response.ok) return { totalSize: 0 };
+  const data = await response.json();
+  return { totalSize: data.totalSize || 0 };
+}
+
+/**
  * Removes a label from a page using the v1 REST API.
  * Returns true on success.
  */
