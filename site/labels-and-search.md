@@ -1,6 +1,6 @@
 ---
 title: Labels and Search
-description: CQL search, label import, and label export.
+description: CQL search, synchronize classifications from and to labels.
 section: information-classification
 order: 50
 slug: labels-and-search
@@ -28,35 +28,36 @@ type = page AND space = "ENGINEERING" AND culmat_classification_level = "confide
 
 You can use these aliases in the Confluence search bar at `/wiki/search?cql=...`.
 
-## Label import
+## Synchronize from Labels
 
-The label import wizard (in global [Configuration](Configuration) -> Labels tab) lets you bulk-classify pages based on their existing Confluence labels.
+The "Synchronize from Labels" wizard (in global [Configuration](Configuration) -> Labels tab) lets you bulk-classify pages based on their existing Confluence labels.
 
-1. Create mappings: assign a classification level to one or more label names.
+1. Select labels: pick one or more existing Confluence labels per classification level from the dropdown.
 2. Choose the scope: all spaces or specific spaces.
 3. Preview the number of matching pages.
-4. Start the import.
+4. Start the synchronization.
 
 Options:
 
 - **Remove labels after import** - deletes the matched labels from pages after classification
 
-The import runs asynchronously with progress tracking.
+The synchronization runs asynchronously with progress tracking.
 
 If a page matches multiple label-to-level mappings, the most restrictive level wins (based on level sort order).
 
-## Label export
+## Synchronize to Labels
 
-The label export wizard lets you add Confluence labels to pages based on their current classification.
+The "Synchronize to Labels" wizard lets you add Confluence labels to pages based on their current classification.
 
 1. Create mappings: assign a label name to each classification level.
 2. Choose the scope: all spaces or specific spaces.
-3. Start the export.
+3. Preview the number of classified pages per level.
+4. Start the synchronization.
 
-Labels are added to pages - existing labels are not affected. The export runs asynchronously with progress tracking.
+Labels are added to pages - existing labels are not affected. The synchronization runs asynchronously with progress tracking.
 
 ## Use cases
 
-- **Migration:** Import classifications from a label-based scheme you were using before.
-- **Integration:** Export classification as labels for use with other apps or automation that reads Confluence labels.
+- **Migration:** Synchronize classifications from a label-based scheme you were using before.
+- **Integration:** Synchronize classifications to labels for use with other apps or automation that reads Confluence labels.
 - **Reporting:** Use CQL aliases in Confluence search or dashboards to find pages by classification level.

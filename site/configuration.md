@@ -64,7 +64,7 @@ When a user views the classification popup, the app resolves text based on their
 
 ## Labels
 
-The Labels tab provides **Import** and **Export** wizards for bulk classification operations.
+The Labels tab provides **Synchronize from Labels** and **Synchronize to Labels** wizards for bulk classification operations.
 
 See [Labels and Search](Labels-and-Search) for details.
 

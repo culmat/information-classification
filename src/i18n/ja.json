@@ -140,7 +140,7 @@
       "empty": "分類はまだありません。"
     },
     "import": {
-      "title": "ラベルからインポート",
+      "title": "ラベルから同期",
       "scan_button": "ラベルをスキャン",
       "scanning": "{count}レベルのラベルをスキャン中...",
       "level_column": "レベル",
@@ -153,27 +153,27 @@
       "scope_space": "スペース:",
       "scope_empty": "1つ以上のスペースキーを入力してください。",
       "remove_labels": "インポート後にラベルを削除（推奨）",
-      "remove_labels_help": "インポート後、ラベルは実際の分類を反映しなくなります。古いラベルはユーザーを誤解させます。インポートログが保存され、いつでもラベルにエクスポートできます。",
+      "remove_labels_help": "同期後、ラベルは実際の分類を反映しなくなります。古いラベルはユーザーを誤解させます。ログが保存され、いつでもラベルに同期できます。",
       "remove_labels_atomic": "ラベルはページごとに削除されます。中断した場合は再実行してください。",
       "never_weaken": "より制限的なレベルで既に分類されているページはダウングレードされません。",
       "index_lag_hint": "ページ数の反映には最大1分かかることがあります。数値が想定と異なる場合は、安定するまで更新してください。",
-      "start_button": "インポート開始",
+      "start_button": "同期を開始",
       "summary": "{labels}ラベルから{count}ページをインポートします",
-      "complete": "インポート完了: {classified}ページを分類しました。",
+      "complete": "同期完了: {classified}ページを分類しました。",
       "pages_suffix": "ページ",
       "page_suffix": "ページ"
     },
     "export": {
-      "title": "ラベルにエクスポート",
+      "title": "ラベルに同期",
       "description": "現在の分類に基づいてページラベルを追加します。これにより、いつでもラベルベースの分類に戻ることができます。",
       "level_column": "レベル",
       "label_name": "ラベル名",
       "pages_column": "分類済みページ",
       "no_classifications": "現在、分類されたページはありません。まずページを分類してから、分類をラベルとしてエクスポートしてください。",
-      "start_button": "エクスポート開始",
+      "start_button": "同期を開始",
       "summary": "{count}ページにラベルを追加します",
-      "complete": "エクスポート完了: {exported}ページにラベルを追加しました。",
-      "running": "エクスポート中..."
+      "complete": "同期完了: {exported}ページにラベルを追加しました。",
+      "running": "同期中..."
     },
     "languages": {
       "title": "コンテンツ言語",

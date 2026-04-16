@@ -26,7 +26,7 @@ slug: index
 - **Multilingual** - level names and descriptions support multiple languages
 - **Recursive classification** - classify an entire page tree with progress tracking
 - **Restriction warnings** - warns when a classified page lacks matching view restrictions
-- **Labels and CQL** - search classified pages with CQL aliases; import/export classification via labels
+- **Labels and CQL** - search classified pages with CQL aliases; synchronize classifications from/to labels
 - **Per-space overrides** - space admins can restrict available levels and set a space default
 - **Statistics** - coverage and distribution charts for administrators
 - **Audit trail** - full history of classification changes per page
@@ -34,7 +34,7 @@ slug: index
 **For administrators:**
 
 - Global settings to manage levels, contacts, links, and languages
-- Label import/export wizards for bulk operations
+- Label synchronization wizards for bulk operations
 - Per-space configuration and statistics
 
 ## Read on
@@ -46,7 +46,7 @@ slug: index
 | [Space Settings](Space-Settings)                     | Per-space level overrides and space defaults                       |
 | [Classification](Classification)                     | How to classify a page, the byline badge, and restriction warnings |
 | [Recursive Classification](Recursive-Classification) | Tree classification, async processing, and progress tracking       |
-| [Labels and Search](Labels-and-Search)               | CQL search, label import, and label export                         |
+| [Labels and Search](Labels-and-Search)               | CQL search, label synchronization from/to                          |
 
 ## Trust & Legal
 

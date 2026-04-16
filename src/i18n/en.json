@@ -140,7 +140,7 @@
       "empty": "No classifications yet."
     },
     "import": {
-      "title": "Import from Labels",
+      "title": "Synchronize from Labels",
       "level_column": "Level",
       "labels_column": "Labels to import",
       "labels_placeholder": "Search and select labels...",
@@ -151,27 +151,27 @@
       "scope_space": "Space:",
       "scope_empty": "Enter one or more space keys to scope the import.",
       "remove_labels": "Remove matched labels after import (recommended)",
-      "remove_labels_help": "After import, labels no longer reflect actual classifications — changes via the app won't update labels. Stale labels mislead users. This is reversible: an import log is saved, and you can export classifications back to labels anytime.",
+      "remove_labels_help": "After synchronization, labels no longer reflect actual classifications — changes via the app won't update labels. Stale labels mislead users. This is reversible: a log is saved, and you can synchronize classifications back to labels anytime.",
       "remove_labels_atomic": "Labels are removed per-page. If interrupted, re-run to resume.",
       "never_weaken": "Pages already classified at a more restrictive level will not be downgraded.",
       "index_lag_hint": "Matched page counts may take up to a minute to reflect recent changes. If numbers look unexpected, refresh until they stabilize.",
-      "start_button": "Start Import",
+      "start_button": "Start Synchronization",
       "summary": "Will import {count} pages from {labels} labels",
-      "complete": "Import complete: {classified} pages classified.",
+      "complete": "Synchronization complete: {classified} pages classified.",
       "pages_suffix": "pages",
       "page_suffix": "page"
     },
     "export": {
-      "title": "Export to Labels",
+      "title": "Synchronize to Labels",
       "description": "Add page labels based on current classifications. This lets you return to label-based classification at any time.",
       "level_column": "Level",
       "label_name": "Label name",
       "pages_column": "Classified pages",
       "no_classifications": "No pages are currently classified. Classify pages first, then export their classifications as labels.",
-      "start_button": "Start Export",
+      "start_button": "Start Synchronization",
       "summary": "Will add labels to {count} pages",
-      "complete": "Export complete: {exported} pages labeled.",
-      "running": "Exporting..."
+      "complete": "Synchronization complete: {exported} pages labeled.",
+      "running": "Synchronizing..."
     },
     "languages": {
       "title": "Content Languages",

@@ -140,7 +140,7 @@
       "empty": "Aucune classification pour le moment."
     },
     "import": {
-      "title": "Importer depuis les labels",
+      "title": "Synchroniser depuis les labels",
       "scan_button": "Rechercher les labels",
       "scanning": "Recherche de labels pour {count} niveaux...",
       "level_column": "Niveau",
@@ -153,27 +153,27 @@
       "scope_space": "Espace :",
       "scope_empty": "Entrez une ou plusieurs clés d'espace.",
       "remove_labels": "Supprimer les labels après import (recommandé)",
-      "remove_labels_help": "Après l'import, les labels ne reflètent plus la classification réelle. Les labels obsolètes sont trompeurs. Un journal d'import est sauvegardé et vous pouvez exporter les classifications vers des labels à tout moment.",
+      "remove_labels_help": "Après la synchronisation, les labels ne reflètent plus la classification réelle. Les labels obsolètes sont trompeurs. Un journal est sauvegardé et vous pouvez synchroniser les classifications vers des labels à tout moment.",
       "remove_labels_atomic": "Les labels sont supprimés page par page. En cas d'interruption, relancez.",
       "never_weaken": "Les pages déjà classifiées à un niveau plus restrictif ne seront pas rétrogradées.",
       "index_lag_hint": "Le nombre de pages peut prendre jusqu'à une minute pour refléter les modifications récentes. En cas de doute, actualisez jusqu'à stabilisation.",
-      "start_button": "Démarrer l'import",
+      "start_button": "Démarrer la synchronisation",
       "summary": "{count} pages de {labels} labels seront importées",
-      "complete": "Import terminé : {classified} pages classifiées.",
+      "complete": "Synchronisation terminée : {classified} pages classifiées.",
       "pages_suffix": "pages",
       "page_suffix": "page"
     },
     "export": {
-      "title": "Exporter vers les labels",
+      "title": "Synchroniser vers les labels",
       "description": "Ajouter des labels aux pages basés sur les classifications actuelles. Cela vous permet de revenir à tout moment à une classification par labels.",
       "level_column": "Niveau",
       "label_name": "Nom du label",
       "pages_column": "Pages classifiées",
       "no_classifications": "Aucune page n'est actuellement classifiée. Classifiez d'abord des pages, puis exportez leurs classifications sous forme de labels.",
-      "start_button": "Démarrer l'export",
+      "start_button": "Démarrer la synchronisation",
       "summary": "Ajoutera des labels à {count} pages",
-      "complete": "Export terminé : {exported} pages étiquetées.",
-      "running": "Export en cours..."
+      "complete": "Synchronisation terminée : {exported} pages étiquetées.",
+      "running": "Synchronisation en cours..."
     },
     "languages": {
       "title": "Langues du contenu",
