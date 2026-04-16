@@ -26,7 +26,7 @@
     "apply_recursive": "Auf alle Unterseiten anwenden",
     "apply_recursive_count": "{count} Unterseiten werden aktualisiert",
     "no_subpages": "Diese Seite hat keine Unterseiten.",
-    "all_subpages_classified": "Alle Unterseiten bereits auf dieser Stufe",
+    "all_subpages_classified": "Alle Unterseiten bereits auf dieser Stufe.",
     "apply_button": "Anwenden",
     "cancel_button": "Abbrechen",
     "close_button": "Schließen",
@@ -40,7 +40,6 @@
     "async_close_hint": "Sie können dieses Dialogfeld schließen. Die Klassifizierung wird im Hintergrund fortgesetzt.",
     "async_eta_min": "~{minutes} Min. verbleibend",
     "async_eta_sec": "~{seconds} Sek. verbleibend",
-    "disallowed": "Nicht erlaubt",
     "not_allowed": "Nicht erlaubt",
     "success": "Klassifizierung wurde aktualisiert.",
     "success_recursive": "Klassifizierung für {classified} Seiten aktualisiert.",
@@ -185,7 +184,7 @@
       "already_added": "Diese Sprache wurde bereits hinzugefügt."
     },
     "save_button": "Konfiguration speichern",
-    "save_success": "Konfiguration erfolgreich gespeichert.",
+    "save_success": "Konfiguration gespeichert.",
     "save_error": "Konfiguration konnte nicht gespeichert werden.",
     "unsaved_changes": "Es gibt ungespeicherte Änderungen. Klicken Sie auf Speichern."
   },
@@ -197,7 +196,7 @@
     "reset_button": "Auf globale Standardwerte zurücksetzen",
     "save_button": "Speichern",
     "save_success": "Bereichseinstellungen gespeichert.",
-    "reset_success": "Auf globale Standardwerte zurückgesetzt."
+    "reset_success": "Bereichseinstellungen auf globale Standardwerte zurückgesetzt."
   },
   "language_names": {
     "en": "Englisch",

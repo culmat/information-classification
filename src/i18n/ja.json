@@ -26,7 +26,7 @@
     "apply_recursive": "すべてのサブページに適用",
     "apply_recursive_count": "{count}件のサブページが更新されます",
     "no_subpages": "このページにはサブページがありません。",
-    "all_subpages_classified": "すべてのサブページは既にこのレベルです",
+    "all_subpages_classified": "すべてのサブページは既にこのレベルです。",
     "apply_button": "適用",
     "cancel_button": "キャンセル",
     "close_button": "閉じる",
@@ -40,7 +40,6 @@
     "async_close_hint": "このダイアログを閉じることができます。分類はバックグラウンドで続行されます。",
     "async_eta_min": "残り約{minutes}分",
     "async_eta_sec": "残り約{seconds}秒",
-    "disallowed": "許可されていません",
     "not_allowed": "許可されていません",
     "success": "分類が更新されました。",
     "success_recursive": "{classified}ページの分類が更新されました。",
@@ -185,7 +184,7 @@
       "already_added": "この言語はすでに追加されています。"
     },
     "save_button": "設定を保存",
-    "save_success": "設定が正常に保存されました。",
+    "save_success": "設定が保存されました。",
     "save_error": "設定の保存に失敗しました。",
     "unsaved_changes": "未保存の変更があります。保存をクリックしてください。"
   },
@@ -197,7 +196,7 @@
     "reset_button": "グローバルデフォルトにリセット",
     "save_button": "保存",
     "save_success": "スペース設定が保存されました。",
-    "reset_success": "グローバルデフォルトにリセットされました。"
+    "reset_success": "スペース設定がグローバルデフォルトにリセットされました。"
   },
   "language_names": {
     "en": "英語",

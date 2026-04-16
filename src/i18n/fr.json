@@ -26,7 +26,7 @@
     "apply_recursive": "Appliquer à toutes les sous-pages",
     "apply_recursive_count": "{count} sous-pages seront mises à jour",
     "no_subpages": "Cette page n'a pas de sous-pages.",
-    "all_subpages_classified": "Toutes les sous-pages sont déjà à ce niveau",
+    "all_subpages_classified": "Toutes les sous-pages sont déjà à ce niveau.",
     "apply_button": "Appliquer",
     "cancel_button": "Annuler",
     "close_button": "Fermer",
@@ -40,7 +40,6 @@
     "async_close_hint": "Vous pouvez fermer cette boîte de dialogue. La classification continuera en arrière-plan.",
     "async_eta_min": "~{minutes} min restantes",
     "async_eta_sec": "~{seconds} sec restantes",
-    "disallowed": "Non autorisé",
     "not_allowed": "Non autorisé",
     "success": "Classification mise à jour.",
     "success_recursive": "Classification mise à jour pour {classified} pages.",
@@ -185,7 +184,7 @@
       "already_added": "Cette langue a déjà été ajoutée."
     },
     "save_button": "Enregistrer la configuration",
-    "save_success": "Configuration enregistrée avec succès.",
+    "save_success": "Configuration enregistrée.",
     "save_error": "Impossible d'enregistrer la configuration.",
     "unsaved_changes": "Vous avez des modifications non enregistrées. Cliquez sur Enregistrer."
   },
@@ -197,7 +196,7 @@
     "reset_button": "Réinitialiser aux valeurs globales",
     "save_button": "Enregistrer",
     "save_success": "Paramètres d'espace enregistrés.",
-    "reset_success": "Réinitialisé aux valeurs globales."
+    "reset_success": "Paramètres d'espace réinitialisés aux valeurs globales."
   },
   "language_names": {
     "en": "Anglais",
