@@ -429,14 +429,6 @@ const App = () => {
         setImportProgress((prev) => ({ ...prev, ...data }));
         if (data.done) {
           setImportStep('done');
-          showFlag({
-            id: 'import-complete',
-            title: interpolate(t('admin.import.complete'), {
-              classified: data.classified || 0,
-            }),
-            type: 'success',
-            isAutoDismiss: true,
-          });
           refreshImportCounts();
           if (importSubRef.current) {
             importSubRef.current.unsubscribe();
@@ -465,14 +457,6 @@ const App = () => {
         if (data.done) {
           setExportLoading(false);
           setExportListening(false);
-          showFlag({
-            id: 'export-complete',
-            title: interpolate(t('admin.export.complete'), {
-              exported: data.classified || 0,
-            }),
-            type: 'success',
-            isAutoDismiss: true,
-          });
           if (exportSubRef.current) {
             exportSubRef.current.unsubscribe();
             exportSubRef.current = null;
@@ -482,7 +466,6 @@ const App = () => {
       .then((sub) => {
         exportSubRef.current = sub;
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exportListening]);
 
   // Export page count helpers (mirrors import count pattern)
@@ -1503,7 +1486,9 @@ const App = () => {
                       <SectionMessage appearance="information">
                         <Text>{t('admin.import.never_weaken')}</Text>
                       </SectionMessage>
-                      <Text>{t('admin.import.index_lag_hint')}</Text>
+                      <SectionMessage appearance="information">
+                        <Text>{t('admin.import.index_lag_hint')}</Text>
+                      </SectionMessage>
                     </Stack>
                   </Box>
                 </TabPanel>

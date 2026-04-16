@@ -31,7 +31,7 @@ import ForgeReconciler, {
   TabPanel,
   xcss,
 } from '@forge/react';
-import { invoke } from '@forge/bridge';
+import { invoke, showFlag } from '@forge/bridge';
 import { colorToLozenge } from '../shared/constants';
 import { localize } from '../shared/i18n';
 import StatisticsPanel from './StatisticsPanel';
@@ -116,7 +116,13 @@ const App = () => {
         },
       });
       if (result.success) {
-        setMessage({ type: 'success', text: t('space_settings.save_success') });
+        setMessage(null);
+        showFlag({
+          id: 'space-settings-saved',
+          title: t('space_settings.save_success'),
+          type: 'success',
+          isAutoDismiss: true,
+        });
       } else {
         setMessage({ type: 'error', text: result.error || 'Failed to save.' });
       }
@@ -141,9 +147,12 @@ const App = () => {
         setEnabledLevelIds(globalAllowed);
         setDefaultLevelId(globalConfig.defaultLevelId);
         setSpaceConfig(null);
-        setMessage({
+        setMessage(null);
+        showFlag({
+          id: 'space-settings-reset',
+          title: t('space_settings.reset_success'),
           type: 'success',
-          text: t('space_settings.reset_success'),
+          isAutoDismiss: true,
         });
       }
     } catch (error) {
