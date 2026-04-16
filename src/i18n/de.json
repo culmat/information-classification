@@ -220,6 +220,13 @@
     "ru": "Russisch",
     "uk": "Ukrainisch"
   },
+  "macro": {
+    "stats": {
+      "title": "Informationsklassifizierung Statistiken",
+      "description": "Zeigt Klassifizierungsverteilung und kürzlich klassifizierte Seiten an.",
+      "empty": "Keine klassifizierten Seiten in diesem Bereich gefunden."
+    }
+  },
   "license": {
     "inactive_title": "Lizenz erforderlich",
     "inactive_message": "Informationsklassifizierung für Confluence erfordert eine aktive Lizenz. Bitte installieren oder erneuern Sie Ihre Lizenz im Atlassian Marketplace."

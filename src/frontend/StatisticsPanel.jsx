@@ -12,6 +12,8 @@
  * - onRefresh: () => void — callback for the refresh button
  * - spaceFilter: string — CQL fragment for space scoping (e.g. ' AND space="KEY"'), empty string for global
  * - showSpaceColumn: boolean — whether to show the space column in the recent pages table
+ * - hideSections: 'distribution' | 'recent' | null — optionally hide one section (for macro config)
+ * - hideToggle: boolean — hide the unclassified toggle (macro controls it via config instead)
  * - t: translation function from useTranslation
  */
 
@@ -46,6 +48,8 @@ const StatisticsPanel = ({
   onRefresh,
   spaceFilter = '',
   showSpaceColumn = false,
+  hideSections = null,
+  hideToggle = false,
   t,
 }) => {
   return (
@@ -65,22 +69,25 @@ const StatisticsPanel = ({
           </Inline>
         )}
 
-        {/* Coverage toggle */}
-        <Inline space="space.100" alignBlock="center">
-          <Toggle
-            id="coverage-toggle"
-            isChecked={showUnclassified}
-            onChange={onToggleUnclassified}
-          />
-          <Label labelFor="coverage-toggle">
-            {t('admin.audit.show_unclassified')}
-          </Label>
-        </Inline>
+        {/* Coverage toggle — hidden in macro context where config controls this */}
+        {!hideToggle && (
+          <Inline space="space.100" alignBlock="center">
+            <Toggle
+              id="coverage-toggle"
+              isChecked={showUnclassified}
+              onChange={onToggleUnclassified}
+            />
+            <Label labelFor="coverage-toggle">
+              {t('admin.audit.show_unclassified')}
+            </Label>
+          </Inline>
+        )}
 
         {/* Distribution chart — when "show unclassified" is OFF, unclassified
          pages are rolled into the default level so the chart always reflects
          the effective classification of every page. */}
-        {data &&
+        {hideSections !== 'distribution' &&
+          data &&
           data.totalPages > 0 &&
           (() => {
             const unclassified = data.totalPages - data.classifiedPages;
@@ -170,7 +177,7 @@ const StatisticsPanel = ({
           })()}
 
         {/* Recently classified pages — only show when there are entries */}
-        {(data?.recentPages || []).length > 0 && (
+        {hideSections !== 'recent' && (data?.recentPages || []).length > 0 && (
           <>
             <Heading size="small">{t('admin.audit.recent_changes')}</Heading>
             <DynamicTable

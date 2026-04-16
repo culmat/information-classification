@@ -220,6 +220,13 @@
     "ru": "Russe",
     "uk": "Ukrainien"
   },
+  "macro": {
+    "stats": {
+      "title": "Statistiques de classification des informations",
+      "description": "Affiche la répartition des classifications et les pages récemment classifiées.",
+      "empty": "Aucune page classifiée trouvée dans ce périmètre."
+    }
+  },
   "license": {
     "inactive_title": "Licence requise",
     "inactive_message": "La classification des informations pour Confluence nécessite une licence active. Veuillez installer ou renouveler votre licence sur l'Atlassian Marketplace."

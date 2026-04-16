@@ -146,7 +146,7 @@
       "no_pages_found": "No pages found with the selected labels in this scope.",
       "pages_column": "Matched pages",
       "refresh_button": "Refresh counts",
-      "scope_all": "Whole instance",
+      "scope_all": "Entire instance",
       "scope_space": "Space:",
       "scope_empty": "Enter one or more space keys to scope the import.",
       "remove_labels": "Remove matched labels after import (recommended)",
@@ -217,6 +217,13 @@
     "zh": "Chinese",
     "ru": "Russian",
     "uk": "Ukrainian"
+  },
+  "macro": {
+    "stats": {
+      "title": "Information Classification Statistics",
+      "description": "Displays classification distribution and recently classified pages.",
+      "empty": "No classified pages found in this scope."
+    }
   },
   "license": {
     "inactive_title": "License Required",

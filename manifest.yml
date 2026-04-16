@@ -28,6 +28,19 @@ modules:
       resolver:
         function: resolver
       route: information-classification
+  macro:
+    - key: classification-stats
+      title:
+        i18n: macro.stats.title
+      description:
+        i18n: macro.stats.description
+      resource: stats-macro-ui
+      render: native
+      resolver:
+        function: resolver
+      config: true
+      categories:
+        - reporting
   confluence:contentProperty:
     - key: classification-index
       propertyKey: culmat_page_classification
@@ -65,6 +78,8 @@ resources:
     path: src/frontend/admin.jsx
   - key: space-settings-ui
     path: src/frontend/spaceSettings.jsx
+  - key: stats-macro-ui
+    path: src/frontend/statsMacro.jsx
 translations:
   resources:
     - key: en-US

@@ -220,6 +220,13 @@
     "ru": "ロシア語",
     "uk": "ウクライナ語"
   },
+  "macro": {
+    "stats": {
+      "title": "情報分類統計",
+      "description": "分類の分布と最近分類されたページを表示します。",
+      "empty": "このスコープ内に分類されたページが見つかりません。"
+    }
+  },
   "license": {
     "inactive_title": "ライセンスが必要",
     "inactive_message": "Information Classification for Confluenceにはアクティブなライセンスが必要です。Atlassian Marketplaceでライセンスをインストールまたは更新してください。"

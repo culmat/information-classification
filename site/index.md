@@ -28,6 +28,7 @@ slug: index
 - **Restriction warnings** - warns when a classified page lacks matching view restrictions
 - **Labels and CQL** - search classified pages with CQL aliases; synchronize classifications from/to labels
 - **Per-space overrides** - space admins can restrict available levels and set a space default
+- **Statistics macro** - embed classification charts and recent changes on any page, scoped to page tree, space, or instance
 - **Statistics** - coverage and distribution charts for administrators
 - **Audit trail** - full history of classification changes per page
 
@@ -47,6 +48,7 @@ slug: index
 | [Classification](Classification)                     | How to classify a page, the byline badge, and restriction warnings |
 | [Recursive Classification](Recursive-Classification) | Tree classification, async processing, and progress tracking       |
 | [Labels and Search](Labels-and-Search)               | CQL search, label synchronization from/to                          |
+| [Statistics Macro](Statistics-Macro)                 | Embed classification stats scoped to page tree, space, or instance |
 
 ## Trust & Legal
 

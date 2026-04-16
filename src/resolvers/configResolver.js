@@ -92,46 +92,59 @@ async function cqlSearch(cql, limit = 0) {
 
 /**
  * Resolver: getAuditData
- * Returns CQL-based classification statistics for the admin dashboard.
+ * Returns CQL-based classification statistics.
  * Distribution per level, total pages, coverage, and recently classified pages.
+ *
+ * Scoping options (all optional, combine as needed):
+ * - spaceKey: restrict to a single space
+ * - ancestorId: restrict to a page tree (the page and its descendants)
+ * - source: 'macro' bypasses admin check (CQL runs as user, enforcing visibility)
  */
 export async function getAuditDataResolver(req) {
-  // Audit data without a spaceKey is a global query — require admin access.
-  // Space-scoped audit queries are also used by the spaceSettings module,
-  // which is gated to space admins — allow those through.
-  const { spaceKey } = req.payload || {};
-  if (!spaceKey) {
+  const { spaceKey, ancestorId, source } = req.payload || {};
+
+  // Macros run as the viewing user — CQL already enforces page visibility.
+  // Only require admin for unrestricted global queries from the admin panel.
+  if (!spaceKey && !ancestorId && source !== 'macro') {
     const accountId = req.context.accountId;
     if (!accountId || !(await isConfluenceAdmin(accountId))) {
       return errorResponse('Admin access required', 403);
     }
   }
 
-  // Validate spaceKey format before embedding in CQL
+  // Validate inputs before embedding in CQL
   if (spaceKey && !isValidSpaceKey(spaceKey)) {
     return validationError('Invalid space key format');
+  }
+  if (ancestorId && !/^\d+$/.test(String(ancestorId))) {
+    return validationError('Invalid ancestor ID format');
   }
 
   try {
     const config = await getGlobalConfig();
     const levels = config.levels || [];
     const spaceFilter = spaceKey ? ` AND space="${spaceKey}"` : '';
+    // ancestor= excludes the page itself, so include it with (id=X OR ancestor=X)
+    const ancestorFilter = ancestorId
+      ? ` AND (id=${ancestorId} OR ancestor=${ancestorId})`
+      : '';
+    const scopeFilter = `${spaceFilter}${ancestorFilter}`;
 
     // Count pages per level + total pages in parallel
     const countPromises = levels.map((l) =>
       cqlSearch(
-        `type=page${spaceFilter} AND culmat_classification_level="${l.id}"`,
+        `type=page${scopeFilter} AND culmat_classification_level="${l.id}"`,
       ).then(({ totalSize }) => ({ level: l.id, count: totalSize })),
     );
-    const totalPagesPromise = cqlSearch(`type=page${spaceFilter}`);
+    const totalPagesPromise = cqlSearch(`type=page${scopeFilter}`);
     // Build an OR query for all configured levels instead of "is not null",
     // which is not reliably supported by content property search aliases.
     const levelFilter = levels
       .map((l) => `culmat_classification_level="${l.id}"`)
       .join(' OR ');
     const recentCql = levelFilter
-      ? `type=page${spaceFilter} AND (${levelFilter}) ORDER BY lastModified DESC`
-      : `type=page${spaceFilter}`;
+      ? `type=page${scopeFilter} AND (${levelFilter}) ORDER BY lastModified DESC`
+      : `type=page${scopeFilter}`;
     const recentPromise = cqlSearch(recentCql, 20);
 
     const [distribution, totalPagesResult, recentResult] = await Promise.all([
@@ -147,6 +160,9 @@ export async function getAuditDataResolver(req) {
       totalPages: totalPagesResult.totalSize,
       classifiedPages,
       recentPages: recentResult.results,
+      // Include level metadata so macros can render charts without calling getConfig
+      levels: levels.map((l) => ({ id: l.id, color: l.color })),
+      defaultLevelId: config.defaultLevelId,
     });
   } catch (error) {
     console.error('Error getting audit data:', error);

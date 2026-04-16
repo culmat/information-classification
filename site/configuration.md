@@ -77,3 +77,5 @@ The Statistics tab shows classification coverage and distribution across the ent
 - **Recent changes** - table of the last 20 classified pages with links
 
 Toggle **Show unclassified as separate slice** to see unclassified pages as their own segment or rolled into the default level.
+
+To make statistics visible to non-admin users, use the [Statistics Macro](Statistics-Macro) on any Confluence page.
