@@ -295,12 +295,6 @@ const App = () => {
                   </SectionMessage>
                 )}
 
-                {isDirty && (
-                  <SectionMessage appearance="warning">
-                    <Text>{t('admin.unsaved_changes')}</Text>
-                  </SectionMessage>
-                )}
-
                 {/* Action buttons */}
                 <ButtonGroup>
                   <Button

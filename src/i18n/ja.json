@@ -195,8 +195,7 @@
     },
     "save_button": "設定を保存",
     "save_success": "設定が保存されました。",
-    "save_error": "設定の保存に失敗しました。",
-    "unsaved_changes": "未保存の変更があります。保存をクリックしてください。"
+    "save_error": "設定の保存に失敗しました。"
   },
   "space_settings": {
     "title": "情報分類設定",

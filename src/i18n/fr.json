@@ -195,8 +195,7 @@
     },
     "save_button": "Enregistrer la configuration",
     "save_success": "Configuration enregistrée.",
-    "save_error": "Impossible d'enregistrer la configuration.",
-    "unsaved_changes": "Vous avez des modifications non enregistrées. Cliquez sur Enregistrer."
+    "save_error": "Impossible d'enregistrer la configuration."
   },
   "space_settings": {
     "title": "Paramètres de classification",

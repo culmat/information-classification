@@ -195,8 +195,7 @@
     },
     "save_button": "Konfiguration speichern",
     "save_success": "Konfiguration gespeichert.",
-    "save_error": "Konfiguration konnte nicht gespeichert werden.",
-    "unsaved_changes": "Es gibt ungespeicherte Änderungen. Klicken Sie auf Speichern."
+    "save_error": "Konfiguration konnte nicht gespeichert werden."
   },
   "space_settings": {
     "title": "Einstellungen Informationsklassifizierung",

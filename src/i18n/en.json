@@ -193,8 +193,7 @@
     },
     "save_button": "Save Configuration",
     "save_success": "Configuration saved.",
-    "save_error": "Failed to save configuration.",
-    "unsaved_changes": "You have unsaved changes. Click Save to apply them."
+    "save_error": "Failed to save configuration."
   },
   "space_settings": {
     "title": "Information Classification Settings",

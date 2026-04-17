@@ -1719,12 +1719,6 @@ const App = () => {
               </SectionMessage>
             )}
 
-            {isDirty && (
-              <SectionMessage appearance="warning">
-                <Text>{t('admin.unsaved_changes')}</Text>
-              </SectionMessage>
-            )}
-
             <Button
               appearance="primary"
               onClick={handleSave}
