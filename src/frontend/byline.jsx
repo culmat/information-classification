@@ -670,12 +670,10 @@ const App = () => {
                         <Text>{t('classify.all_subpages_classified')}</Text>
                       );
                     }
-                    return saving ? (
-                      <Inline space="space.100" alignBlock="center">
-                        <Spinner size="small" />
-                        <Text>{t('classify.sync_progress')}</Text>
-                      </Inline>
-                    ) : (
+                    // The Apply button's isLoading already signals progress;
+                    // swapping this row for a spinner would change height and
+                    // briefly toggle the modal scrollbar.
+                    return (
                       <Text>
                         {interpolate(t('classify.apply_recursive_count'), {
                           count: totalToUpdate,
