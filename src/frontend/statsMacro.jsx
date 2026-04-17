@@ -19,6 +19,7 @@ import ForgeReconciler, {
   SectionMessage,
   Label,
   Select,
+  Textfield,
   CheckboxGroup,
 } from '@forge/react';
 import { invoke } from '@forge/bridge';
@@ -27,7 +28,8 @@ import StatisticsPanel from './StatisticsPanel';
 const defaultConfig = {
   scope: 'subtree',
   show: 'both',
-  showUnclassified: ['yes'], // CheckboxGroup returns array
+  countAsDefault: ['yes'], // CheckboxGroup returns array; checked = roll into default
+  maxRecent: '10',
 };
 
 /** Extract plain string value from a Select config entry ({label,value} or string). */
@@ -50,14 +52,15 @@ const App = () => {
   // Normalise config values
   const scope = selectValue(config.scope, 'subtree');
   const show = selectValue(config.show, 'both');
-  const showUnclassified = (config.showUnclassified || []).includes('yes');
+  const countAsDefault = (config.countAsDefault || []).includes('yes');
+  const maxRecent = parseInt(config.maxRecent, 10) || 10;
 
   // Fetch stats when context + config scope are ready
   const fetchStats = useCallback(async () => {
     if (!pageId && !spaceKey) return; // context not yet available
     setLoading(true);
     try {
-      const payload = { source: 'macro' };
+      const payload = { source: 'macro', recentLimit: maxRecent };
       if (scope === 'subtree' && pageId) {
         payload.ancestorId = pageId;
       } else if (scope === 'space' && spaceKey) {
@@ -73,7 +76,7 @@ const App = () => {
     } finally {
       setLoading(false);
     }
-  }, [pageId, spaceKey, scope]);
+  }, [pageId, spaceKey, scope, maxRecent]);
 
   useEffect(() => {
     fetchStats();
@@ -121,12 +124,13 @@ const App = () => {
     spaceFilter = ` AND space="${spaceKey}"`;
   }
 
+  // Visuals come from shared StatisticsPanel; keep props in sync with admin.jsx and spaceSettings.jsx
   return (
     <StatisticsPanel
       data={data}
       levels={data?.levels || []}
       defaultLevelId={data?.defaultLevelId}
-      showUnclassified={showUnclassified}
+      showUnclassified={countAsDefault}
       onToggleUnclassified={() => {}}
       isLoading={loading}
       onRefresh={fetchStats}
@@ -168,10 +172,13 @@ const Config = () => {
         }}
       />
 
+      <Label>Max recent pages</Label>
+      <Textfield name="maxRecent" defaultValue="10" />
+
       <CheckboxGroup
-        name="showUnclassified"
+        name="countAsDefault"
         options={[
-          { label: 'Include unclassified pages in chart', value: 'yes' },
+          { label: 'Count unclassified as default level', value: 'yes' },
         ]}
       />
     </>

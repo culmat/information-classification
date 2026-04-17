@@ -933,7 +933,8 @@ const App = () => {
             <Tab>{t('admin.tabs.labels')}</Tab>
           </TabList>
 
-          {/* Statistics Tab */}
+          {/* Statistics Tab — visuals come from shared StatisticsPanel;
+              keep props in sync with spaceSettings.jsx and statsMacro.jsx */}
           <TabPanel>
             <StatisticsPanel
               data={auditData}

@@ -19,17 +19,20 @@ The Classification Statistics macro lets you embed a classification distribution
 
 ## Configuration options
 
-| Option                                  | Values                                                                  | Default                         | Description                                                                                                                             |
-| --------------------------------------- | ----------------------------------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **Scope**                               | This page and sub-pages, Current space, Entire instance                 | This page and sub-pages         | Controls which pages are included in the statistics.                                                                                    |
-| **Display**                             | Distribution and recent changes, Distribution only, Recent changes only | Distribution and recent changes | Choose which sections to show.                                                                                                          |
-| **Include unclassified pages in chart** | Checkbox                                                                | Checked                         | When checked, unclassified pages appear as a separate slice in the donut chart. When unchecked, they are rolled into the default level. |
+| Option                                  | Values                                                                  | Default                         | Description                                                                                                                                                 |
+| --------------------------------------- | ----------------------------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Scope**                               | This page and sub-pages, Current space, Entire instance                 | This page and sub-pages         | Controls which pages are included in the statistics.                                                                                                        |
+| **Display**                             | Distribution and recent changes, Distribution only, Recent changes only | Distribution and recent changes | Choose which sections to show.                                                                                                                              |
+| **Max recent pages**                    | Number (1-50)                                                           | 10                              | How many recently classified pages to show in the table.                                                                                                    |
+| **Count unclassified as default level** | Checkbox                                                                | Checked                         | When checked, unclassified pages are counted under the instance default level in the chart. When unchecked, they appear as a separate "Unclassified" slice. |
 
 ## Features
 
-- **Donut chart** showing the classification distribution with color-coded levels
-- **Clickable CQL links** per level — click a level name to search for all pages classified at that level
-- **Recently classified pages** table with links to each page
+- **Coverage bar** showing classified pages count, percentage, and progress bar
+- **Donut chart** showing the classification distribution with color-coded level Lozenges
+- **Clickable legend** — click any level to search for all pages classified at that level
+- **Recently classified pages** table with level indicator, relative timestamp, and links
+- **Smart columns** — the Space column only appears when scope is "Entire instance"
 - **Refresh button** to reload data without reloading the page
 
 ## Notes

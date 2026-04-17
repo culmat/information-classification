@@ -70,23 +70,35 @@ export async function setConfigResolver(req) {
 /**
  * Runs a CQL search and returns { totalSize, results }.
  */
-async function cqlSearch(cql, limit = 0) {
+async function cqlSearch(cql, limit = 0, { expandProperties = false } = {}) {
+  const expand = expandProperties
+    ? 'content.space,content.metadata.properties.culmat_page_classification'
+    : 'content.space';
   const response = await api
     .asUser()
     .requestConfluence(
-      route`/wiki/rest/api/search?cql=${cql}&limit=${limit}&expand=content.space`,
+      route`/wiki/rest/api/search?cql=${cql}&limit=${limit}&expand=${expand}`,
       { headers: { Accept: 'application/json' } },
     );
   if (!response.ok) return { totalSize: 0, results: [] };
   const data = await response.json();
   return {
     totalSize: data.totalSize || 0,
-    results: (data.results || []).map((r) => ({
-      id: String(r.content?.id),
-      title: r.content?.title,
-      spaceKey: r.content?.space?.key || r.resultGlobalContainer?.title,
-      url: r.url || r.content?._links?.webui,
-    })),
+    results: (data.results || []).map((r) => {
+      const result = {
+        id: String(r.content?.id),
+        title: r.content?.title,
+        spaceKey: r.content?.space?.key || r.resultGlobalContainer?.title,
+        url: r.url || r.content?._links?.webui,
+        lastModified: r.lastModified || r.content?.version?.when || null,
+      };
+      if (expandProperties) {
+        const props =
+          r.content?.metadata?.properties?.culmat_page_classification;
+        result.levelId = props?.value?.level || null;
+      }
+      return result;
+    }),
   };
 }
 
@@ -101,7 +113,7 @@ async function cqlSearch(cql, limit = 0) {
  * - source: 'macro' bypasses admin check (CQL runs as user, enforcing visibility)
  */
 export async function getAuditDataResolver(req) {
-  const { spaceKey, ancestorId, source } = req.payload || {};
+  const { spaceKey, ancestorId, source, recentLimit } = req.payload || {};
 
   // Macros run as the viewing user — CQL already enforces page visibility.
   // Only require admin for unrestricted global queries from the admin panel.
@@ -145,7 +157,10 @@ export async function getAuditDataResolver(req) {
     const recentCql = levelFilter
       ? `type=page${scopeFilter} AND (${levelFilter}) ORDER BY lastModified DESC`
       : `type=page${scopeFilter}`;
-    const recentPromise = cqlSearch(recentCql, 20);
+    const limit = Math.min(Math.max(parseInt(recentLimit, 10) || 20, 1), 50);
+    const recentPromise = cqlSearch(recentCql, limit, {
+      expandProperties: true,
+    });
 
     const [distribution, totalPagesResult, recentResult] = await Promise.all([
       Promise.all(countPromises),
