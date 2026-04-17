@@ -143,6 +143,9 @@
       "hours_ago": "{count}時間前",
       "yesterday": "昨日",
       "days_ago": "{count}日前",
+      "last_updated": "{time}に更新",
+      "reload": "再読み込み",
+      "loading": "読み込み中...",
       "empty": "分類はまだありません。"
     },
     "import": {

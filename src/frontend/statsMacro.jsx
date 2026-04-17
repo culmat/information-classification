@@ -4,8 +4,8 @@
  *
  * Config options:
  * - scope: 'subtree' (default) | 'space' | 'global'
- * - show: 'both' (default) | 'distribution' | 'recent'
- * - showUnclassified: checkbox (default checked)
+ * - maxRecent: number (default 10)
+ * - countAsDefault: checkbox (default checked)
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -27,7 +27,6 @@ import StatisticsPanel from './StatisticsPanel';
 
 const defaultConfig = {
   scope: 'subtree',
-  show: 'both',
   countAsDefault: ['yes'], // CheckboxGroup returns array; checked = roll into default
   maxRecent: '10',
 };
@@ -51,7 +50,6 @@ const App = () => {
 
   // Normalise config values
   const scope = selectValue(config.scope, 'subtree');
-  const show = selectValue(config.show, 'both');
   const countAsDefault = (config.countAsDefault || []).includes('yes');
   const maxRecent = parseInt(config.maxRecent, 10) || 10;
 
@@ -95,7 +93,7 @@ const App = () => {
     );
   }
 
-  if (loading) {
+  if (loading && !data) {
     return <Spinner size="medium" />;
   }
 
@@ -107,14 +105,6 @@ const App = () => {
       </SectionMessage>
     );
   }
-
-  // Derive hideSections from the normalised "show" value
-  const hideSections =
-    show === 'distribution'
-      ? 'recent'
-      : show === 'recent'
-        ? 'distribution'
-        : null;
 
   // Build CQL scope filter for clickable links
   let spaceFilter = '';
@@ -136,7 +126,6 @@ const App = () => {
       onRefresh={fetchStats}
       spaceFilter={spaceFilter}
       showSpaceColumn={scope === 'global'}
-      hideSections={hideSections}
       hideToggle
       t={t}
     />
@@ -156,20 +145,6 @@ const Config = () => {
           { label: 'Entire instance', value: 'global' },
         ]}
         defaultValue={{ label: 'This page and sub-pages', value: 'subtree' }}
-      />
-
-      <Label>Display</Label>
-      <Select
-        name="show"
-        options={[
-          { label: 'Distribution and recent changes', value: 'both' },
-          { label: 'Distribution only', value: 'distribution' },
-          { label: 'Recent changes only', value: 'recent' },
-        ]}
-        defaultValue={{
-          label: 'Distribution and recent changes',
-          value: 'both',
-        }}
       />
 
       <Label>Max recent pages</Label>

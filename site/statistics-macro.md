@@ -19,16 +19,15 @@ The Classification Statistics macro lets you embed a classification distribution
 
 ## Configuration options
 
-| Option                                  | Values                                                                  | Default                         | Description                                                                                                                                                 |
-| --------------------------------------- | ----------------------------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Scope**                               | This page and sub-pages, Current space, Entire instance                 | This page and sub-pages         | Controls which pages are included in the statistics.                                                                                                        |
-| **Display**                             | Distribution and recent changes, Distribution only, Recent changes only | Distribution and recent changes | Choose which sections to show.                                                                                                                              |
-| **Max recent pages**                    | Number (1-50)                                                           | 10                              | How many recently classified pages to show in the table.                                                                                                    |
-| **Count unclassified as default level** | Checkbox                                                                | Checked                         | When checked, unclassified pages are counted under the instance default level in the chart. When unchecked, they appear as a separate "Unclassified" slice. |
+| Option                                  | Values                                                  | Default                 | Description                                                                                                                                                 |
+| --------------------------------------- | ------------------------------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Scope**                               | This page and sub-pages, Current space, Entire instance | This page and sub-pages | Controls which pages are included in the statistics.                                                                                                        |
+| **Max recent pages**                    | Number (1-50)                                           | 10                      | How many recently classified pages to show in the table.                                                                                                    |
+| **Count unclassified as default level** | Checkbox                                                | Checked                 | When checked, unclassified pages are counted under the instance default level in the chart. When unchecked, they appear as a separate "Unclassified" slice. |
 
 ## Features
 
-- **Coverage bar** showing classified pages count, percentage, and progress bar
+- **Two tabs**: Distribution and Recently Classified — switch between views without reloading
 - **Donut chart** showing the classification distribution with color-coded level Lozenges
 - **Clickable legend** — click any level to search for all pages classified at that level
 - **Recently classified pages** table with level indicator, relative timestamp, and links

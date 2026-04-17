@@ -143,6 +143,9 @@
       "hours_ago": "vor {count} Std.",
       "yesterday": "Gestern",
       "days_ago": "vor {count} Tagen",
+      "last_updated": "Aktualisiert {time}",
+      "reload": "Aktualisieren",
+      "loading": "Wird geladen...",
       "empty": "Noch keine Klassifizierungen."
     },
     "import": {

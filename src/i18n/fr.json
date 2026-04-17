@@ -143,6 +143,9 @@
       "hours_ago": "il y a {count}h",
       "yesterday": "Hier",
       "days_ago": "il y a {count} jours",
+      "last_updated": "Mis à jour {time}",
+      "reload": "Actualiser",
+      "loading": "Chargement...",
       "empty": "Aucune classification pour le moment."
     },
     "import": {
