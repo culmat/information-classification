@@ -88,12 +88,22 @@ async function reportProgress(
 
 /**
  * Publishes final completion event and removes the KVS job key.
+ * If `source` is set and any page was classified, also pings the
+ * `classification-changed` channel so open stats panels refresh.
  */
-async function completeJob(channel, jobKey, { classified, failed, total }) {
+async function completeJob(
+  channel,
+  jobKey,
+  { classified, failed, total },
+  source,
+) {
   await Promise.all([
     publishGlobal(channel, { classified, failed, total, done: true }),
     kvs.delete(jobKey),
   ]);
+  if (source && classified > 0) {
+    await publishGlobal('classification-changed', { source });
+  }
 }
 
 /**
@@ -171,6 +181,7 @@ async function handleRecursive(event) {
     locale,
     level,
     pages,
+    source: 'recursive',
   });
 }
 
@@ -229,6 +240,7 @@ async function handleReclassify(event) {
     locale,
     level,
     pages,
+    source: 'reclassify',
   });
 }
 
@@ -360,11 +372,12 @@ async function handleImport(event) {
     totalFailed: failed,
   });
 
-  await completeJob(channel, jobKey, {
-    classified,
-    failed,
-    total: totalToClassify,
-  });
+  await completeJob(
+    channel,
+    jobKey,
+    { classified, failed, total: totalToClassify },
+    'import',
+  );
 
   console.log(
     `Label import complete: classified=${classified}, failed=${failed}`,
@@ -451,6 +464,7 @@ async function processPages({
   locale,
   level,
   pages,
+  source,
 }) {
   let classified = 0;
   let failed = 0;
@@ -491,11 +505,12 @@ async function processPages({
     }
   }
 
-  await completeJob(channel, jobKey, {
-    classified,
-    failed,
-    total: totalToClassify,
-  });
+  await completeJob(
+    channel,
+    jobKey,
+    { classified, failed, total: totalToClassify },
+    source,
+  );
 
   console.log(
     `Classification complete: classified=${classified}, failed=${failed}`,

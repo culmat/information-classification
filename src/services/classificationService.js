@@ -11,6 +11,7 @@
  */
 
 import { route } from '@forge/api';
+import { publishGlobal } from '@forge/realtime';
 import { buildSpaceFilter } from '../shared/constants';
 import { getRequester } from '../utils/requester';
 import { getEffectiveConfig } from '../storage/configStore';
@@ -176,6 +177,14 @@ export async function classifyPage({
     if (previousLevel !== levelId) {
       recursiveResult.classified += 1;
     }
+  }
+
+  // Ping any open stats panels to refresh — cheap no-op when nobody's listening.
+  if (previousLevel !== levelId || recursive) {
+    await publishGlobal('classification-changed', {
+      source: recursive ? 'recursive-sync' : 'classify',
+      spaceKey,
+    });
   }
 
   return {

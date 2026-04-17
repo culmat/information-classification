@@ -26,6 +26,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
+import { realtime } from '@forge/bridge';
 import {
   Box,
   Text,
@@ -123,6 +124,25 @@ const StatisticsPanel = ({
   useEffect(() => {
     return () => clearTimeout(timerRef.current);
   }, []);
+
+  // Live-refresh when a classification commits anywhere in the instance.
+  // Debounced so a reclassify burst doesn't trigger a storm of refetches.
+  useEffect(() => {
+    let subscription = null;
+    let debounce = null;
+    realtime
+      .subscribeGlobal('classification-changed', () => {
+        if (debounce) clearTimeout(debounce);
+        debounce = setTimeout(() => onRefresh(), 1000);
+      })
+      .then((sub) => {
+        subscription = sub;
+      });
+    return () => {
+      if (debounce) clearTimeout(debounce);
+      if (subscription) subscription.unsubscribe();
+    };
+  }, [onRefresh]);
 
   // --- Build chart data ---
   const levelColorMap = {};

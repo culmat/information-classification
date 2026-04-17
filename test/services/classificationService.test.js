@@ -40,6 +40,10 @@ vi.mock('@forge/api', () => ({
     strings.reduce((acc, str, i) => acc + str + (values[i] || ''), ''),
 }));
 
+vi.mock('@forge/realtime', () => ({
+  publishGlobal: vi.fn().mockResolvedValue(undefined),
+}));
+
 const { getPageClassification, classifyPage } =
   await import('../../src/services/classificationService');
 
