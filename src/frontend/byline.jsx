@@ -191,13 +191,19 @@ const App = () => {
           loadClassification(false);
           setDescendantCount(0);
           setShowModal(false);
+          const hasFailures = (data.failed || 0) > 0;
           showFlag({
             id: 'classify-success',
-            title: interpolate(t('classify.async_complete'), {
-              classified: data.classified,
-            }),
-            type: 'success',
-            isAutoDismiss: true,
+            title: hasFailures
+              ? interpolate(t('classify.async_complete_partial'), {
+                  classified: data.classified || 0,
+                  failed: data.failed,
+                })
+              : interpolate(t('classify.async_complete'), {
+                  classified: data.classified || 0,
+                }),
+            type: hasFailures ? 'warning' : 'success',
+            isAutoDismiss: !hasFailures,
           });
         }
       })
@@ -596,7 +602,7 @@ const App = () => {
                   ))}
                 </Stack>
 
-                {/* Show description for selected level */}
+                {/* Show description for selected level, or error message if disallowed */}
                 {selectedLevel &&
                   (() => {
                     const level = config?.levels?.find(
@@ -604,10 +610,17 @@ const App = () => {
                     );
                     if (!level) return null;
 
-                    if (!level.allowed && level.errorMessage) {
+                    if (!level.allowed) {
+                      // Always show an error for disallowed levels — custom message
+                      // if configured, otherwise a generic "not allowed" notice.
+                      const customMessage = level.errorMessage
+                        ? localize(level.errorMessage, locale)
+                        : '';
                       return (
                         <SectionMessage appearance="error">
-                          <Text>{localize(level.errorMessage, locale)}</Text>
+                          <Text>
+                            {customMessage || t('classify.not_allowed')}
+                          </Text>
                         </SectionMessage>
                       );
                     }
@@ -636,17 +649,25 @@ const App = () => {
                   {recursive && !countLoading && totalDescendants === 0 && (
                     <Text>{t('classify.no_subpages')}</Text>
                   )}
-                  {recursive &&
-                    !countLoading &&
-                    totalDescendants > 0 &&
-                    descendantCount === 0 && (
-                      <Text>{t('classify.all_subpages_classified')}</Text>
-                    )}
-                  {recursive &&
-                    !countLoading &&
-                    descendantCount > 0 &&
-                    !asyncJob &&
-                    (saving ? (
+                  {/* Total pages to update = descendants needing change + current page if it needs change */}
+                  {(() => {
+                    if (
+                      !recursive ||
+                      countLoading ||
+                      asyncJob ||
+                      !selectedLevelAllowed
+                    )
+                      return null;
+                    const currentNeedsUpdate = selectedLevel !== currentLevelId;
+                    const totalToUpdate =
+                      (descendantCount || 0) + (currentNeedsUpdate ? 1 : 0);
+                    if (totalDescendants === 0) return null; // handled above
+                    if (totalToUpdate === 0) {
+                      return (
+                        <Text>{t('classify.all_subpages_classified')}</Text>
+                      );
+                    }
+                    return saving ? (
                       <Inline space="space.100" alignBlock="center">
                         <Spinner size="small" />
                         <Text>{t('classify.sync_progress')}</Text>
@@ -654,10 +675,11 @@ const App = () => {
                     ) : (
                       <Text>
                         {interpolate(t('classify.apply_recursive_count'), {
-                          count: descendantCount,
+                          count: totalToUpdate,
                         })}
                       </Text>
-                    ))}
+                    );
+                  })()}
                 </Stack>
 
                 {/* Async progress bar */}

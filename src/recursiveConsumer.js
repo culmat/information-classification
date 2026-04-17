@@ -39,12 +39,20 @@ const EARLY_PROGRESS_COUNT = 3; // report every page for the first N pages
 async function fetchAllPages(queryFn) {
   const pages = [];
   let start = 0;
+  let lastStart = -1;
   while (true) {
     const { results, totalSize } = await queryFn(FETCH_BATCH_SIZE, start);
     if (!results || results.length === 0) break;
     pages.push(...results);
     start += results.length;
-    if (pages.length >= totalSize || results.length < FETCH_BATCH_SIZE) break;
+    // Only break when we've fetched at least totalSize. Don't trust
+    // `results.length < FETCH_BATCH_SIZE` — Confluence's search API can
+    // return fewer than requested even when more results exist (causing
+    // the last page to be silently dropped).
+    if (pages.length >= totalSize) break;
+    // Safety: if start didn't advance, we'd loop forever
+    if (start === lastStart) break;
+    lastStart = start;
   }
   return pages;
 }
@@ -461,6 +469,9 @@ async function processPages({
       if (success) {
         classified++;
       } else {
+        console.error(
+          `classifySinglePage returned false for page ${page.id} (title=${page.title})`,
+        );
         failed++;
       }
     } catch (error) {
