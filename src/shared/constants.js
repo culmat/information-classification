@@ -203,15 +203,24 @@ const SELECTABLE_COLORS = [
   'red',
   'yellow',
   'purple',
-  'teal',
   'orange',
-  'magenta',
   'grey',
-  'lime',
 ];
 
+// Unicode colored circles for visual hints in the Select dropdown.
+// Not exact matches to the Atlassian palette, but close enough to help pick.
+const COLOR_INDICATOR = {
+  green: '\u{1F7E2}',
+  blue: '\u{1F535}',
+  red: '\u{1F534}',
+  yellow: '\u{1F7E1}',
+  purple: '\u{1F7E3}',
+  orange: '\u{1F7E0}',
+  grey: '\u26AA',
+};
+
 export const COLOR_OPTIONS = SELECTABLE_COLORS.map((color) => ({
-  label: color.replace(/^./, (c) => c.toUpperCase()),
+  label: `${COLOR_INDICATOR[color] || ''} ${color.replace(/^./, (c) => c.toUpperCase())}`,
   value: color,
 }));
 
