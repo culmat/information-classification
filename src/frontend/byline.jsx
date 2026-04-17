@@ -127,6 +127,7 @@ const App = () => {
               failed: result.activeJob.failed || 0,
               total: result.activeJob.total,
               done: false,
+              fromRealtime: false,
             });
             setSaving(true);
             setShowModal(true);
@@ -184,7 +185,7 @@ const App = () => {
     let subscription = null;
     realtime
       .subscribeGlobal(`classification-progress:${pageId}`, (data) => {
-        setAsyncProgress(data);
+        setAsyncProgress({ ...data, fromRealtime: true });
         if (data.done) {
           setAsyncJob(null);
           setSaving(false);
@@ -257,6 +258,7 @@ const App = () => {
             failed: 0,
             total: result.totalToClassify,
             done: false,
+            fromRealtime: false,
           });
           setMessage({
             type: 'info',
@@ -343,6 +345,7 @@ const App = () => {
           failed: result.activeJob.failed || 0,
           total: result.activeJob.total,
           done: false,
+          fromRealtime: false,
         });
         setSaving(true);
         return;
@@ -682,33 +685,44 @@ const App = () => {
                   })()}
                 </Stack>
 
-                {/* Async progress bar */}
+                {/* Async progress bar — spinner placeholder until first live
+                    Realtime event arrives, to avoid flashing "0 of X" when
+                    KVS state hasn't been updated yet. */}
                 {asyncJob && asyncProgress && (
                   <Stack space="space.100">
-                    <Text>
-                      {interpolate(t('classify.async_progress'), {
-                        classified: asyncProgress.classified || 0,
-                        total: asyncJob.total,
-                      })}
-                    </Text>
-                    <ProgressBar
-                      value={
-                        asyncJob.total > 0
-                          ? (asyncProgress.classified || 0) / asyncJob.total
-                          : 0
-                      }
-                    />
-                    {(asyncProgress.classified || 0) > 0 &&
-                      asyncJob.startedAt &&
-                      (() => {
-                        const eta = formatEta(
-                          asyncJob.startedAt,
-                          asyncProgress.classified || 0,
-                          asyncJob.total,
-                          t,
-                        );
-                        return eta ? <Text>{eta}</Text> : null;
-                      })()}
+                    {asyncProgress.fromRealtime ? (
+                      <>
+                        <Text>
+                          {interpolate(t('classify.async_progress'), {
+                            classified: asyncProgress.classified || 0,
+                            total: asyncJob.total,
+                          })}
+                        </Text>
+                        <ProgressBar
+                          value={
+                            asyncJob.total > 0
+                              ? (asyncProgress.classified || 0) / asyncJob.total
+                              : 0
+                          }
+                        />
+                        {(asyncProgress.classified || 0) > 0 &&
+                          asyncJob.startedAt &&
+                          (() => {
+                            const eta = formatEta(
+                              asyncJob.startedAt,
+                              asyncProgress.classified || 0,
+                              asyncJob.total,
+                              t,
+                            );
+                            return eta ? <Text>{eta}</Text> : null;
+                          })()}
+                      </>
+                    ) : (
+                      <Inline space="space.100" alignBlock="center">
+                        <Spinner size="small" />
+                        <Text>{t('classify.async_loading_progress')}</Text>
+                      </Inline>
+                    )}
                     <Text>{t('classify.async_close_hint')}</Text>
                   </Stack>
                 )}

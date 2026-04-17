@@ -172,8 +172,10 @@ export async function classifyPage({
       level,
       startTime: Date.now(),
     });
-    // Include the parent page in the count
-    recursiveResult.classified += 1;
+    // Include the parent page in the count only if it actually changed
+    if (previousLevel !== levelId) {
+      recursiveResult.classified += 1;
+    }
   }
 
   return {

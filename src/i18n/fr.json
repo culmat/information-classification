@@ -35,6 +35,7 @@
     "async_progress": "{classified} pages classifiées sur {total}",
     "async_complete": "Classification terminée : {classified} pages mises à jour.",
     "async_complete_partial": "Classification terminée : {classified} pages mises à jour, {failed} échouées. Vérifiez les restrictions de pages ou réessayez.",
+    "async_loading_progress": "Chargement de la progression…",
     "async_remaining": "{count} pages ont été ajoutées ou modifiées pendant le traitement.",
     "async_review_link": "Vérifier les pages concernées",
     "async_background": "La classification continue en arrière-plan.",

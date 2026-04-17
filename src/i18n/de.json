@@ -35,6 +35,7 @@
     "async_progress": "{classified} von {total} Seiten klassifiziert",
     "async_complete": "Klassifizierung abgeschlossen: {classified} Seiten aktualisiert.",
     "async_complete_partial": "Klassifizierung abgeschlossen: {classified} Seiten aktualisiert, {failed} fehlgeschlagen. Prüfen Sie die Seitenbeschränkungen oder versuchen Sie es erneut.",
+    "async_loading_progress": "Fortschritt wird geladen…",
     "async_remaining": "{count} Seiten wurden während der Verarbeitung hinzugefügt oder geändert.",
     "async_review_link": "Betroffene Seiten prüfen",
     "async_background": "Klassifizierung wird im Hintergrund fortgesetzt.",
