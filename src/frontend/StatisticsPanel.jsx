@@ -306,7 +306,12 @@ const StatisticsPanel = ({
                           {
                             key: 'date',
                             content: (
-                              <Text>{relativeTime(page.lastModified, t)}</Text>
+                              <Text>
+                                {relativeTime(
+                                  page.classifiedAt || page.lastModified,
+                                  t,
+                                )}
+                              </Text>
                             ),
                           },
                         ],

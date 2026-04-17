@@ -96,6 +96,7 @@ async function cqlSearch(cql, limit = 0, { expandProperties = false } = {}) {
         const props =
           r.content?.metadata?.properties?.culmat_page_classification;
         result.levelId = props?.value?.level || null;
+        result.classifiedAt = props?.value?.classifiedAt || null;
       }
       return result;
     }),
@@ -154,8 +155,10 @@ export async function getAuditDataResolver(req) {
     const levelFilter = levels
       .map((l) => `culmat_classification_level="${l.id}"`)
       .join(' OR ');
+    // Sort by classification date (not page lastModified) so newly classified
+    // pages appear at the top even if their content hasn't been edited recently.
     const recentCql = levelFilter
-      ? `type=page${scopeFilter} AND (${levelFilter}) ORDER BY lastModified DESC`
+      ? `type=page${scopeFilter} AND (${levelFilter}) ORDER BY culmat_classification_date DESC`
       : `type=page${scopeFilter}`;
     const limit = Math.min(Math.max(parseInt(recentLimit, 10) || 20, 1), 50);
     const recentPromise = cqlSearch(recentCql, limit, {
