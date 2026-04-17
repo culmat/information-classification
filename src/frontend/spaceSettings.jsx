@@ -20,11 +20,9 @@ import ForgeReconciler, {
   Stack,
   Inline,
   Checkbox,
-  Select,
   Lozenge,
   Spinner,
   SectionMessage,
-  Label,
   Tabs,
   Tab,
   TabList,
@@ -52,8 +50,11 @@ const App = () => {
 
   // Track which levels are enabled in this space
   const [enabledLevelIds, setEnabledLevelIds] = useState([]);
-  const [defaultLevelId, setDefaultLevelId] = useState(null);
+  const [savedEnabledLevelIds, setSavedEnabledLevelIds] = useState([]);
   const [showUnclassified, setShowUnclassified] = useState(true); // coverage toggle
+  const isDirty =
+    JSON.stringify([...enabledLevelIds].sort()) !==
+    JSON.stringify([...savedEnabledLevelIds].sort());
 
   // Statistics tab state (lazy-loaded)
   const [statsData, setStatsData] = useState(null);
@@ -76,16 +77,12 @@ const App = () => {
             .map((l) => l.id);
 
           if (result.spaceConfig) {
-            setEnabledLevelIds(
-              result.spaceConfig.allowedLevelIds || globalAllowed,
-            );
-            setDefaultLevelId(
-              result.spaceConfig.defaultLevelId ||
-                result.globalConfig.defaultLevelId,
-            );
+            const ids = result.spaceConfig.allowedLevelIds || globalAllowed;
+            setEnabledLevelIds(ids);
+            setSavedEnabledLevelIds(ids);
           } else {
             setEnabledLevelIds(globalAllowed);
-            setDefaultLevelId(result.globalConfig.defaultLevelId);
+            setSavedEnabledLevelIds(globalAllowed);
           }
         }
       } catch (error) {
@@ -112,10 +109,10 @@ const App = () => {
         spaceKey,
         config: {
           allowedLevelIds: enabledLevelIds,
-          defaultLevelId,
         },
       });
       if (result.success) {
+        setSavedEnabledLevelIds(enabledLevelIds);
         setMessage(null);
         showFlag({
           id: 'space-settings-saved',
@@ -132,7 +129,7 @@ const App = () => {
     } finally {
       setSaving(false);
     }
-  }, [spaceKey, enabledLevelIds, defaultLevelId, t]);
+  }, [spaceKey, enabledLevelIds, t]);
 
   const handleReset = useCallback(async () => {
     setSaving(true);
@@ -145,7 +142,7 @@ const App = () => {
           .filter((l) => l.allowed)
           .map((l) => l.id);
         setEnabledLevelIds(globalAllowed);
-        setDefaultLevelId(globalConfig.defaultLevelId);
+        setSavedEnabledLevelIds(globalAllowed);
         setSpaceConfig(null);
         setMessage(null);
         showFlag({
@@ -240,12 +237,13 @@ const App = () => {
             <Tab>{t('admin.tabs.levels')}</Tab>
           </TabList>
 
-          {/* Statistics Tab */}
+          {/* Statistics Tab — visuals come from shared StatisticsPanel;
+              keep props in sync with admin.jsx and statsMacro.jsx */}
           <TabPanel>
             <StatisticsPanel
               data={statsData}
               levels={globalAllowedLevels}
-              defaultLevelId={defaultLevelId}
+              defaultLevelId={globalConfig?.defaultLevelId}
               showUnclassified={showUnclassified}
               onToggleUnclassified={() =>
                 setShowUnclassified(!showUnclassified)
@@ -286,29 +284,6 @@ const App = () => {
                   ))}
                 </Stack>
 
-                {/* Default level selector */}
-                <Stack space="space.050">
-                  <Label labelFor="space-default-level">
-                    {t('space_settings.default_level')}
-                  </Label>
-                  <Select
-                    inputId="space-default-level"
-                    value={globalAllowedLevels
-                      .filter((l) => l.id === defaultLevelId)
-                      .map((l) => ({
-                        label: localize(l.name, 'en'),
-                        value: l.id,
-                      }))}
-                    options={globalAllowedLevels
-                      .filter((l) => enabledLevelIds.includes(l.id))
-                      .map((l) => ({
-                        label: localize(l.name, 'en'),
-                        value: l.id,
-                      }))}
-                    onChange={(option) => setDefaultLevelId(option.value)}
-                  />
-                </Stack>
-
                 {/* Status message */}
                 {message && (
                   <SectionMessage
@@ -320,12 +295,19 @@ const App = () => {
                   </SectionMessage>
                 )}
 
+                {isDirty && (
+                  <SectionMessage appearance="warning">
+                    <Text>{t('admin.unsaved_changes')}</Text>
+                  </SectionMessage>
+                )}
+
                 {/* Action buttons */}
                 <ButtonGroup>
                   <Button
                     appearance="primary"
                     onClick={handleSave}
                     isLoading={saving}
+                    isDisabled={!isDirty}
                   >
                     {t('space_settings.save_button')}
                   </Button>

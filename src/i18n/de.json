@@ -120,7 +120,7 @@
     "audit": {
       "title": "Klassifizierungsübersicht",
       "classified_pages": "Klassifizierte Seiten",
-      "show_unclassified": "Nicht klassifizierte Seiten separat anzeigen",
+      "count_as_default": "Nicht klassifizierte als {level} zählen",
       "unclassified": "Nicht klassifiziert",
       "recent_changes": "Kürzlich klassifiziert",
       "distribution": "Klassifizierungsverteilung",
@@ -136,6 +136,13 @@
       "filter_to": "Bis Datum",
       "filter_apply": "Filter anwenden",
       "filter_clear": "Zurücksetzen",
+      "level": "Stufe",
+      "classified_at": "Klassifiziert",
+      "just_now": "Gerade eben",
+      "minutes_ago": "vor {count} Min.",
+      "hours_ago": "vor {count} Std.",
+      "yesterday": "Gestern",
+      "days_ago": "vor {count} Tagen",
       "empty": "Noch keine Klassifizierungen."
     },
     "import": {
@@ -192,7 +199,6 @@
     "title": "Einstellungen Informationsklassifizierung",
     "description": "Konfigurieren Sie, welche Klassifizierungsstufen in diesem Bereich verfügbar sind.",
     "enabled_levels": "Aktivierte Stufen",
-    "default_level": "Standardstufe",
     "reset_button": "Auf globale Standardwerte zurücksetzen",
     "save_button": "Speichern",
     "save_success": "Bereichseinstellungen gespeichert.",

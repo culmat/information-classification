@@ -120,7 +120,7 @@
     "audit": {
       "title": "分類の概要",
       "classified_pages": "分類済みページ",
-      "show_unclassified": "未分類ページを別に表示",
+      "count_as_default": "未分類を{level}としてカウント",
       "unclassified": "未分類",
       "recent_changes": "最近の分類",
       "distribution": "分類の分布",
@@ -136,6 +136,13 @@
       "filter_to": "終了日",
       "filter_apply": "フィルター適用",
       "filter_clear": "クリア",
+      "level": "レベル",
+      "classified_at": "分類日",
+      "just_now": "たった今",
+      "minutes_ago": "{count}分前",
+      "hours_ago": "{count}時間前",
+      "yesterday": "昨日",
+      "days_ago": "{count}日前",
       "empty": "分類はまだありません。"
     },
     "import": {
@@ -192,7 +199,6 @@
     "title": "情報分類設定",
     "description": "このスペースで利用可能な分類レベルを設定します。",
     "enabled_levels": "有効なレベル",
-    "default_level": "デフォルトレベル",
     "reset_button": "グローバルデフォルトにリセット",
     "save_button": "保存",
     "save_success": "スペース設定が保存されました。",

@@ -83,16 +83,6 @@ export async function setSpaceConfigResolver(req) {
     );
   }
 
-  // Default must be one of the space-allowed levels
-  if (config.defaultLevelId) {
-    const effectiveAllowed = config.allowedLevelIds || globalAllowedIds;
-    if (!effectiveAllowed.includes(config.defaultLevelId)) {
-      return validationError(
-        'Default level must be one of the allowed levels.',
-      );
-    }
-  }
-
   try {
     await setSpaceConfig(spaceKey, config);
     return successResponse({ config });

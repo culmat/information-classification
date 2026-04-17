@@ -120,7 +120,7 @@
     "audit": {
       "title": "Classification Overview",
       "classified_pages": "Classified Pages",
-      "show_unclassified": "Show unclassified pages separately",
+      "count_as_default": "Count unclassified as {level}",
       "unclassified": "Unclassified",
       "recent_changes": "Recently Classified",
       "distribution": "Classification Distribution",
@@ -136,6 +136,13 @@
       "filter_to": "To Date",
       "filter_apply": "Apply Filter",
       "filter_clear": "Clear",
+      "level": "Level",
+      "classified_at": "Classified",
+      "just_now": "Just now",
+      "minutes_ago": "{count} min ago",
+      "hours_ago": "{count}h ago",
+      "yesterday": "Yesterday",
+      "days_ago": "{count} days ago",
       "empty": "No classifications yet."
     },
     "import": {
@@ -190,7 +197,6 @@
     "title": "Information Classification Settings",
     "description": "Configure which classification levels are available in this space.",
     "enabled_levels": "Enabled Levels",
-    "default_level": "Default Level",
     "reset_button": "Reset to Global Defaults",
     "save_button": "Save",
     "save_success": "Space settings saved.",

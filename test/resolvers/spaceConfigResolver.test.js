@@ -97,20 +97,6 @@ describe('setSpaceConfigResolver', () => {
     expect(result.error).toMatch(/not globally allowed/i);
   });
 
-  it('should reject default not in allowed set', async () => {
-    const result = await setSpaceConfigResolver(
-      req({
-        spaceKey: 'DEV',
-        config: {
-          allowedLevelIds: ['public'],
-          defaultLevelId: 'internal', // not in allowed list
-        },
-      }),
-    );
-    expect(result.success).toBe(false);
-    expect(result.error).toMatch(/allowed levels/i);
-  });
-
   it('should save valid space config', async () => {
     mockSetSpaceConfig.mockResolvedValue(undefined);
 

@@ -120,7 +120,7 @@
     "audit": {
       "title": "Aperçu des classifications",
       "classified_pages": "Pages classifiées",
-      "show_unclassified": "Afficher les pages non classifiées séparément",
+      "count_as_default": "Compter les non classifiées comme {level}",
       "unclassified": "Non classifié",
       "recent_changes": "Récemment classifiées",
       "distribution": "Répartition des classifications",
@@ -136,6 +136,13 @@
       "filter_to": "Date de fin",
       "filter_apply": "Appliquer le filtre",
       "filter_clear": "Effacer",
+      "level": "Niveau",
+      "classified_at": "Classifié",
+      "just_now": "À l'instant",
+      "minutes_ago": "il y a {count} min",
+      "hours_ago": "il y a {count}h",
+      "yesterday": "Hier",
+      "days_ago": "il y a {count} jours",
       "empty": "Aucune classification pour le moment."
     },
     "import": {
@@ -192,7 +199,6 @@
     "title": "Paramètres de classification",
     "description": "Configurez les niveaux de classification disponibles dans cet espace.",
     "enabled_levels": "Niveaux activés",
-    "default_level": "Niveau par défaut",
     "reset_button": "Réinitialiser aux valeurs globales",
     "save_button": "Enregistrer",
     "save_success": "Paramètres d'espace enregistrés.",
