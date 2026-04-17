@@ -193,10 +193,25 @@ export const TAG_COLORS = [
   'standard',
 ];
 
-// Selectable color options for the admin UI — value is the Tag color name,
-// label is a human-readable display name shown in the Select dropdown.
-export const COLOR_OPTIONS = TAG_COLORS.map((color) => ({
-  label: color.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()),
+// Selectable color options for the admin UI — simplified to base colors only.
+// Light variants and duplicates are omitted to reduce clutter; they remain in
+// TAG_COLORS / COLOR_TO_HEX / VALID_COLORS for backward compatibility with
+// existing saved configs.
+const SELECTABLE_COLORS = [
+  'green',
+  'blue',
+  'red',
+  'yellow',
+  'purple',
+  'teal',
+  'orange',
+  'magenta',
+  'grey',
+  'lime',
+];
+
+export const COLOR_OPTIONS = SELECTABLE_COLORS.map((color) => ({
+  label: color.replace(/^./, (c) => c.toUpperCase()),
   value: color,
 }));
 

@@ -87,12 +87,17 @@ describe('constants', () => {
     expect(VALID_COLORS).toHaveLength(TAG_COLORS.length + 1);
   });
 
-  it('should have COLOR_OPTIONS for each Tag color', () => {
-    expect(COLOR_OPTIONS).toHaveLength(TAG_COLORS.length);
+  it('should have COLOR_OPTIONS as a subset of Tag colors (base colors only)', () => {
+    expect(COLOR_OPTIONS.length).toBeGreaterThan(0);
+    expect(COLOR_OPTIONS.length).toBeLessThanOrEqual(TAG_COLORS.length);
     for (const option of COLOR_OPTIONS) {
       expect(option).toHaveProperty('label');
       expect(option).toHaveProperty('value');
       expect(TAG_COLORS).toContain(option.value);
+    }
+    // No light variants in the selectable options
+    for (const option of COLOR_OPTIONS) {
+      expect(option.value).not.toMatch(/Light$/);
     }
   });
 
