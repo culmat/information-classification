@@ -24,8 +24,38 @@ import { asyncJobKey } from './shared/constants';
 import { getEffectiveConfig } from './storage/configStore';
 import { getSpaceConfig } from './storage/spaceConfigStore';
 
-const BATCH_SIZE = 25;
+const FETCH_BATCH_SIZE = 200; // pages per CQL fetch (API max is ~200)
 const PROGRESS_INTERVAL = 10; // publish progress every N pages
+const EARLY_PROGRESS_COUNT = 3; // report every page for the first N pages
+
+/**
+ * Fetches ALL pages matching a CQL query by paginating until exhausted.
+ * Decouples "find pages" from "process pages" — avoids the CQL index lag race
+ * that occurs when the predicate filters pages mutated by the loop itself.
+ *
+ * @param queryFn - (limit, start) => Promise<{ results, totalSize }>
+ * @returns array of all matching pages
+ */
+async function fetchAllPages(queryFn) {
+  const pages = [];
+  let start = 0;
+  while (true) {
+    const { results, totalSize } = await queryFn(FETCH_BATCH_SIZE, start);
+    if (!results || results.length === 0) break;
+    pages.push(...results);
+    start += results.length;
+    if (pages.length >= totalSize || results.length < FETCH_BATCH_SIZE) break;
+  }
+  return pages;
+}
+
+/**
+ * Decides whether to report progress for the current page count.
+ * Reports every page early (immediate user feedback) then settles into batches.
+ */
+function shouldReportProgress(count) {
+  return count <= EARLY_PROGRESS_COUNT || count % PROGRESS_INTERVAL === 0;
+}
 
 /**
  * Publishes progress to the Realtime channel and persists state in KVS.
@@ -113,8 +143,14 @@ async function handleRecursive(event) {
     return;
   }
 
-  const fetchBatch = () =>
-    findDescendantsToClassify(pageId, levelId, BATCH_SIZE, 0, { asApp: true });
+  // Fetch all descendant page IDs up front to avoid the CQL index lag race.
+  // Pagination is essential — without it, only the first batch was ever processed.
+  const pages = await fetchAllPages((limit, start) =>
+    findDescendantsToClassify(pageId, levelId, limit, start, { asApp: true }),
+  );
+  console.log(
+    `Recursive classification: fetched ${pages.length} descendants for pageId=${pageId}`,
+  );
 
   await processPages({
     channel,
@@ -126,7 +162,7 @@ async function handleRecursive(event) {
     accountId,
     locale,
     level,
-    fetchBatch,
+    pages,
   });
 }
 
@@ -165,9 +201,13 @@ async function handleReclassify(event) {
     return;
   }
 
-  // Pages with fromLevelId — they drop out of CQL results once reclassified
-  const fetchBatch = () =>
-    findPagesByLevel(fromLevelId, BATCH_SIZE, 0, { asApp: true });
+  // Fetch all pages with fromLevelId up front (paginated) to avoid CQL index lag race
+  const pages = await fetchAllPages((limit, start) =>
+    findPagesByLevel(fromLevelId, limit, start, { asApp: true }),
+  );
+  console.log(
+    `Reclassify: fetched ${pages.length} pages with level=${fromLevelId}`,
+  );
 
   // Reclassify pages need a spaceKey per page — we pass null and classifySinglePage handles it
   await processPages({
@@ -180,7 +220,7 @@ async function handleReclassify(event) {
     accountId,
     locale,
     level,
-    fetchBatch,
+    pages,
   });
 }
 
@@ -290,7 +330,7 @@ async function handleImport(event) {
           failed++;
         }
 
-        if ((classified + failed) % PROGRESS_INTERVAL === 0) {
+        if (shouldReportProgress(classified + failed)) {
           await reportProgress(channel, jobKey, {
             classified,
             failed,
@@ -368,7 +408,7 @@ async function handleExport(event) {
       }
       processed.add(page.id);
 
-      if ((exported + failed) % PROGRESS_INTERVAL === 0) {
+      if (shouldReportProgress(exported + failed)) {
         await reportProgress(channel, jobKey, {
           classified: exported,
           failed,
@@ -390,6 +430,7 @@ async function handleExport(event) {
 
 /**
  * Shared processing loop for recursive and reclassify modes.
+ * Pages are pre-fetched (paginated) by the caller — no CQL race condition.
  */
 async function processPages({
   channel,
@@ -401,50 +442,41 @@ async function processPages({
   accountId,
   locale,
   level,
-  fetchBatch,
+  pages,
 }) {
   let classified = 0;
   let failed = 0;
-  const processed = new Set();
 
-  while (true) {
-    const { results } = await fetchBatch();
-    if (results.length === 0) break;
-
-    const unprocessed = results.filter((p) => !processed.has(p.id));
-    if (unprocessed.length === 0) break;
-
-    for (const page of unprocessed) {
-      try {
-        const success = await classifySinglePage({
-          childPageId: page.id,
-          spaceKey,
-          levelId,
-          accountId,
-          locale,
-          level,
-          asApp: true,
-        });
-        if (success) {
-          classified++;
-        } else {
-          failed++;
-        }
-      } catch (error) {
-        console.error(`Failed to classify page ${page.id}:`, error);
+  for (const page of pages) {
+    try {
+      const success = await classifySinglePage({
+        childPageId: page.id,
+        spaceKey,
+        levelId,
+        accountId,
+        locale,
+        level,
+        asApp: true,
+      });
+      if (success) {
+        classified++;
+      } else {
         failed++;
       }
-      processed.add(page.id);
+    } catch (error) {
+      console.error(`Failed to classify page ${page.id}:`, error);
+      failed++;
+    }
 
-      if ((classified + failed) % PROGRESS_INTERVAL === 0) {
-        await reportProgress(channel, jobKey, {
-          classified,
-          failed,
-          total: totalToClassify,
-          startedAt,
-          levelId,
-        });
-      }
+    // Report frequently early for fast user feedback, then settle into batches
+    if (shouldReportProgress(classified + failed)) {
+      await reportProgress(channel, jobKey, {
+        classified,
+        failed,
+        total: totalToClassify,
+        startedAt,
+        levelId,
+      });
     }
   }
 
