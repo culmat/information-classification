@@ -104,42 +104,23 @@ async function completeJob(
 }
 
 /**
- * Consumer handler — invoked by Forge async events queue.
+ * Consumer handler — invoked by Forge async events queue for admin-initiated
+ * batch jobs (import / export / reclassify). Recursive page classification
+ * runs client-side in classifyJobResolver (asUser, restriction-aware) so is
+ * not handled here.
  *
  * @param {Object} event - { body, jobId, retryContext }
  */
 export async function handler(event) {
   const { mode, fromLevelId } = event.body;
 
-  if (mode === 'import') {
-    return await handleImport(event);
-  }
-  if (mode === 'export') {
-    return await handleExport(event);
-  }
-  if (fromLevelId) {
-    return handleReclassify(event);
-  }
-  // Recursive page classification runs client-side now (see
-  // classifyJobResolver) so the user's restrictions are honored — any
-  // legacy event that still hits this handler is a no-op. We just publish
-  // `done` so the byline's Realtime subscription clears the dialog.
-  const { pageId, totalToClassify = 0 } = event.body;
-  if (pageId) {
-    const channel = `classification-progress:${pageId}`;
-    await Promise.all([
-      publishGlobal(channel, {
-        classified: 0,
-        failed: 0,
-        total: totalToClassify,
-        done: true,
-        error: 'recursive_queue_retired',
-      }),
-      kvs.delete(asyncJobKey(pageId)),
-    ]);
-  }
+  if (mode === 'import') return await handleImport(event);
+  if (mode === 'export') return await handleExport(event);
+  if (fromLevelId) return handleReclassify(event);
+
   console.warn(
-    'recursiveConsumer: recursive classify events are retired — see classifyJobResolver',
+    'recursiveConsumer: unrecognised event body — ignoring',
+    JSON.stringify(event.body || {}),
   );
 }
 
