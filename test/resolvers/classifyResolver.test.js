@@ -109,69 +109,34 @@ describe('getClassificationResolver', () => {
     expect(result.config).toBeTruthy();
   });
 
-  describe('stale-job clearance', () => {
-    // Regression guards for the stuck-dialog bug: when the async consumer
-    // dies mid-job (tunnel reload, retry exhaustion) the KVS entry persists
-    // and the byline dialog gets stuck on "Classified 0 of N". We treat any
-    // job with no progress update in STALE_JOB_MS (10 minutes) as dead.
-    const now = Date.now();
-    const ONE_MIN = 60 * 1000;
-
-    it('returns activeJob when it is fresh (startedAt 1 min ago)', async () => {
-      mockKvsGet.mockResolvedValue({
-        jobId: 'job-abc',
-        total: 72,
-        startedAt: now - 1 * ONE_MIN,
-        classified: 0,
-        failed: 0,
-      });
-
-      const result = await getClassificationResolver({
-        context: {},
-        payload: { pageId: '123', spaceKey: 'DEV' },
-      });
-
-      expect(result.activeJob).toBeTruthy();
-      expect(result.activeJob.jobId).toBe('job-abc');
-      expect(mockKvsDelete).not.toHaveBeenCalled();
+  // Regression guard: stale `activeJob` plumbing was removed once recursive
+  // classify went client-driven. Job state now lives in its own KVS
+  // namespace and is reported by getUserPendingJobs — this resolver must
+  // neither read nor return an `activeJob` field.
+  it('does not read the legacy async-job KVS or return activeJob', async () => {
+    await getClassificationResolver({
+      context: {},
+      payload: { pageId: '123', spaceKey: 'DEV' },
     });
 
-    it('clears activeJob when startedAt is >10 min ago and no lastProgressAt', async () => {
-      mockKvsGet.mockResolvedValue({
-        jobId: 'job-abc',
-        total: 72,
-        startedAt: now - 15 * ONE_MIN,
-        classified: 0,
-        failed: 0,
-      });
+    const asyncJobReads = mockKvsGet.mock.calls.filter((c) =>
+      String(c[0]).startsWith('async-job:'),
+    );
+    expect(asyncJobReads).toHaveLength(0);
+  });
 
-      const result = await getClassificationResolver({
-        context: {},
-        payload: { pageId: '123', spaceKey: 'DEV' },
-      });
-
-      expect(result.activeJob).toBeNull();
-      expect(mockKvsDelete).toHaveBeenCalledOnce();
+  it('response does not include an activeJob field', async () => {
+    mockGetPageClassification.mockResolvedValue({
+      classification: { level: 'internal' },
+      config: { levels: [], defaultLevelId: 'internal' },
     });
 
-    it('keeps activeJob when lastProgressAt is recent (even if startedAt is old)', async () => {
-      mockKvsGet.mockResolvedValue({
-        total: 72,
-        startedAt: now - 30 * ONE_MIN,
-        classified: 40,
-        failed: 0,
-        lastProgressAt: now - 1 * ONE_MIN,
-      });
-
-      const result = await getClassificationResolver({
-        context: {},
-        payload: { pageId: '123', spaceKey: 'DEV' },
-      });
-
-      expect(result.activeJob).toBeTruthy();
-      expect(result.activeJob.classified).toBe(40);
-      expect(mockKvsDelete).not.toHaveBeenCalled();
+    const result = await getClassificationResolver({
+      context: {},
+      payload: { pageId: '123', spaceKey: 'DEV' },
     });
+
+    expect(result).not.toHaveProperty('activeJob');
   });
 });
 
@@ -227,13 +192,12 @@ describe('setClassificationResolver', () => {
     });
 
     expect(result.success).toBe(true);
-    // Recursive flag ignored — resolver only handles single-page now.
+    // Payload's recursive flag is ignored — resolver only handles single-page now.
     expect(mockClassifyPage).toHaveBeenCalledWith({
       pageId: '456',
       spaceKey: 'DEV',
       levelId: 'public',
       accountId: 'user-123',
-      recursive: false,
       locale: 'de',
     });
   });
@@ -254,19 +218,6 @@ describe('setClassificationResolver', () => {
     expect(result.error).toBe('Not allowed.');
   });
 
-  it('should default recursive to false', async () => {
-    mockClassifyPage.mockResolvedValue({ success: true });
-
-    await setClassificationResolver({
-      context: { accountId: 'user-123' },
-      payload: { pageId: '123', spaceKey: 'DEV', levelId: 'public' },
-    });
-
-    expect(mockClassifyPage).toHaveBeenCalledWith(
-      expect.objectContaining({ recursive: false }),
-    );
-  });
-
   it('should default locale to en', async () => {
     mockClassifyPage.mockResolvedValue({ success: true });
 
@@ -284,7 +235,7 @@ describe('setClassificationResolver', () => {
   // now runs client-side via startRecursiveClassify / processClassifyBatch
   // (see classifyJobResolver.test.js). setClassification only handles the
   // single-page path now; any `recursive: true` payload is ignored here.
-  it('always classifies non-recursively (recursive flag ignored)', async () => {
+  it('ignores the recursive flag and never enqueues a job', async () => {
     mockClassifyPage.mockResolvedValue({ success: true });
 
     await setClassificationResolver({
@@ -297,9 +248,10 @@ describe('setClassificationResolver', () => {
       },
     });
 
-    expect(mockClassifyPage).toHaveBeenCalledWith(
-      expect.objectContaining({ recursive: false }),
-    );
+    // classifyPage is called without a `recursive` key at all (signature
+    // dropped it when the dead recursive branch was removed).
+    const call = mockClassifyPage.mock.calls[0][0];
+    expect(call).not.toHaveProperty('recursive');
     expect(mockEnqueueJob).not.toHaveBeenCalled();
   });
 });

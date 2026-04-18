@@ -42,39 +42,15 @@ async function fetchAllPages(queryFn) {
   const pages = [];
   let start = 0;
   let lastStart = -1;
-  let iteration = 0;
   while (true) {
-    iteration++;
-    console.log(
-      `[fetchAllPages] iter=${iteration} calling queryFn(limit=${FETCH_BATCH_SIZE}, start=${start})`,
-    );
     const { results, totalSize } = await queryFn(FETCH_BATCH_SIZE, start);
-    console.log(
-      `[fetchAllPages] iter=${iteration} got results.length=${results?.length ?? 0} totalSize=${totalSize} runningTotal=${pages.length + (results?.length ?? 0)}`,
-    );
-    if (!results || results.length === 0) {
-      console.log(`[fetchAllPages] iter=${iteration} empty results — breaking`);
-      break;
-    }
+    if (!results || results.length === 0) break;
     pages.push(...results);
     start += results.length;
-    if (pages.length >= totalSize) {
-      console.log(
-        `[fetchAllPages] iter=${iteration} pages.length (${pages.length}) >= totalSize (${totalSize}) — breaking`,
-      );
-      break;
-    }
-    if (start === lastStart) {
-      console.log(
-        `[fetchAllPages] iter=${iteration} start did not advance (${start}) — breaking`,
-      );
-      break;
-    }
+    if (pages.length >= totalSize) break;
+    if (start === lastStart) break;
     lastStart = start;
   }
-  console.log(
-    `[fetchAllPages] final total=${pages.length} ids=[${pages.map((p) => p.id).join(',')}]`,
-  );
   return pages;
 }
 
@@ -473,25 +449,16 @@ async function processPages({
       });
       if (result === true) {
         classified++;
-        console.log(
-          `[processPages] classified page=${page.id} title="${page.title}"`,
-        );
       } else if (result === null) {
         skipped++;
-        console.log(
-          `[processPages] skipped (already at target) page=${page.id} title="${page.title}"`,
-        );
       } else {
         console.error(
-          `[processPages] classifySinglePage returned false for page=${page.id} title="${page.title}"`,
+          `classifySinglePage returned false for page=${page.id} title="${page.title}"`,
         );
         failed++;
       }
     } catch (error) {
-      console.error(
-        `[processPages] exception classifying page=${page.id} title="${page.title}":`,
-        error,
-      );
+      console.error(`Failed to classify page ${page.id}:`, error);
       failed++;
     }
 

@@ -268,7 +268,7 @@ describe('classifyPage', () => {
     );
   });
 
-  it('should return unchanged when level is same and not recursive', async () => {
+  it('should return unchanged when level is the same', async () => {
     mockGetClassification.mockResolvedValue({ level: 'internal' });
 
     const result = await classifyPage({
@@ -276,7 +276,6 @@ describe('classifyPage', () => {
       spaceKey: 'DEV',
       levelId: 'internal',
       accountId: 'user-1',
-      recursive: false,
     });
 
     expect(result.success).toBe(true);
@@ -299,7 +298,7 @@ describe('classifyPage', () => {
     expect(result.error).toBe('write_failed');
   });
 
-  it('should log history when classifying recursively', async () => {
+  it('should log history on classification', async () => {
     mockGetClassification.mockResolvedValue(null);
     mockHasViewRestrictions.mockResolvedValue(false);
 
@@ -308,7 +307,6 @@ describe('classifyPage', () => {
       spaceKey: 'DEV',
       levelId: 'public',
       accountId: 'user-1',
-      recursive: true,
     });
 
     expect(mockAppendHistory).toHaveBeenCalledWith(

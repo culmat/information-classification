@@ -60,24 +60,23 @@ export async function getPageClassification(pageId, spaceKey) {
 }
 
 /**
- * Classifies a page with the given level.
- * Optionally applies recursively to all child pages.
+ * Classifies a single page with the given level. Recursive classification is
+ * handled separately by the client-driven job flow (classifyJobResolver),
+ * which calls this function as-user per page via `classifySinglePage`.
  *
  * @param {Object} params
  * @param {string} params.pageId - Confluence page ID
  * @param {string} params.spaceKey - Confluence space key
  * @param {string} params.levelId - classification level ID to apply
  * @param {string} params.accountId - Atlassian account ID of the user making the change
- * @param {boolean} params.recursive - whether to apply to child pages
  * @param {string} params.locale - user's locale for resolving level names (e.g. 'en')
- * @returns {Promise<Object>} result with success status, warnings, and recursive stats
+ * @returns {Promise<Object>} result with success status, warnings
  */
 export async function classifyPage({
   pageId,
   spaceKey,
   levelId,
   accountId,
-  recursive = false,
   locale = 'en',
 }) {
   // Load effective config for this space
@@ -108,8 +107,8 @@ export async function classifyPage({
   const currentClassification = await getClassification(pageId);
   const previousLevel = currentClassification?.level || null;
 
-  // Skip entirely if already at this level and not recursive
-  if (previousLevel === levelId && !recursive) {
+  // Skip entirely if already at this level
+  if (previousLevel === levelId) {
     return { success: true, unchanged: true };
   }
 
@@ -129,28 +128,25 @@ export async function classifyPage({
     tooltip: levelName,
   };
 
-  // Only write + log the parent page if the level actually changed
-  if (previousLevel !== levelId) {
-    const writeSuccess = await setClassification(
-      pageId,
-      classificationData,
-      bylineData,
-    );
-    if (!writeSuccess) {
-      return {
-        success: false,
-        error: 'write_failed',
-        message: 'Failed to save classification.',
-      };
-    }
-
-    await appendHistory(pageId, {
-      from: previousLevel,
-      to: levelId,
-      by: accountId,
-      at: now,
-    });
+  const writeSuccess = await setClassification(
+    pageId,
+    classificationData,
+    bylineData,
+  );
+  if (!writeSuccess) {
+    return {
+      success: false,
+      error: 'write_failed',
+      message: 'Failed to save classification.',
+    };
   }
+
+  await appendHistory(pageId, {
+    from: previousLevel,
+    to: levelId,
+    by: accountId,
+    at: now,
+  });
 
   // Check restriction mismatch warning
   let restrictionWarning = null;
@@ -161,37 +157,16 @@ export async function classifyPage({
     }
   }
 
-  // Handle recursive classification for child pages
-  let recursiveResult = null;
-  if (recursive) {
-    recursiveResult = await classifyDescendants({
-      pageId,
-      spaceKey,
-      levelId,
-      accountId,
-      locale,
-      level,
-      startTime: Date.now(),
-    });
-    // Include the parent page in the count only if it actually changed
-    if (previousLevel !== levelId) {
-      recursiveResult.classified += 1;
-    }
-  }
-
   // Ping any open stats panels to refresh — cheap no-op when nobody's listening.
-  if (previousLevel !== levelId || recursive) {
-    await publishGlobal('classification-changed', {
-      source: recursive ? 'recursive-sync' : 'classify',
-      spaceKey,
-    });
-  }
+  await publishGlobal('classification-changed', {
+    source: 'classify',
+    spaceKey,
+  });
 
   return {
     success: true,
     classification: classificationData,
     restrictionWarning,
-    recursiveResult,
   };
 }
 
@@ -244,13 +219,7 @@ export async function findPagesByLevel(
 }
 
 /**
- * Shared CQL page search helper.
- *
- * Extensive debug logging is intentional: Confluence's CQL search has
- * reproducibly dropped specific pages (e.g. Leaf-C-30 from a 71-page
- * subtree). Logging the exact CQL, pagination parameters, the returned
- * totalSize, and the full ID list lets us see exactly where the drop
- * happens (first batch? second batch? totalSize mismatch?).
+ * Shared CQL page search helper. Returns `{ results, totalSize }`.
  */
 async function cqlPageSearch(cql, limit, startIndex, useApp) {
   const requester = getRequester(useApp);
@@ -258,22 +227,15 @@ async function cqlPageSearch(cql, limit, startIndex, useApp) {
     route`/wiki/rest/api/search?cql=${cql}&limit=${limit}&start=${startIndex}`,
     { headers: { Accept: 'application/json' } },
   );
-  if (!response.ok) {
-    console.error(
-      `[cqlPageSearch] HTTP ${response.status} for cql="${cql}" limit=${limit} start=${startIndex}`,
-    );
-    return { results: [], totalSize: 0 };
-  }
+  if (!response.ok) return { results: [], totalSize: 0 };
   const data = await response.json();
-  const results = (data.results || []).map((r) => ({
-    id: String(r.content.id),
-    title: r.content.title,
-  }));
-  const totalSize = data.totalSize || 0;
-  console.log(
-    `[cqlPageSearch] cql="${cql}" limit=${limit} start=${startIndex} -> totalSize=${totalSize} results=${results.length} ids=[${results.map((r) => r.id).join(',')}]`,
-  );
-  return { results, totalSize };
+  return {
+    results: (data.results || []).map((r) => ({
+      id: String(r.content.id),
+      title: r.content.title,
+    })),
+    totalSize: data.totalSize || 0,
+  };
 }
 
 /**
@@ -334,76 +296,4 @@ export async function classifySinglePage({
   );
 
   return true;
-}
-
-/**
- * Classifies descendants of a page using CQL to find only pages that need changes.
- * Stops if approaching the Forge function timeout (25s).
- *
- * @param {Object} params
- * @returns {Promise<Object>} { classified, failed, timedOut }
- */
-async function classifyDescendants({
-  pageId,
-  spaceKey,
-  levelId,
-  accountId,
-  locale,
-  level,
-  startTime,
-}) {
-  const MAX_DURATION_MS = 20000; // Stop 5 seconds before the 25s Forge timeout
-
-  let classified = 0;
-  let failed = 0;
-  // Track processed pages — CQL index updates are async, so a page we just
-  // classified may still appear in the next CQL batch. Skip it to avoid
-  // double-counting and redundant writes.
-  const processed = new Set();
-
-  // Always fetch from startIndex=0 because classified pages eventually drop
-  // out of the CQL result set once the index catches up.
-  while (true) {
-    if (Date.now() - startTime > MAX_DURATION_MS) {
-      console.warn(
-        `Recursive classification timed out after ${classified} descendants`,
-      );
-      return { classified, failed, timedOut: true };
-    }
-
-    const { results } = await findDescendantsToClassify(pageId, levelId, 25, 0);
-    // Filter out pages we already processed in a previous batch
-    const unprocessed = results.filter((p) => !processed.has(p.id));
-    if (unprocessed.length === 0) break;
-
-    for (const page of unprocessed) {
-      if (Date.now() - startTime > MAX_DURATION_MS) {
-        return { classified, failed, timedOut: true };
-      }
-
-      processed.add(page.id);
-      try {
-        const success = await classifySinglePage({
-          childPageId: page.id,
-          spaceKey,
-          levelId,
-          accountId,
-          locale,
-          level,
-        });
-        if (success === true) {
-          classified++;
-        } else if (success === false) {
-          failed++;
-        }
-        // success === null means the page was already at target (index lag
-        // can resurface a page we just classified) — silently skip.
-      } catch (error) {
-        console.error(`Failed to classify descendant page ${page.id}:`, error);
-        failed++;
-      }
-    }
-  }
-
-  return { classified, failed, timedOut: false };
 }

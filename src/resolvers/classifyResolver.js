@@ -4,13 +4,11 @@
  */
 
 import { Queue } from '@forge/events';
-import { kvs } from '@forge/kvs';
 import {
   getPageClassification,
   classifyPage,
   findDescendantsToClassify,
 } from '../services/classificationService';
-import { asyncJobKey } from '../shared/constants';
 import { getEffectiveConfig } from '../storage/configStore';
 import { getSpaceConfig } from '../storage/spaceConfigStore';
 import {
@@ -81,10 +79,9 @@ export async function getClassificationResolver(req) {
   }
 
   try {
-    const [result, history, activeJob] = await Promise.all([
+    const [result, history] = await Promise.all([
       getPageClassification(String(pageId), spaceKey),
       getHistory(String(pageId)),
-      kvs.get(asyncJobKey(String(pageId))),
     ]);
 
     // Strip admin-only fields — minimize data sent to all users.
@@ -93,26 +90,13 @@ export async function getClassificationResolver(req) {
     const config = { ...result.config };
     delete config.languages;
 
-    // Stale-job clearance: if the async consumer died (tunnel reload, retry
-    // exhaustion, etc.), the KVS entry persists and the byline dialog gets
-    // stuck on "Classified 0 of N". Treat any job with no progress update in
-    // STALE_JOB_MS as dead, delete the KVS entry, and hide it from the UI.
-    const STALE_JOB_MS = 10 * 60 * 1000;
-    let liveActiveJob = activeJob;
-    if (
-      activeJob &&
-      Date.now() - (activeJob.lastProgressAt || activeJob.startedAt || 0) >
-        STALE_JOB_MS
-    ) {
-      await kvs.delete(asyncJobKey(String(pageId)));
-      liveActiveJob = null;
-    }
-
+    // Client-driven classify-job state lives in its own KVS namespace and is
+    // retrieved via getUserPendingJobs when the modal opens. This resolver
+    // no longer reports an `activeJob` field.
     return successResponse({
       ...result,
       config,
       history,
-      activeJob: liveActiveJob || null,
     });
   } catch (error) {
     console.error('Error getting classification:', error);
@@ -147,7 +131,6 @@ export async function setClassificationResolver(req) {
       spaceKey,
       levelId,
       accountId,
-      recursive: false,
       locale: locale || 'en',
     });
 

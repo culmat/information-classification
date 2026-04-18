@@ -134,25 +134,9 @@ const App = () => {
           setConfig(result.config);
           setRestrictionWarning(result.restrictionWarning);
           setHistory(result.history || { truncated: false, entries: [] });
-
-          // Resume active async job if one exists (e.g. after page reload)
-          if (result.activeJob) {
-            setAsyncJob({
-              jobId: result.activeJob.jobId,
-              total: result.activeJob.total,
-              startedAt: result.activeJob.startedAt,
-              levelId: result.activeJob.levelId,
-            });
-            setAsyncProgress({
-              classified: result.activeJob.classified || 0,
-              failed: result.activeJob.failed || 0,
-              total: result.activeJob.total,
-              done: false,
-              fromRealtime: false,
-            });
-            setSaving(true);
-            setShowModal(true);
-          }
+          // Paused recursive-classify jobs are surfaced via getUserPendingJobs
+          // when the modal opens — not on byline mount, to keep page views
+          // free of extra KVS reads.
         }
       } catch (error) {
         console.error('Failed to load classification:', error);

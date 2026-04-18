@@ -110,7 +110,6 @@ export async function startRecursiveClassifyResolver(req) {
       spaceKey,
       levelId,
       accountId,
-      recursive: false,
       locale: locale || 'en',
     });
     if (!rootResult.success) {
