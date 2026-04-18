@@ -48,6 +48,12 @@ import { invoke, view, showFlag } from '@forge/bridge';
 import { colorToLozenge } from '../shared/constants';
 import { localize, interpolate, formatSessionEta } from '../shared/i18n';
 
+// Fixed-width Unicode Braille dots used as a plain-text activity spinner.
+// All characters live in the same Unicode block (U+2800–U+28FF), so every
+// font renders them at identical width — cycling them in place changes
+// pixels but not layout.
+const ACTIVITY_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
 // Style for the popup content area
 const popupContentStyle = xcss({
   padding: 'space.200',
@@ -86,6 +92,11 @@ const App = () => {
 
   // Stop-confirmation for the active recursive classify loop.
   const [stopConfirmVisible, setStopConfirmVisible] = useState(false);
+
+  // Activity indicator: a single Braille spinner character cycled on a timer.
+  // Appended to the progress text so the element structure never changes —
+  // no reflow / scrollbar flicker (unlike a Spinner component).
+  const [activityFrame, setActivityFrame] = useState(0);
   // Refs read by the loop; refs (not state) so updates take effect without
   // waiting for a React render cycle.
   const pauseRequestedRef = useRef(false);
@@ -203,6 +214,18 @@ const App = () => {
   // Recursive classification is driven client-side (runRecursiveLoop) — no
   // Realtime subscription needed. Kept a slim stub only if we ever need to
   // listen to server-side admin flows.
+
+  // Cycle the activity-indicator frame at ~8 fps while a job is active.
+  // Only the text content of the progress line changes — no DOM structure
+  // change, so no reflow or scrollbar flicker (which is why Spinner /
+  // Button isLoading didn't work here).
+  useEffect(() => {
+    if (!asyncJob) return;
+    const id = setInterval(() => {
+      setActivityFrame((f) => (f + 1) % ACTIVITY_FRAMES.length);
+    }, 120);
+    return () => clearInterval(id);
+  }, [asyncJob]);
 
   // Find the current level definition from config
   const currentLevel = config?.levels?.find(
@@ -1036,6 +1059,8 @@ const App = () => {
                     {asyncProgress.fromRealtime ? (
                       <>
                         <Text>
+                          {ACTIVITY_FRAMES[activityFrame]}
+                          {'  '}
                           {interpolate(t('classify.async_progress'), {
                             classified: asyncProgress.classified || 0,
                             total: asyncJob.total,
