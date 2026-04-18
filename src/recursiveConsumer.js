@@ -1,16 +1,19 @@
 /**
- * Async event consumer for background classification jobs.
- * Supports three modes:
- * - Recursive: classify descendants of a page (pageId + levelId)
+ * Async event consumer for admin-initiated batch jobs.
+ * Supports:
  * - Reclassify: move all pages from one level to another (fromLevelId + toLevelId)
  * - Import: classify pages by label mapping and optionally remove labels
+ * - Export: add labels to pages based on their classification
  * Publishes progress via Forge Realtime and tracks state in KVS.
+ *
+ * Recursive classification is NOT handled here — it's driven from the
+ * browser (classifyJobResolver) so it runs `asUser` and respects page
+ * restrictions.
  */
 
 import { publishGlobal } from '@forge/realtime';
 import { kvs } from '@forge/kvs';
 import {
-  findDescendantsToClassify,
   findPagesByLevel,
   classifySinglePage,
 } from './services/classificationService';
@@ -22,7 +25,6 @@ import {
 } from './services/labelService';
 import { asyncJobKey } from './shared/constants';
 import { getEffectiveConfig } from './storage/configStore';
-import { getSpaceConfig } from './storage/spaceConfigStore';
 
 const FETCH_BATCH_SIZE = 200; // pages per CQL fetch (API max is ~200)
 const PROGRESS_INTERVAL = 10; // publish progress every N pages
@@ -40,20 +42,39 @@ async function fetchAllPages(queryFn) {
   const pages = [];
   let start = 0;
   let lastStart = -1;
+  let iteration = 0;
   while (true) {
+    iteration++;
+    console.log(
+      `[fetchAllPages] iter=${iteration} calling queryFn(limit=${FETCH_BATCH_SIZE}, start=${start})`,
+    );
     const { results, totalSize } = await queryFn(FETCH_BATCH_SIZE, start);
-    if (!results || results.length === 0) break;
+    console.log(
+      `[fetchAllPages] iter=${iteration} got results.length=${results?.length ?? 0} totalSize=${totalSize} runningTotal=${pages.length + (results?.length ?? 0)}`,
+    );
+    if (!results || results.length === 0) {
+      console.log(`[fetchAllPages] iter=${iteration} empty results — breaking`);
+      break;
+    }
     pages.push(...results);
     start += results.length;
-    // Only break when we've fetched at least totalSize. Don't trust
-    // `results.length < FETCH_BATCH_SIZE` — Confluence's search API can
-    // return fewer than requested even when more results exist (causing
-    // the last page to be silently dropped).
-    if (pages.length >= totalSize) break;
-    // Safety: if start didn't advance, we'd loop forever
-    if (start === lastStart) break;
+    if (pages.length >= totalSize) {
+      console.log(
+        `[fetchAllPages] iter=${iteration} pages.length (${pages.length}) >= totalSize (${totalSize}) — breaking`,
+      );
+      break;
+    }
+    if (start === lastStart) {
+      console.log(
+        `[fetchAllPages] iter=${iteration} start did not advance (${start}) — breaking`,
+      );
+      break;
+    }
     lastStart = start;
   }
+  console.log(
+    `[fetchAllPages] final total=${pages.length} ids=[${pages.map((p) => p.id).join(',')}]`,
+  );
   return pages;
 }
 
@@ -81,6 +102,7 @@ async function reportProgress(
       startedAt,
       classified,
       failed,
+      lastProgressAt: Date.now(),
       ...(levelId !== undefined && { levelId }),
     }),
   ]);
@@ -94,13 +116,12 @@ async function reportProgress(
 async function completeJob(
   channel,
   jobKey,
-  { classified, failed, total },
+  { classified, failed, total, levelId },
   source,
 ) {
-  await Promise.all([
-    publishGlobal(channel, { classified, failed, total, done: true }),
-    kvs.delete(jobKey),
-  ]);
+  const payload = { classified, failed, total, done: true };
+  if (levelId !== undefined) payload.levelId = levelId;
+  await Promise.all([publishGlobal(channel, payload), kvs.delete(jobKey)]);
   if (source && classified > 0) {
     await publishGlobal('classification-changed', { source });
   }
@@ -123,66 +144,27 @@ export async function handler(event) {
   if (fromLevelId) {
     return handleReclassify(event);
   }
-  return handleRecursive(event);
-}
-
-/**
- * Recursive mode: classify descendants of a specific page.
- */
-async function handleRecursive(event) {
-  const { pageId, spaceKey, levelId, accountId, locale, totalToClassify } =
-    event.body;
-  const channel = `classification-progress:${pageId}`;
-  const jobKey = asyncJobKey(pageId);
-
-  console.log(
-    `Async classification started: pageId=${pageId}, levelId=${levelId}, total=${totalToClassify}`,
-  );
-
-  const jobState = await kvs.get(jobKey);
-  const startedAt = jobState?.startedAt || Date.now();
-
-  const spConfig = await getSpaceConfig(spaceKey);
-  const effectiveConfig = await getEffectiveConfig(spaceKey, spConfig);
-  const level = effectiveConfig.levels.find((l) => l.id === levelId);
-
-  if (!level) {
-    console.error(`Level ${levelId} not found in config`);
+  // Recursive page classification runs client-side now (see
+  // classifyJobResolver) so the user's restrictions are honored — any
+  // legacy event that still hits this handler is a no-op. We just publish
+  // `done` so the byline's Realtime subscription clears the dialog.
+  const { pageId, totalToClassify = 0 } = event.body;
+  if (pageId) {
+    const channel = `classification-progress:${pageId}`;
     await Promise.all([
       publishGlobal(channel, {
         classified: 0,
         failed: 0,
         total: totalToClassify,
         done: true,
-        error: 'Level not found',
+        error: 'recursive_queue_retired',
       }),
-      kvs.delete(jobKey),
+      kvs.delete(asyncJobKey(pageId)),
     ]);
-    return;
   }
-
-  // Fetch all descendant page IDs up front to avoid the CQL index lag race.
-  // Pagination is essential — without it, only the first batch was ever processed.
-  const pages = await fetchAllPages((limit, start) =>
-    findDescendantsToClassify(pageId, levelId, limit, start, { asApp: true }),
+  console.warn(
+    'recursiveConsumer: recursive classify events are retired — see classifyJobResolver',
   );
-  console.log(
-    `Recursive classification: fetched ${pages.length} descendants for pageId=${pageId}`,
-  );
-
-  await processPages({
-    channel,
-    jobKey,
-    startedAt,
-    totalToClassify,
-    levelId,
-    spaceKey,
-    accountId,
-    locale,
-    level,
-    pages,
-    source: 'recursive',
-  });
 }
 
 /**
@@ -465,13 +447,22 @@ async function processPages({
   level,
   pages,
   source,
+  initialClassified = 0,
 }) {
-  let classified = 0;
+  // classifySinglePage returns:
+  //   true  -> page was at a different level and is now at `levelId` → count it
+  //   null  -> page was already at `levelId`; no write happened → skip silently
+  //   false -> write failed → count it as failed
+  // `classified` is seeded with `initialClassified` so a caller that already
+  // classified some pages (e.g. the parent, done synchronously by the resolver
+  // before enqueue) is reflected in the final total.
+  let classified = initialClassified;
   let failed = 0;
+  let skipped = 0;
 
   for (const page of pages) {
     try {
-      const success = await classifySinglePage({
+      const result = await classifySinglePage({
         childPageId: page.id,
         spaceKey,
         levelId,
@@ -480,21 +471,32 @@ async function processPages({
         level,
         asApp: true,
       });
-      if (success) {
+      if (result === true) {
         classified++;
+        console.log(
+          `[processPages] classified page=${page.id} title="${page.title}"`,
+        );
+      } else if (result === null) {
+        skipped++;
+        console.log(
+          `[processPages] skipped (already at target) page=${page.id} title="${page.title}"`,
+        );
       } else {
         console.error(
-          `classifySinglePage returned false for page ${page.id} (title=${page.title})`,
+          `[processPages] classifySinglePage returned false for page=${page.id} title="${page.title}"`,
         );
         failed++;
       }
     } catch (error) {
-      console.error(`Failed to classify page ${page.id}:`, error);
+      console.error(
+        `[processPages] exception classifying page=${page.id} title="${page.title}":`,
+        error,
+      );
       failed++;
     }
 
     // Report frequently early for fast user feedback, then settle into batches
-    if (shouldReportProgress(classified + failed)) {
+    if (shouldReportProgress(classified + failed + skipped)) {
       await reportProgress(channel, jobKey, {
         classified,
         failed,
@@ -508,11 +510,11 @@ async function processPages({
   await completeJob(
     channel,
     jobKey,
-    { classified, failed, total: totalToClassify },
+    { classified, failed, total: totalToClassify, levelId },
     source,
   );
 
   console.log(
-    `Classification complete: classified=${classified}, failed=${failed}`,
+    `Classification complete: classified=${classified}, failed=${failed}, skipped=${skipped}`,
   );
 }

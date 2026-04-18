@@ -10,7 +10,7 @@
  * via the getClassification resolver.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ForgeReconciler, {
   useProductContext,
   useTranslation,
@@ -44,7 +44,7 @@ import ForgeReconciler, {
   EmptyState,
   xcss,
 } from '@forge/react';
-import { invoke, view, realtime, showFlag } from '@forge/bridge';
+import { invoke, view, showFlag } from '@forge/bridge';
 import { colorToLozenge } from '../shared/constants';
 import { localize, interpolate, formatEta } from '../shared/i18n';
 
@@ -84,6 +84,15 @@ const App = () => {
   const [restrictionWarning, setRestrictionWarning] = useState(null);
   const [history, setHistory] = useState({ truncated: false, entries: [] });
 
+  // Stop-confirmation for the active recursive classify loop.
+  const [stopConfirmVisible, setStopConfirmVisible] = useState(false);
+  // Refs read by the loop; refs (not state) so updates take effect without
+  // waiting for a React render cycle.
+  const pauseRequestedRef = useRef(false);
+  const stopRequestedRef = useRef(false);
+  // Paused jobs on OTHER pages — populated when the modal opens.
+  const [pendingJobs, setPendingJobs] = useState([]);
+
   // Recursive descendant count (fetched when toggle is activated)
   const [descendantCount, setDescendantCount] = useState(null); // pages needing changes
   const [totalDescendants, setTotalDescendants] = useState(null); // all sub-pages
@@ -121,6 +130,7 @@ const App = () => {
               jobId: result.activeJob.jobId,
               total: result.activeJob.total,
               startedAt: result.activeJob.startedAt,
+              levelId: result.activeJob.levelId,
             });
             setAsyncProgress({
               classified: result.activeJob.classified || 0,
@@ -179,42 +189,20 @@ const App = () => {
     };
   }, [recursive, selectedLevel, selectedLevelAllowed, pageId]);
 
-  // Subscribe to Realtime progress when an async job is active
-  useEffect(() => {
-    if (!asyncJob || !pageId) return;
-    let subscription = null;
-    realtime
-      .subscribeGlobal(`classification-progress:${pageId}`, (data) => {
-        setAsyncProgress({ ...data, fromRealtime: true });
-        if (data.done) {
-          setAsyncJob(null);
-          setSaving(false);
-          loadClassification(false);
-          setDescendantCount(0);
-          setShowModal(false);
-          const hasFailures = (data.failed || 0) > 0;
-          showFlag({
-            id: 'classify-success',
-            title: hasFailures
-              ? interpolate(t('classify.async_complete_partial'), {
-                  classified: data.classified || 0,
-                  failed: data.failed,
-                })
-              : interpolate(t('classify.async_complete'), {
-                  classified: data.classified || 0,
-                }),
-            type: hasFailures ? 'warning' : 'success',
-            isAutoDismiss: !hasFailures,
-          });
-        }
-      })
-      .then((sub) => {
-        subscription = sub;
-      });
-    return () => {
-      if (subscription) subscription.unsubscribe();
-    };
-  }, [asyncJob, pageId, loadClassification]);
+  // Resolve the localized display name of a level by id, with a safe fallback
+  // so completion messages read cleanly even if the level was deleted mid-flight.
+  const resolveLevelName = useCallback(
+    (levelId) => {
+      if (!levelId) return '';
+      const level = config?.levels?.find((l) => l.id === levelId);
+      return level ? localize(level.name, locale) || levelId : levelId;
+    },
+    [config, locale],
+  );
+
+  // Recursive classification is driven client-side (runRecursiveLoop) — no
+  // Realtime subscription needed. Kept a slim stub only if we ever need to
+  // listen to server-side admin flows.
 
   // Find the current level definition from config
   const currentLevel = config?.levels?.find(
@@ -231,84 +219,220 @@ const App = () => {
     (l) => l.levelIds?.length === 0 || l.levelIds?.includes(currentLevelId),
   );
 
+  // Drive a client-side batched classify loop. Runs asUser, respects page
+  // restrictions. Pause (close dialog) preserves KVS state; Stop deletes it.
+  const runRecursiveLoop = useCallback(
+    async (jobId, initialProgress) => {
+      const levelName = resolveLevelName(
+        (initialProgress && initialProgress.levelId) || selectedLevel,
+      );
+      let progress = initialProgress || {};
+
+      // Helper: close dialog and show the appropriate end-of-job flag.
+      const finish = (kind, { classified, failed }) => {
+        setShowModal(false);
+        setAsyncJob(null);
+        setAsyncProgress(null);
+        setSaving(false);
+        loadClassification(false);
+        setDescendantCount(0);
+        view.refresh();
+
+        let msg;
+        if (kind === 'completed') {
+          msg =
+            failed > 0
+              ? interpolate(t('classify.async_complete_partial'), {
+                  classified,
+                  failed,
+                  level: levelName,
+                })
+              : interpolate(t('classify.async_complete'), {
+                  classified,
+                  level: levelName,
+                });
+        } else if (kind === 'stopped') {
+          msg = interpolate(t('classify.stopped'), {
+            classified,
+            level: levelName,
+          });
+        } else if (kind === 'aborted_level_deleted') {
+          msg = interpolate(t('classify.aborted_level_deleted'), {
+            classified,
+          });
+        } else if (kind === 'aborted_level_disallowed') {
+          msg = interpolate(t('classify.aborted_level_disallowed'), {
+            classified,
+          });
+        }
+        showFlag({
+          id: 'classify-end',
+          title: msg || '',
+          type:
+            kind === 'completed' && !failed
+              ? 'success'
+              : kind === 'stopped'
+                ? 'info'
+                : 'warning',
+          isAutoDismiss: kind === 'completed' && !failed,
+        });
+      };
+
+      // Already-done case (tiny tree classified by the start call itself).
+      if (progress.done) {
+        finish('completed', {
+          classified: progress.classified || 0,
+          failed: progress.failed || 0,
+        });
+        return;
+      }
+
+      while (true) {
+        if (stopRequestedRef.current) {
+          const result = await invoke('cancelClassifyJob', { jobId });
+          finish('stopped', {
+            classified: result?.classified || progress.classified || 0,
+            failed: result?.failed || progress.failed || 0,
+          });
+          return;
+        }
+        if (pauseRequestedRef.current) {
+          // Dialog already closed (or is closing). Don't show a flag — the
+          // paused banner on the next modal open is the user's hint.
+          setAsyncJob(null);
+          setAsyncProgress(null);
+          setSaving(false);
+          return;
+        }
+
+        let batch;
+        try {
+          batch = await invoke('processClassifyBatch', { jobId });
+        } catch (err) {
+          console.error('processClassifyBatch failed:', err);
+          setMessage({ type: 'error', text: t('classify.error') });
+          setSaving(false);
+          return;
+        }
+        if (!batch || !batch.success) {
+          setMessage({ type: 'error', text: t('classify.error') });
+          setSaving(false);
+          return;
+        }
+
+        progress = batch;
+        setAsyncProgress({
+          classified: batch.classified,
+          failed: batch.failed,
+          skipped: batch.skipped,
+          total: batch.totalEstimate,
+          discoveryDone: batch.discoveryDone,
+          done: batch.done,
+          fromRealtime: true,
+        });
+
+        if (batch.done) {
+          if (batch.cancelled) {
+            finish('stopped', batch);
+          } else if (batch.aborted === 'level_deleted') {
+            finish('aborted_level_deleted', batch);
+          } else if (batch.aborted === 'level_disallowed') {
+            finish('aborted_level_disallowed', batch);
+          } else {
+            finish('completed', batch);
+          }
+          return;
+        }
+      }
+    },
+    [selectedLevel, t, loadClassification, resolveLevelName],
+  );
+
   // Handle classification change submission
   const handleClassify = useCallback(async () => {
     if (!selectedLevel) return;
     setSaving(true);
     setMessage(null);
-    try {
-      const result = await invoke('setClassification', {
-        pageId,
-        spaceKey,
-        levelId: selectedLevel,
-        recursive,
-        locale,
-      });
+    pauseRequestedRef.current = false;
+    stopRequestedRef.current = false;
 
-      if (result.success) {
-        // Async path — large tree pushed to background queue
-        if (result.asyncJobId) {
-          setAsyncJob({
-            jobId: result.asyncJobId,
-            total: result.totalToClassify,
-            startedAt: Date.now(),
-          });
-          setAsyncProgress({
-            classified: 0,
-            failed: 0,
-            total: result.totalToClassify,
-            done: false,
-            fromRealtime: false,
-          });
+    try {
+      if (!recursive) {
+        // Single-page classify — server-side, one call.
+        const result = await invoke('setClassification', {
+          pageId,
+          spaceKey,
+          levelId: selectedLevel,
+          locale,
+        });
+        if (!result.success) {
           setMessage({
-            type: 'info',
-            text: interpolate(t('classify.async_started'), {
-              total: result.totalToClassify,
-            }),
+            type: 'error',
+            text: result.error || t('classify.error'),
           });
-          // Don't close modal or stop saving — Realtime subscription handles completion
+          setSaving(false);
           return;
         }
-
-        // Sync path — build success message
-        let msg = t('classify.success');
-        if (result.recursiveResult) {
-          const { classified, failed, timedOut } = result.recursiveResult;
-          if (timedOut || failed > 0) {
-            msg = interpolate(t('classify.success_recursive_partial'), {
-              classified,
-              failed,
-            });
-          } else {
-            msg = interpolate(t('classify.success_recursive'), { classified });
-          }
-        }
-
-        // Close modal and show an ephemeral toast flag instead of a persistent
-        // in-modal message. The flag auto-dismisses after 8 seconds.
+        const levelName = resolveLevelName(selectedLevel);
+        const msg = interpolate(t('classify.success'), { level: levelName });
         setShowModal(false);
+        setSaving(false);
         showFlag({
           id: 'classify-success',
           title: msg,
           type: 'success',
           isAutoDismiss: true,
         });
-        // Reload classification data so the byline badge updates.
         await loadClassification(false);
-        // Reset descendant count locally — CQL indexing is async so a server
-        // re-fetch would return stale data.
         setDescendantCount(0);
         view.refresh();
-      } else {
+        return;
+      }
+
+      // Recursive — client-driven loop.
+      const start = await invoke('startRecursiveClassify', {
+        pageId,
+        spaceKey,
+        levelId: selectedLevel,
+        locale,
+      });
+      if (!start.success) {
         setMessage({
           type: 'error',
-          text: result.error || t('classify.error'),
+          text: start.message || start.error || t('classify.error'),
         });
+        return;
       }
+      setAsyncJob({
+        jobId: start.jobId,
+        total: start.totalEstimate,
+        startedAt: Date.now(),
+        levelId: selectedLevel,
+      });
+      setAsyncProgress({
+        classified: start.classified || 0,
+        failed: start.failed || 0,
+        skipped: start.skipped || 0,
+        total: start.totalEstimate,
+        discoveryDone: start.discoveryDone,
+        done: start.done,
+        fromRealtime: true,
+      });
+      setMessage({
+        type: 'info',
+        text: interpolate(t('classify.async_started'), {
+          total: start.totalEstimate,
+          level: resolveLevelName(selectedLevel),
+        }),
+      });
+
+      await runRecursiveLoop(start.jobId, {
+        ...start,
+        levelId: selectedLevel,
+      });
     } catch (error) {
       console.error('Failed to classify:', error);
       setMessage({ type: 'error', text: t('classify.error') });
-    } finally {
       setSaving(false);
     }
   }, [
@@ -319,6 +443,8 @@ const App = () => {
     locale,
     t,
     loadClassification,
+    resolveLevelName,
+    runRecursiveLoop,
   ]);
 
   // Open the classification modal
@@ -329,49 +455,95 @@ const App = () => {
     setDescendantCount(null);
     setTotalDescendants(null);
     setCountLoading(false);
+    setStopConfirmVisible(false);
+    setSaving(false);
+    pauseRequestedRef.current = false;
+    stopRequestedRef.current = false;
     setShowModal(true);
 
-    // Check for an active background job before resetting async state
+    // Look up the user's pending client-driven jobs — one KVS read, only on
+    // modal open (never on byline mount) so page views stay cheap.
+    // `currentPageId` lets the server annotate each job with `isSelf` /
+    // `isAncestor` so the UI can hide the picker when starting a new
+    // classify here would conflict with an in-progress job rooted above.
     try {
-      const result = await invoke('getClassification', { pageId, spaceKey });
-      if (result.success && result.activeJob) {
-        setAsyncJob({
-          jobId: result.activeJob.jobId,
-          total: result.activeJob.total,
-          startedAt: result.activeJob.startedAt,
-        });
-        setAsyncProgress({
-          classified: result.activeJob.classified || 0,
-          failed: result.activeJob.failed || 0,
-          total: result.activeJob.total,
-          done: false,
-          fromRealtime: false,
-        });
-        setSaving(true);
-        return;
-      }
+      const result = await invoke('getUserPendingJobs', {
+        currentPageId: pageId,
+      });
+      setPendingJobs(result?.jobs || []);
     } catch (_) {
-      /* ignore */
+      setPendingJobs([]);
     }
-    // No active job — clear async state
     setAsyncJob(null);
     setAsyncProgress(null);
-  }, [currentLevelId, pageId, spaceKey]);
+  }, [currentLevelId, pageId]);
 
-  // Close modal and refresh the byline badge so it reflects any classification change.
+  // Close modal. If a job is running, signal pause (client loop stops, KVS
+  // state is preserved so the user can resume from any page's byline).
   const closeModal = useCallback(() => {
-    if (asyncJob) {
+    if (asyncJob && !stopRequestedRef.current) {
+      pauseRequestedRef.current = true;
       showFlag({
-        id: 'classify-background',
-        title: t('classify.async_background'),
+        id: 'classify-paused',
+        title: t('classify.paused'),
         type: 'info',
         isAutoDismiss: true,
       });
     }
     setShowModal(false);
-    setAsyncJob(null);
+    setStopConfirmVisible(false);
     view.refresh();
   }, [asyncJob, t]);
+
+  // Stop button → confirmation → actually cancel the job.
+  const requestStop = useCallback(() => {
+    setStopConfirmVisible(true);
+  }, []);
+  const confirmStop = useCallback(() => {
+    stopRequestedRef.current = true;
+    setStopConfirmVisible(false);
+  }, []);
+  const abandonStop = useCallback(() => {
+    setStopConfirmVisible(false);
+  }, []);
+
+  // Resume a job directly in the current dialog. The loop is server-calls
+  // only, so there's no reason to navigate to the root page — the user
+  // immediately sees progress resuming in the byline they opened.
+  const resumePendingJob = useCallback(
+    (job) => {
+      if (!job?.jobId) return;
+      setSelectedLevel(job.levelId);
+      setRecursive(true);
+      setPendingJobs((prev) => prev.filter((j) => j.jobId !== job.jobId));
+      setAsyncJob({
+        jobId: job.jobId,
+        total: job.totalEstimate,
+        startedAt: job.startedAt,
+        levelId: job.levelId,
+      });
+      setAsyncProgress({
+        classified: job.classified,
+        failed: job.failed,
+        skipped: job.skipped,
+        total: job.totalEstimate,
+        discoveryDone: job.discoveryDone,
+        done: false,
+        fromRealtime: true,
+      });
+      setSaving(true);
+      setMessage(null);
+      pauseRequestedRef.current = false;
+      stopRequestedRef.current = false;
+      runRecursiveLoop(job.jobId, { ...job, done: false });
+    },
+    [runRecursiveLoop],
+  );
+  const stopPendingJob = useCallback(async (job) => {
+    if (!job?.jobId) return;
+    await invoke('cancelClassifyJob', { jobId: job.jobId });
+    setPendingJobs((prev) => prev.filter((j) => j.jobId !== job.jobId));
+  }, []);
 
   // License check: only enforce in production where Marketplace injects license info.
   // Dev/staging always return license: null, so skip enforcement there.
@@ -401,6 +573,17 @@ const App = () => {
     const level = config?.levels?.find((l) => l.id === levelId);
     return level ? colorToLozenge(level.color) : 'default';
   };
+
+  // Partition pending jobs: a job on this page or an ancestor page "owns"
+  // this tree — the picker should be hidden and the banner made prominent,
+  // because starting a new classify here would conflict. Other jobs
+  // (unrelated pages) get a compact list above the normal picker.
+  const ownerJob = !asyncJob
+    ? pendingJobs.find((j) => j.isSelf || j.isAncestor)
+    : null;
+  const otherJobs = !asyncJob
+    ? pendingJobs.filter((j) => !(j.isSelf || j.isAncestor))
+    : [];
 
   // Helper: compact date+time format for history entries
   const formatDate = (dateStr) => {
@@ -576,112 +759,270 @@ const App = () => {
             <ModalBody>
               <Stack space="space.200">
                 {/*
+                 * Paused job that owns this tree (current page is its root
+                 * or a descendant of its root). Picker is hidden below; the
+                 * user can only resume or stop — starting a new classify
+                 * here would conflict.
+                 */}
+                {ownerJob && (
+                  <SectionMessage
+                    appearance="information"
+                    actions={[
+                      <Button
+                        key="resume"
+                        appearance="primary"
+                        onClick={() => resumePendingJob(ownerJob)}
+                      >
+                        {t('classify.resume_button')}
+                      </Button>,
+                      <Button
+                        key="stop"
+                        appearance="subtle"
+                        onClick={() => stopPendingJob(ownerJob)}
+                      >
+                        {t('classify.stop_button')}
+                      </Button>,
+                    ]}
+                  >
+                    <Stack space="space.050">
+                      <Inline space="space.050" alignBlock="center">
+                        <Text>
+                          {ownerJob.isSelf
+                            ? t('classify.paused_here_prefix')
+                            : interpolate(
+                                t('classify.paused_ancestor_prefix'),
+                                { title: ownerJob.rootTitle || '' },
+                              )}
+                        </Text>
+                        <Text>→</Text>
+                        <Lozenge
+                          isBold
+                          appearance={levelAppearance(ownerJob.levelId)}
+                        >
+                          {resolveLevelName(ownerJob.levelId)}
+                        </Lozenge>
+                      </Inline>
+                      <Text>
+                        {interpolate(t('classify.paused_progress'), {
+                          classified: ownerJob.classified,
+                          total: ownerJob.totalEstimate,
+                        })}
+                      </Text>
+                    </Stack>
+                  </SectionMessage>
+                )}
+
+                {/* Paused jobs on unrelated pages — compact list above the
+                    normal picker. Never auto-resumes; user decides. */}
+                {otherJobs.length > 0 && (
+                  <Stack space="space.100">
+                    {otherJobs.slice(0, 3).map((job) => (
+                      <SectionMessage
+                        key={job.jobId}
+                        appearance="information"
+                        actions={[
+                          <Button
+                            key="resume"
+                            appearance="primary"
+                            onClick={() => resumePendingJob(job)}
+                          >
+                            {t('classify.resume_button')}
+                          </Button>,
+                          <Button
+                            key="stop"
+                            appearance="subtle"
+                            onClick={() => stopPendingJob(job)}
+                          >
+                            {t('classify.stop_button')}
+                          </Button>,
+                        ]}
+                      >
+                        <Stack space="space.050">
+                          <Inline space="space.050" alignBlock="center">
+                            <Text>
+                              {job.rootTitle
+                                ? interpolate(
+                                    t('classify.paused_other_prefix'),
+                                    { title: job.rootTitle },
+                                  )
+                                : t('classify.paused_other_prefix_notitle')}
+                            </Text>
+                            <Text>→</Text>
+                            <Lozenge
+                              isBold
+                              appearance={levelAppearance(job.levelId)}
+                            >
+                              {resolveLevelName(job.levelId)}
+                            </Lozenge>
+                          </Inline>
+                          <Text>
+                            {interpolate(t('classify.paused_progress'), {
+                              classified: job.classified,
+                              total: job.totalEstimate,
+                            })}
+                          </Text>
+                        </Stack>
+                      </SectionMessage>
+                    ))}
+                  </Stack>
+                )}
+
+                {/* Stop-confirmation — inline SectionMessage over the picker.
+                    Avoids nested Modal complexity; covers the dialog contextually. */}
+                {stopConfirmVisible && asyncJob && (
+                  <SectionMessage
+                    appearance="warning"
+                    actions={[
+                      // Keep going is the default; Yes, stop is destructive
+                      // but de-emphasized so users don't hit it accidentally.
+                      <Button
+                        key="abandon"
+                        appearance="primary"
+                        onClick={abandonStop}
+                      >
+                        {t('classify.stop_keep_going_button')}
+                      </Button>,
+                      <Button
+                        key="confirm"
+                        appearance="subtle"
+                        onClick={confirmStop}
+                      >
+                        {t('classify.stop_confirm_button')}
+                      </Button>,
+                    ]}
+                  >
+                    <Text>
+                      {interpolate(t('classify.stop_confirm_message'), {
+                        classified: asyncProgress?.classified || 0,
+                        level: resolveLevelName(asyncJob.levelId),
+                      })}
+                    </Text>
+                  </SectionMessage>
+                )}
+
+                {/*
                  * Level picker: each row combines a Radio button (handles selection)
                  * with a colored Lozenge (shows the classification color).
                  * Box onClick is not supported in Forge UI Kit, so Radio onChange
                  * is the only reliable click target.
+                 *
+                 * Hidden while a recursive job is active on this page or an
+                 * ancestor — starting another classify would conflict; the
+                 * owner-job banner above is the only path forward.
                  */}
-                <Stack space="space.075">
-                  {(config?.levels || []).map((level) => (
-                    <Inline
-                      key={level.id}
-                      space="space.100"
-                      alignBlock="center"
-                    >
-                      <Radio
-                        value={level.id}
-                        isChecked={selectedLevel === level.id}
-                        isDisabled={!!asyncJob || saving}
-                        onChange={() => setSelectedLevel(level.id)}
-                        label=""
-                      />
-                      <Lozenge isBold appearance={colorToLozenge(level.color)}>
-                        {localize(level.name, locale)}
-                      </Lozenge>
-                      {!level.allowed && (
-                        <Text>({t('classify.not_allowed')})</Text>
+                {!asyncJob && !ownerJob && (
+                  <>
+                    <Stack space="space.075">
+                      {(config?.levels || []).map((level) => (
+                        <Inline
+                          key={level.id}
+                          space="space.100"
+                          alignBlock="center"
+                        >
+                          <Radio
+                            value={level.id}
+                            isChecked={selectedLevel === level.id}
+                            isDisabled={!!asyncJob || saving}
+                            onChange={() => setSelectedLevel(level.id)}
+                            label=""
+                          />
+                          <Lozenge
+                            isBold
+                            appearance={colorToLozenge(level.color)}
+                          >
+                            {localize(level.name, locale)}
+                          </Lozenge>
+                          {!level.allowed && (
+                            <Text>({t('classify.not_allowed')})</Text>
+                          )}
+                        </Inline>
+                      ))}
+                    </Stack>
+
+                    {/* Show description for selected level, or error message if disallowed */}
+                    {selectedLevel &&
+                      (() => {
+                        const level = config?.levels?.find(
+                          (l) => l.id === selectedLevel,
+                        );
+                        if (!level) return null;
+
+                        if (!level.allowed) {
+                          // Always show an error for disallowed levels — custom message
+                          // if configured, otherwise a generic "not allowed" notice.
+                          const customMessage = level.errorMessage
+                            ? localize(level.errorMessage, locale)
+                            : '';
+                          return (
+                            <SectionMessage appearance="error">
+                              <Text>
+                                {customMessage || t('classify.not_allowed')}
+                              </Text>
+                            </SectionMessage>
+                          );
+                        }
+
+                        if (level.description) {
+                          return (
+                            <Text>{localize(level.description, locale)}</Text>
+                          );
+                        }
+
+                        return null;
+                      })()}
+
+                    {/* Recursive toggle with descendant count */}
+                    <Stack space="space.050">
+                      <Inline space="space.100" alignBlock="center">
+                        <Toggle
+                          id="recursive-toggle"
+                          isChecked={recursive}
+                          onChange={() => setRecursive(!recursive)}
+                          isDisabled={
+                            !!asyncJob || saving || !selectedLevelAllowed
+                          }
+                        />
+                        <Label labelFor="recursive-toggle">
+                          {t('classify.apply_recursive')}
+                        </Label>
+                        {countLoading && <Spinner size="small" />}
+                      </Inline>
+                      {recursive && !countLoading && totalDescendants === 0 && (
+                        <Text>{t('classify.no_subpages')}</Text>
                       )}
-                    </Inline>
-                  ))}
-                </Stack>
-
-                {/* Show description for selected level, or error message if disallowed */}
-                {selectedLevel &&
-                  (() => {
-                    const level = config?.levels?.find(
-                      (l) => l.id === selectedLevel,
-                    );
-                    if (!level) return null;
-
-                    if (!level.allowed) {
-                      // Always show an error for disallowed levels — custom message
-                      // if configured, otherwise a generic "not allowed" notice.
-                      const customMessage = level.errorMessage
-                        ? localize(level.errorMessage, locale)
-                        : '';
-                      return (
-                        <SectionMessage appearance="error">
+                      {/* Total pages to update = descendants needing change + current page if it needs change */}
+                      {(() => {
+                        if (
+                          !recursive ||
+                          countLoading ||
+                          asyncJob ||
+                          !selectedLevelAllowed
+                        )
+                          return null;
+                        const currentNeedsUpdate =
+                          selectedLevel !== currentLevelId;
+                        const totalToUpdate =
+                          (descendantCount || 0) + (currentNeedsUpdate ? 1 : 0);
+                        if (totalDescendants === 0) return null; // handled above
+                        if (totalToUpdate === 0) {
+                          return (
+                            <Text>{t('classify.all_subpages_classified')}</Text>
+                          );
+                        }
+                        // The Apply button's isLoading already signals progress;
+                        // swapping this row for a spinner would change height and
+                        // briefly toggle the modal scrollbar.
+                        return (
                           <Text>
-                            {customMessage || t('classify.not_allowed')}
+                            {interpolate(t('classify.apply_recursive_count'), {
+                              count: totalToUpdate,
+                            })}
                           </Text>
-                        </SectionMessage>
-                      );
-                    }
-
-                    if (level.description) {
-                      return <Text>{localize(level.description, locale)}</Text>;
-                    }
-
-                    return null;
-                  })()}
-
-                {/* Recursive toggle with descendant count */}
-                <Stack space="space.050">
-                  <Inline space="space.100" alignBlock="center">
-                    <Toggle
-                      id="recursive-toggle"
-                      isChecked={recursive}
-                      onChange={() => setRecursive(!recursive)}
-                      isDisabled={!!asyncJob || saving || !selectedLevelAllowed}
-                    />
-                    <Label labelFor="recursive-toggle">
-                      {t('classify.apply_recursive')}
-                    </Label>
-                    {countLoading && <Spinner size="small" />}
-                  </Inline>
-                  {recursive && !countLoading && totalDescendants === 0 && (
-                    <Text>{t('classify.no_subpages')}</Text>
-                  )}
-                  {/* Total pages to update = descendants needing change + current page if it needs change */}
-                  {(() => {
-                    if (
-                      !recursive ||
-                      countLoading ||
-                      asyncJob ||
-                      !selectedLevelAllowed
-                    )
-                      return null;
-                    const currentNeedsUpdate = selectedLevel !== currentLevelId;
-                    const totalToUpdate =
-                      (descendantCount || 0) + (currentNeedsUpdate ? 1 : 0);
-                    if (totalDescendants === 0) return null; // handled above
-                    if (totalToUpdate === 0) {
-                      return (
-                        <Text>{t('classify.all_subpages_classified')}</Text>
-                      );
-                    }
-                    // The Apply button's isLoading already signals progress;
-                    // swapping this row for a spinner would change height and
-                    // briefly toggle the modal scrollbar.
-                    return (
-                      <Text>
-                        {interpolate(t('classify.apply_recursive_count'), {
-                          count: totalToUpdate,
-                        })}
-                      </Text>
-                    );
-                  })()}
-                </Stack>
+                        );
+                      })()}
+                    </Stack>
+                  </>
+                )}
 
                 {/* Async progress bar — spinner placeholder until first live
                     Realtime event arrives, to avoid flashing "0 of X" when
@@ -694,6 +1035,7 @@ const App = () => {
                           {interpolate(t('classify.async_progress'), {
                             classified: asyncProgress.classified || 0,
                             total: asyncJob.total,
+                            level: resolveLevelName(asyncJob.levelId),
                           })}
                         </Text>
                         <ProgressBar
@@ -742,29 +1084,42 @@ const App = () => {
             </ModalBody>
             <ModalFooter>
               <ButtonGroup>
-                <Button appearance="subtle" onClick={closeModal}>
-                  {asyncJob
-                    ? t('classify.close_button')
-                    : t('classify.cancel_button')}
-                </Button>
-                <Button
-                  appearance="primary"
-                  onClick={handleClassify}
-                  isLoading={saving}
-                  isDisabled={
-                    !!asyncJob ||
-                    !selectedLevel ||
-                    saving ||
-                    !selectedLevelAllowed ||
-                    (selectedLevel === currentLevelId && !recursive) ||
-                    (recursive &&
-                      !countLoading &&
-                      (descendantCount === 0 || totalDescendants === 0) &&
-                      selectedLevel === currentLevelId)
-                  }
-                >
-                  {t('classify.apply_button')}
-                </Button>
+                {asyncJob ? (
+                  <>
+                    {/* Stop is destructive but NOT the default; keep it
+                        subtle on the left so Pause (the safe close) is the
+                        visually prominent primary action on the right. */}
+                    <Button appearance="subtle" onClick={requestStop}>
+                      {t('classify.stop_button')}
+                    </Button>
+                    <Button appearance="primary" onClick={closeModal}>
+                      {t('classify.pause_button')}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button appearance="subtle" onClick={closeModal}>
+                      {t('classify.cancel_button')}
+                    </Button>
+                    <Button
+                      appearance="primary"
+                      onClick={handleClassify}
+                      isLoading={saving}
+                      isDisabled={
+                        !selectedLevel ||
+                        saving ||
+                        !selectedLevelAllowed ||
+                        (selectedLevel === currentLevelId && !recursive) ||
+                        (recursive &&
+                          !countLoading &&
+                          (descendantCount === 0 || totalDescendants === 0) &&
+                          selectedLevel === currentLevelId)
+                      }
+                    >
+                      {t('classify.apply_button')}
+                    </Button>
+                  </>
+                )}
               </ButtonGroup>
             </ModalFooter>
           </Modal>

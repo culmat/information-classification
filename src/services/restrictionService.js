@@ -39,7 +39,7 @@ async function checkDirectRestrictions(pageId) {
  * @param {string} pageId - Confluence page ID
  * @returns {Promise<string[]>} ancestor IDs, nearest-first
  */
-async function getAncestorIds(pageId) {
+export async function getAncestorIds(pageId) {
   const response = await api
     .asUser()
     .requestConfluence(

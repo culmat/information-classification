@@ -10,8 +10,7 @@ import {
   classifyPage,
   findDescendantsToClassify,
 } from '../services/classificationService';
-import { ASYNC_THRESHOLD, asyncJobKey } from '../shared/constants';
-import { enqueueJob } from '../utils/jobQueue';
+import { asyncJobKey } from '../shared/constants';
 import { getEffectiveConfig } from '../storage/configStore';
 import { getSpaceConfig } from '../storage/spaceConfigStore';
 import {
@@ -94,11 +93,26 @@ export async function getClassificationResolver(req) {
     const config = { ...result.config };
     delete config.languages;
 
+    // Stale-job clearance: if the async consumer died (tunnel reload, retry
+    // exhaustion, etc.), the KVS entry persists and the byline dialog gets
+    // stuck on "Classified 0 of N". Treat any job with no progress update in
+    // STALE_JOB_MS as dead, delete the KVS entry, and hide it from the UI.
+    const STALE_JOB_MS = 10 * 60 * 1000;
+    let liveActiveJob = activeJob;
+    if (
+      activeJob &&
+      Date.now() - (activeJob.lastProgressAt || activeJob.startedAt || 0) >
+        STALE_JOB_MS
+    ) {
+      await kvs.delete(asyncJobKey(String(pageId)));
+      liveActiveJob = null;
+    }
+
     return successResponse({
       ...result,
       config,
       history,
-      activeJob: activeJob || null,
+      activeJob: liveActiveJob || null,
     });
   } catch (error) {
     console.error('Error getting classification:', error);
@@ -113,82 +127,33 @@ export async function getClassificationResolver(req) {
  * Expected payload: { pageId, spaceKey, levelId, recursive, locale }
  */
 export async function setClassificationResolver(req) {
-  const { pageId, spaceKey, levelId, recursive, locale } = req.payload;
+  const { pageId, spaceKey, levelId, locale } = req.payload;
   const accountId = req.context.accountId;
 
   if (!pageId || !spaceKey || !levelId) {
     return validationError('pageId, spaceKey, and levelId are required');
   }
-
   if (!accountId) {
     return errorResponse('Authentication required', 401);
   }
 
+  // Recursive classification is now driven from the browser via
+  // startRecursiveClassify + processClassifyBatch (so it runs asUser and
+  // respects page restrictions). This resolver only handles single-page
+  // classification.
   try {
-    // Check if this should be processed asynchronously.
-    // Don't trust the frontend count — CQL index lag can make it stale.
-    // Do a fresh server-side count for the threshold decision.
-    let toClassify = 0;
-    if (recursive) {
-      const { totalSize } = await findDescendantsToClassify(
-        String(pageId),
-        levelId,
-        0,
-      );
-      toClassify = totalSize;
-    }
-
-    if (recursive && toClassify > ASYNC_THRESHOLD) {
-      // Classify the parent page synchronously (fast, single page)
-      const result = await classifyPage({
-        pageId: String(pageId),
-        spaceKey,
-        levelId,
-        accountId,
-        recursive: false, // parent only — descendants go to async queue
-        locale: locale || 'en',
-      });
-
-      if (!result.success) {
-        return errorResponse(result.message, 400);
-      }
-
-      // Push descendant classification to async queue
-      const { jobId } = await enqueueJob(
-        String(pageId),
-        {
-          pageId: String(pageId),
-          spaceKey,
-          levelId,
-          accountId,
-          locale: locale || 'en',
-          totalToClassify: toClassify,
-        },
-        `classify-${pageId}`,
-        toClassify,
-      );
-
-      return successResponse({
-        ...result,
-        asyncJobId: jobId,
-        totalToClassify: toClassify,
-      });
-    }
-
-    // Small tree or single page — classify synchronously
     const result = await classifyPage({
       pageId: String(pageId),
       spaceKey,
       levelId,
       accountId,
-      recursive: recursive === true,
+      recursive: false,
       locale: locale || 'en',
     });
 
     if (!result.success) {
       return errorResponse(result.message, 400);
     }
-
     return successResponse(result);
   } catch (error) {
     console.error('Error setting classification:', error);

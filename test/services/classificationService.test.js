@@ -44,8 +44,12 @@ vi.mock('@forge/realtime', () => ({
   publishGlobal: vi.fn().mockResolvedValue(undefined),
 }));
 
-const { getPageClassification, classifyPage } =
-  await import('../../src/services/classificationService');
+const {
+  getPageClassification,
+  classifyPage,
+  classifySinglePage,
+  findDescendants,
+} = await import('../../src/services/classificationService');
 
 const effectiveConfig = {
   levels: [
@@ -311,5 +315,126 @@ describe('classifyPage', () => {
       '123',
       expect.objectContaining({ from: null, to: 'public' }),
     );
+  });
+});
+
+describe('classifySinglePage', () => {
+  // Covers the recurring "last page not classified" bug: the async consumer
+  // now pre-fetches descendants with plain CQL (no `!=` alias) and relies on
+  // classifySinglePage to skip pages already at the target. The contract is:
+  //   true  -> classified (count as changed)
+  //   null  -> already at target (skipped — don't count)
+  //   false -> write failed
+  const level = {
+    id: 'confidential',
+    name: { en: 'Confidential' },
+  };
+
+  it('returns true when previousLevel differs and write succeeds', async () => {
+    mockGetClassification.mockResolvedValue({ level: 'internal' });
+    mockSetClassification.mockResolvedValue(true);
+
+    const result = await classifySinglePage({
+      childPageId: '999',
+      spaceKey: 'DEV',
+      levelId: 'confidential',
+      accountId: 'user-1',
+      locale: 'en',
+      level,
+    });
+
+    expect(result).toBe(true);
+    expect(mockSetClassification).toHaveBeenCalledOnce();
+    expect(mockAppendHistory).toHaveBeenCalledWith(
+      '999',
+      expect.objectContaining({ from: 'internal', to: 'confidential' }),
+      expect.any(Object),
+    );
+  });
+
+  it('returns null (skip) when page is already at target level', async () => {
+    mockGetClassification.mockResolvedValue({ level: 'confidential' });
+
+    const result = await classifySinglePage({
+      childPageId: '999',
+      spaceKey: 'DEV',
+      levelId: 'confidential',
+      accountId: 'user-1',
+      locale: 'en',
+      level,
+    });
+
+    expect(result).toBeNull();
+    expect(mockSetClassification).not.toHaveBeenCalled();
+    expect(mockAppendHistory).not.toHaveBeenCalled();
+  });
+
+  it('returns true when page had no classification yet', async () => {
+    mockGetClassification.mockResolvedValue(null);
+    mockSetClassification.mockResolvedValue(true);
+
+    const result = await classifySinglePage({
+      childPageId: '999',
+      spaceKey: 'DEV',
+      levelId: 'confidential',
+      accountId: 'user-1',
+      locale: 'en',
+      level,
+    });
+
+    expect(result).toBe(true);
+  });
+
+  it('returns false when write fails', async () => {
+    mockGetClassification.mockResolvedValue({ level: 'internal' });
+    mockSetClassification.mockResolvedValue(false);
+
+    const result = await classifySinglePage({
+      childPageId: '999',
+      spaceKey: 'DEV',
+      levelId: 'confidential',
+      accountId: 'user-1',
+      locale: 'en',
+      level,
+    });
+
+    expect(result).toBe(false);
+    expect(mockAppendHistory).not.toHaveBeenCalled();
+  });
+});
+
+describe('findDescendants', () => {
+  // Regression guard: the query MUST be plain `ancestor=X AND type=page` —
+  // no content-property alias (`culmat_classification_level`) because the
+  // `!=` alias is unreliable under index lag, and no v2 endpoint (we tried
+  // /pages/{id}/descendants and hit scope + depth + 400 issues).
+  it('uses CQL `ancestor=X AND type=page` (no content-property alias)', async () => {
+    mockRequestConfluence.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ results: [], totalSize: 0 }),
+    });
+
+    await findDescendants('557281', 200, 0, { asApp: true });
+
+    expect(mockRequestConfluence).toHaveBeenCalledOnce();
+    const url = mockRequestConfluence.mock.calls[0][0];
+    expect(url).toContain('/wiki/rest/api/search');
+    expect(url).toContain('ancestor=557281');
+    expect(url).toContain('type=page');
+    expect(url).not.toContain('culmat_classification_level');
+    expect(url).not.toContain('!=');
+  });
+
+  it('passes limit and start through to the search API', async () => {
+    mockRequestConfluence.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ results: [], totalSize: 0 }),
+    });
+
+    await findDescendants('557281', 50, 100);
+
+    const url = mockRequestConfluence.mock.calls[0][0];
+    expect(url).toContain('limit=50');
+    expect(url).toContain('start=100');
   });
 });

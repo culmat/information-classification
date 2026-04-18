@@ -83,6 +83,23 @@ export function buildSpaceFilter(spaceKey) {
 export const ASYNC_JOB_KEY_PREFIX = 'async-job:';
 export const asyncJobKey = (pageId) => `${ASYNC_JOB_KEY_PREFIX}${pageId}`;
 
+// Client-driven recursive classification: per-batch chunk size.
+// ~10 pages × ~1.2 s each = ~12 s per processClassifyBatch invoke,
+// safely under the 25 s Forge resolver timeout.
+export const CLASSIFY_CHUNK_SIZE = 10;
+
+// KVS keys for the client-driven job state.
+export const userJobsKey = (accountId) => `user-jobs:${accountId}`;
+export const jobHeaderKey = (accountId, rootPageId) =>
+  `job:${accountId}:${rootPageId}`;
+export const jobChunkKey = (accountId, rootPageId, idx) =>
+  `job:${accountId}:${rootPageId}:chunk:${idx}`;
+
+// Stale-job clearance window — shared by the old async-queue jobs and the
+// new client-driven jobs. If `lastProgressAt` is older than this, consider
+// the job dead and garbage-collect it.
+export const STALE_JOB_MS = 10 * 60 * 1000; // 10 minutes
+
 // Lozenge color mapping — maps our level color names to Forge Lozenge appearances.
 // Forge Lozenge renders with solid colored fill (green/blue/orange/red/grey backgrounds),
 // compared to Tag which renders with colored outlines only.

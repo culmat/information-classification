@@ -11,6 +11,12 @@ import {
   getClassificationProgressResolver,
 } from './classifyResolver';
 import {
+  startRecursiveClassifyResolver,
+  processClassifyBatchResolver,
+  cancelClassifyJobResolver,
+  getUserPendingJobsResolver,
+} from './classifyJobResolver';
+import {
   getConfigResolver,
   setConfigResolver,
   getAuditDataResolver,
@@ -37,6 +43,12 @@ resolver.define('getClassification', getClassificationResolver);
 resolver.define('setClassification', setClassificationResolver);
 resolver.define('countDescendants', countDescendantsResolver);
 resolver.define('getClassificationProgress', getClassificationProgressResolver);
+
+// Client-driven recursive classification (runs asUser, respects restrictions)
+resolver.define('startRecursiveClassify', startRecursiveClassifyResolver);
+resolver.define('processClassifyBatch', processClassifyBatchResolver);
+resolver.define('cancelClassifyJob', cancelClassifyJobResolver);
+resolver.define('getUserPendingJobs', getUserPendingJobsResolver);
 
 // Dynamic properties — called by Confluence to set byline title/icon before popup opens
 resolver.define('getDynamicProperties', getDynamicPropertiesResolver);

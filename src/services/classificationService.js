@@ -217,6 +217,20 @@ export async function findDescendantsToClassify(
 }
 
 /**
+ * Finds all descendants of a page using plain CQL (no content-property alias).
+ * Caller paginates via `fetchAllPages` in the consumer.
+ */
+export async function findDescendants(
+  pageId,
+  limit = 0,
+  startIndex = 0,
+  { asApp: useApp = false } = {},
+) {
+  const cql = `ancestor=${pageId} AND type=page`;
+  return await cqlPageSearch(cql, limit, startIndex, useApp);
+}
+
+/**
  * Finds all pages classified with a specific level (for reclassification / deletion warning).
  */
 export async function findPagesByLevel(
@@ -231,6 +245,12 @@ export async function findPagesByLevel(
 
 /**
  * Shared CQL page search helper.
+ *
+ * Extensive debug logging is intentional: Confluence's CQL search has
+ * reproducibly dropped specific pages (e.g. Leaf-C-30 from a 71-page
+ * subtree). Logging the exact CQL, pagination parameters, the returned
+ * totalSize, and the full ID list lets us see exactly where the drop
+ * happens (first batch? second batch? totalSize mismatch?).
  */
 async function cqlPageSearch(cql, limit, startIndex, useApp) {
   const requester = getRequester(useApp);
@@ -238,15 +258,22 @@ async function cqlPageSearch(cql, limit, startIndex, useApp) {
     route`/wiki/rest/api/search?cql=${cql}&limit=${limit}&start=${startIndex}`,
     { headers: { Accept: 'application/json' } },
   );
-  if (!response.ok) return { results: [], totalSize: 0 };
+  if (!response.ok) {
+    console.error(
+      `[cqlPageSearch] HTTP ${response.status} for cql="${cql}" limit=${limit} start=${startIndex}`,
+    );
+    return { results: [], totalSize: 0 };
+  }
   const data = await response.json();
-  return {
-    results: (data.results || []).map((r) => ({
-      id: String(r.content.id),
-      title: r.content.title,
-    })),
-    totalSize: data.totalSize || 0,
-  };
+  const results = (data.results || []).map((r) => ({
+    id: String(r.content.id),
+    title: r.content.title,
+  }));
+  const totalSize = data.totalSize || 0;
+  console.log(
+    `[cqlPageSearch] cql="${cql}" limit=${limit} start=${startIndex} -> totalSize=${totalSize} results=${results.length} ids=[${results.map((r) => r.id).join(',')}]`,
+  );
+  return { results, totalSize };
 }
 
 /**
@@ -270,9 +297,15 @@ export async function classifySinglePage({
   const now = new Date().toISOString();
   const opts = { asApp: useApp };
 
-  // Read current level for history (CQL confirmed it differs, but we need the previous value)
+  // Read current level for skip-detection + history.
   const currentClassification = await getClassification(childPageId, opts);
   const previousLevel = currentClassification?.level || null;
+
+  // Skip if already at target — caller pre-fetches without filtering, so this
+  // takes the place of the server-side `!=` CQL filter (which is unreliable).
+  if (previousLevel === levelId) {
+    return null;
+  }
 
   const classificationData = {
     level: levelId,
@@ -358,11 +391,13 @@ async function classifyDescendants({
           locale,
           level,
         });
-        if (success) {
+        if (success === true) {
           classified++;
-        } else {
+        } else if (success === false) {
           failed++;
         }
+        // success === null means the page was already at target (index lag
+        // can resurface a page we just classified) — silently skip.
       } catch (error) {
         console.error(`Failed to classify descendant page ${page.id}:`, error);
         failed++;
