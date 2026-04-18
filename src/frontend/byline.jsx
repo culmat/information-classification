@@ -237,6 +237,14 @@ const App = () => {
 
       // Helper: close dialog and show the appropriate end-of-job flag.
       const finish = (kind, { classified, failed }) => {
+        // Browser-console marker so we can compare run durations when tuning
+        // concurrency / chunk size. Mirror of the server-side log.
+        if (asyncJob?.startedAt) {
+          const durationMs = Date.now() - asyncJob.startedAt;
+          console.log(
+            `[classify-job] ${kind} classified=${classified} failed=${failed} durationMs=${durationMs}`,
+          );
+        }
         setShowModal(false);
         setAsyncJob(null);
         setAsyncProgress(null);

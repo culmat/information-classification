@@ -285,6 +285,10 @@ export async function processClassifyBatchResolver(req) {
       header.nextChunkIdx >= header.totalChunks;
 
     if (done) {
+      const durationMs = Date.now() - (header.startedAt || Date.now());
+      console.log(
+        `[classify-job] done jobId=${jobId} classified=${header.classified} failed=${header.failed} skipped=${header.skipped} durationMs=${durationMs}`,
+      );
       await deleteJob(accountId, String(jobId));
     } else {
       await writeJobHeader(accountId, String(jobId), header);
