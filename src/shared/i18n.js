@@ -37,3 +37,42 @@ export function formatEta(startedAt, classified, total, t) {
       })
     : interpolate(t('classify.async_eta_sec'), { seconds: remaining });
 }
+
+// Warm-up gate for session-based ETA: need at least this many classified
+// pages in the current session AND this much wall-clock time before we
+// trust the measured rate. Below either threshold the ETA is '' (no line),
+// preventing the "~0 sec remaining" flash on freshly-started jobs and the
+// inflated ETA right after a resume.
+const ETA_MIN_PROGRESSED = 3;
+const ETA_MIN_ELAPSED_MS = 3000;
+
+/**
+ * Session-aware ETA. Computes rate from the CURRENT classification session
+ * only (since the client loop started / resumed), so pause/resume gaps and
+ * per-request warm-up don't skew the remaining-time projection.
+ *
+ * @param {number} sessionStartedAt - Date.now() at the start of this session
+ * @param {number} sessionProgressed - pages classified since sessionStartedAt
+ * @param {number} remainingCount - pages still to classify
+ * @param {Function} t - translation function
+ */
+export function formatSessionEta(
+  sessionStartedAt,
+  sessionProgressed,
+  remainingCount,
+  t,
+) {
+  if (!sessionStartedAt || remainingCount <= 0) return '';
+  const elapsed = Date.now() - sessionStartedAt;
+  if (sessionProgressed < ETA_MIN_PROGRESSED || elapsed < ETA_MIN_ELAPSED_MS) {
+    return '';
+  }
+  const remaining = Math.round(
+    ((elapsed / sessionProgressed) * remainingCount) / 1000,
+  );
+  return remaining >= 60
+    ? interpolate(t('classify.async_eta_min'), {
+        minutes: Math.ceil(remaining / 60),
+      })
+    : interpolate(t('classify.async_eta_sec'), { seconds: remaining });
+}

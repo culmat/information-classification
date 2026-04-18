@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { localize, interpolate, formatEta } from '../../src/shared/i18n';
+import {
+  localize,
+  interpolate,
+  formatEta,
+  formatSessionEta,
+} from '../../src/shared/i18n';
 
 describe('localize', () => {
   it('returns the value for the matching locale', () => {
@@ -96,5 +101,49 @@ describe('formatEta', () => {
     const startedAt = Date.now() - 60000;
     const result = formatEta(startedAt, 10, 100, t);
     expect(result).toMatch(/~\d+ min/);
+  });
+});
+
+describe('formatSessionEta', () => {
+  const t = (key) => {
+    const map = {
+      'classify.async_eta_min': '~{minutes} min',
+      'classify.async_eta_sec': '~{seconds} sec',
+    };
+    return map[key] || key;
+  };
+
+  // Bug #3 guard: fresh job, <3 pages classified and ~0s elapsed → no
+  // "~0 sec remaining" flash.
+  it('returns empty string in the warm-up window (too few pages)', () => {
+    const sessionStartedAt = Date.now() - 5000; // 5s elapsed
+    expect(formatSessionEta(sessionStartedAt, 1, 100, t)).toBe('');
+    expect(formatSessionEta(sessionStartedAt, 2, 100, t)).toBe('');
+  });
+
+  it('returns empty string in the warm-up window (too little elapsed time)', () => {
+    const sessionStartedAt = Date.now() - 500; // 0.5s elapsed
+    expect(formatSessionEta(sessionStartedAt, 10, 100, t)).toBe('');
+  });
+
+  // Bug #2 guard: computes rate from SESSION, not from original job start.
+  // Resume scenario: sessionStartedAt is recent, sessionProgressed is recent.
+  it('extrapolates from the current session only (ignoring pause gaps)', () => {
+    // Simulated resume: session started 10s ago, 5 pages done this session,
+    // 95 remaining → rate = 0.5 pages/s → ~190s remaining → "~4 min" after
+    // ceil-to-minute conversion.
+    const sessionStartedAt = Date.now() - 10000;
+    const result = formatSessionEta(sessionStartedAt, 5, 95, t);
+    expect(result).toMatch(/~\d+ min/);
+  });
+
+  it('returns empty string when there is nothing remaining', () => {
+    const sessionStartedAt = Date.now() - 10000;
+    expect(formatSessionEta(sessionStartedAt, 10, 0, t)).toBe('');
+  });
+
+  it('returns empty string when sessionStartedAt is falsy', () => {
+    expect(formatSessionEta(null, 10, 50, t)).toBe('');
+    expect(formatSessionEta(0, 10, 50, t)).toBe('');
   });
 });

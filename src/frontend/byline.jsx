@@ -46,7 +46,7 @@ import ForgeReconciler, {
 } from '@forge/react';
 import { invoke, view, showFlag } from '@forge/bridge';
 import { colorToLozenge } from '../shared/constants';
-import { localize, interpolate, formatEta } from '../shared/i18n';
+import { localize, interpolate, formatSessionEta } from '../shared/i18n';
 
 // Style for the popup content area
 const popupContentStyle = xcss({
@@ -408,6 +408,8 @@ const App = () => {
         total: start.totalEstimate,
         startedAt: Date.now(),
         levelId: selectedLevel,
+        sessionStartedAt: Date.now(),
+        sessionClassifiedStart: start.classified || 0,
       });
       setAsyncProgress({
         classified: start.classified || 0,
@@ -521,6 +523,8 @@ const App = () => {
         total: job.totalEstimate,
         startedAt: job.startedAt,
         levelId: job.levelId,
+        sessionStartedAt: Date.now(),
+        sessionClassifiedStart: job.classified,
       });
       setAsyncProgress({
         classified: job.classified,
@@ -1045,13 +1049,24 @@ const App = () => {
                               : 0
                           }
                         />
-                        {(asyncProgress.classified || 0) > 0 &&
-                          asyncJob.startedAt &&
+                        {asyncJob.sessionStartedAt &&
                           (() => {
-                            const eta = formatEta(
-                              asyncJob.startedAt,
-                              asyncProgress.classified || 0,
-                              asyncJob.total,
+                            // Rate is measured over the CURRENT session so
+                            // pause/resume gaps don't inflate the ETA, and
+                            // a warm-up gate hides the ETA until we have
+                            // enough data to extrapolate honestly.
+                            const classified = asyncProgress.classified || 0;
+                            const sessionProgressed =
+                              classified -
+                              (asyncJob.sessionClassifiedStart || 0);
+                            const remainingCount = Math.max(
+                              0,
+                              asyncJob.total - classified,
+                            );
+                            const eta = formatSessionEta(
+                              asyncJob.sessionStartedAt,
+                              sessionProgressed,
+                              remainingCount,
                               t,
                             );
                             return eta ? <Text>{eta}</Text> : null;
