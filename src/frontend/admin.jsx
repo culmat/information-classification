@@ -379,7 +379,16 @@ const App = () => {
       setImportLevelLoading({});
       return zero;
     }
-    const counts = {};
+    // Bump per-level sequence numbers before the bulk invoke so any
+    // in-flight per-level call (from a Select change while the bulk is
+    // still running) won't land on top of the bulk result. Mirrors the
+    // export-side guard around `exportSeqRef`.
+    const seqs = {};
+    for (const id of allLevelIds) {
+      seqs[id] = (importSeqRef.current[id] || 0) + 1;
+      importSeqRef.current[id] = seqs[id];
+    }
+    const counts = { ...importCounts };
     const source = labelsOverride || importLabels;
     // One resolver call per level: server returns {labelled, alreadyClassified,
     // toClassify, cql{...}} so the frontend can render three linked counts.
@@ -406,7 +415,7 @@ const App = () => {
       }),
     );
     for (const { level, record } of results) {
-      counts[level] = record;
+      if (importSeqRef.current[level] === seqs[level]) counts[level] = record;
     }
     setImportCounts(counts);
     setImportCountLoading(false);
@@ -451,12 +460,16 @@ const App = () => {
     setTimeout(() => refreshImportCounts(), 50);
   };
 
-  // Per-level auto-refresh with debounce
+  // Per-level auto-refresh with debounce + sequence guard. Mirrors the
+  // export Textfield pattern — if the admin rapid-fires Select changes,
+  // older responses can otherwise land after newer ones and overwrite the
+  // row's counts. Every invoke bumps `importSeqRef.current[levelId]` and
+  // checks it on return; stale responses drop on the floor.
   const importDebounceRef = useRef({});
+  const importSeqRef = useRef({});
   const refreshLevelCount = (levelId, selectedOptions) => {
     clearTimeout(importDebounceRef.current[levelId]);
     importDebounceRef.current[levelId] = setTimeout(async () => {
-      setImportLevelLoading((prev) => ({ ...prev, [levelId]: true }));
       const spaceKey = getImportSpaceKey();
       if (spaceKey === '') {
         setImportCounts((prev) => ({ ...prev, [levelId]: EMPTY_IMPORT_COUNT }));
@@ -471,6 +484,9 @@ const App = () => {
         setImportLevelLoading((prev) => ({ ...prev, [levelId]: false }));
         return;
       }
+      const mySeq = (importSeqRef.current[levelId] || 0) + 1;
+      importSeqRef.current[levelId] = mySeq;
+      setImportLevelLoading((prev) => ({ ...prev, [levelId]: true }));
       let record = EMPTY_IMPORT_COUNT;
       try {
         const result = await invoke('countLabelPages', {
@@ -480,6 +496,7 @@ const App = () => {
         });
         if (result.success) record = result;
       } catch (_) {}
+      if (importSeqRef.current[levelId] !== mySeq) return; // stale — newer invoke pending
       setImportCounts((prev) => ({ ...prev, [levelId]: record }));
       setImportLevelLoading((prev) => ({ ...prev, [levelId]: false }));
     }, 600);
@@ -1843,6 +1860,13 @@ const App = () => {
                                       isMulti
                                       isSearchable
                                       isClearable
+                                      isDisabled={
+                                        pendingLabelJobs.some(
+                                          (j) => j.jobKind === 'label-import',
+                                        ) ||
+                                        importStep === 'running' ||
+                                        importSettling
+                                      }
                                       spacing="compact"
                                       isLoading={labelsLoading}
                                       options={availableLabels}
@@ -1921,74 +1945,115 @@ const App = () => {
 
                       {/* Scope selector */}
                       <Stack space="space.100">
-                        <Inline space="space.200" alignBlock="center">
-                          <Inline space="space.100" alignBlock="center">
-                            <Radio
-                              testId="admin-labels-import-scope-all"
-                              value="all"
-                              isChecked={importScopeAll}
-                              onChange={() => {
-                                setImportScopeAll(true);
-                                onScopeChange();
-                              }}
-                              label=""
-                            />
-                            <Text>{t('admin.import.scope_all')}</Text>
-                          </Inline>
-                          <Inline space="space.100" alignBlock="center">
-                            <Radio
-                              testId="admin-labels-import-scope-space"
-                              value="space"
-                              isChecked={!importScopeAll}
-                              onChange={() => {
-                                setImportScopeAll(false);
-                                onScopeChange();
-                              }}
-                              label=""
-                            />
-                            <Text>{t('admin.import.scope_space')}</Text>
-                          </Inline>
-                        </Inline>
-                        {!importScopeAll && (
-                          <Select
-                            testId="admin-labels-import-spaces"
-                            isMulti
-                            options={availableSpaces}
-                            value={importSpaceKeys}
-                            onChange={(selected) => {
-                              setImportSpaceKeys(selected || []);
-                              setTimeout(() => {
-                                importSpaceKeysRef.current = selected || [];
-                                refreshImportCounts();
-                              }, 50);
-                            }}
-                            placeholder={t('admin.import.scope_empty')}
-                          />
-                        )}
+                        {(() => {
+                          const importLocked =
+                            pendingLabelJobs.some(
+                              (j) => j.jobKind === 'label-import',
+                            ) ||
+                            importStep === 'running' ||
+                            importSettling;
+                          return (
+                            <>
+                              <Inline space="space.200" alignBlock="center">
+                                <Inline space="space.100" alignBlock="center">
+                                  <Radio
+                                    testId="admin-labels-import-scope-all"
+                                    value="all"
+                                    isChecked={importScopeAll}
+                                    isDisabled={importLocked}
+                                    onChange={() => {
+                                      setImportScopeAll(true);
+                                      onScopeChange();
+                                    }}
+                                    label=""
+                                  />
+                                  <Text>{t('admin.import.scope_all')}</Text>
+                                </Inline>
+                                <Inline space="space.100" alignBlock="center">
+                                  <Radio
+                                    testId="admin-labels-import-scope-space"
+                                    value="space"
+                                    isChecked={!importScopeAll}
+                                    isDisabled={importLocked}
+                                    onChange={() => {
+                                      setImportScopeAll(false);
+                                      onScopeChange();
+                                    }}
+                                    label=""
+                                  />
+                                  <Text>{t('admin.import.scope_space')}</Text>
+                                </Inline>
+                              </Inline>
+                              {!importScopeAll && (
+                                <Select
+                                  testId="admin-labels-import-spaces"
+                                  isMulti
+                                  isDisabled={importLocked}
+                                  options={availableSpaces}
+                                  value={importSpaceKeys}
+                                  onChange={(selected) => {
+                                    setImportSpaceKeys(selected || []);
+                                    setTimeout(() => {
+                                      importSpaceKeysRef.current =
+                                        selected || [];
+                                      refreshImportCounts();
+                                    }, 50);
+                                  }}
+                                  placeholder={t('admin.import.scope_empty')}
+                                />
+                              )}
+                            </>
+                          );
+                        })()}
                       </Stack>
 
-                      {/* Remove labels option */}
-                      <Inline space="space.100" alignBlock="center">
-                        <Toggle
-                          testId="admin-labels-import-remove-labels"
-                          id="import-remove-labels"
-                          isChecked={importRemoveLabels}
-                          onChange={() =>
-                            setImportRemoveLabels(!importRemoveLabels)
-                          }
-                        />
-                        <Label labelFor="import-remove-labels">
-                          {t('admin.import.remove_labels')}
-                        </Label>
-                      </Inline>
-                      {/* Only show the "stale label" caveat when the toggle is
-                          OFF — if removal is enabled (the recommended default),
-                          the concern doesn't apply. */}
-                      {!importRemoveLabels && (
-                        <SectionMessage appearance="information">
-                          <Text>{t('admin.import.remove_labels_help')}</Text>
-                        </SectionMessage>
-                      )}
+                      {/* Remove labels option. When a paused import is
+                          waiting to be resumed, the toggle displays the
+                          stored setting (read from the job header) and is
+                          locked — the worker reads from the header, so
+                          a live toggle change would silently not apply.
+                          The admin must resume or discard first. */}
+                      {(() => {
+                        const pendingImport = pendingLabelJobs.find(
+                          (j) => j.jobKind === 'label-import',
+                        );
+                        const locked =
+                          !!pendingImport ||
+                          importStep === 'running' ||
+                          importSettling;
+                        const effectiveValue = pendingImport
+                          ? !!pendingImport.removeLabels
+                          : importRemoveLabels;
+                        return (
+                          <>
+                            <Inline space="space.100" alignBlock="center">
+                              <Toggle
+                                testId="admin-labels-import-remove-labels"
+                                id="import-remove-labels"
+                                isChecked={effectiveValue}
+                                isDisabled={locked}
+                                onChange={() =>
+                                  setImportRemoveLabels(!importRemoveLabels)
+                                }
+                              />
+                              <Label labelFor="import-remove-labels">
+                                {t('admin.import.remove_labels')}
+                              </Label>
+                            </Inline>
+                            {/* Only show the "stale label" caveat when the
+                                toggle is OFF — if removal is enabled (the
+                                recommended default), the concern doesn't
+                                apply. */}
+                            {!effectiveValue && (
+                              <SectionMessage appearance="information">
+                                <Text>
+                                  {t('admin.import.remove_labels_help')}
+                                </Text>
+                              </SectionMessage>
+                            )}
+                          </>
+                        );
+                      })()}
 
                       {/* Actions */}
                       <Button
@@ -2216,12 +2281,19 @@ const App = () => {
                                     exportMappings[level.id] ?? level.id;
                                   const invalid =
                                     value.length > 0 && !isValidLabel(value);
+                                  const exportLocked =
+                                    pendingLabelJobs.some(
+                                      (j) => j.jobKind === 'label-export',
+                                    ) ||
+                                    exportLoading ||
+                                    exportSettling;
                                   return (
                                     <Stack space="space.050">
                                       <Textfield
                                         testId={`admin-labels-export-label-${level.id}`}
                                         value={value}
                                         isInvalid={invalid}
+                                        isDisabled={exportLocked}
                                         onChange={(e) => {
                                           // Whitespace is not allowed in
                                           // Confluence labels — strip it on
@@ -2317,6 +2389,13 @@ const App = () => {
                               testId="admin-labels-export-scope-all"
                               value="all"
                               isChecked={exportScopeAll}
+                              isDisabled={
+                                pendingLabelJobs.some(
+                                  (j) => j.jobKind === 'label-export',
+                                ) ||
+                                exportLoading ||
+                                exportSettling
+                              }
                               onChange={() => {
                                 setExportScopeAll(true);
                                 setTimeout(() => refreshExportCounts(), 50);
@@ -2330,6 +2409,13 @@ const App = () => {
                               testId="admin-labels-export-scope-space"
                               value="space"
                               isChecked={!exportScopeAll}
+                              isDisabled={
+                                pendingLabelJobs.some(
+                                  (j) => j.jobKind === 'label-export',
+                                ) ||
+                                exportLoading ||
+                                exportSettling
+                              }
                               onChange={() => {
                                 setExportScopeAll(false);
                                 setTimeout(() => refreshExportCounts(), 50);
@@ -2343,6 +2429,13 @@ const App = () => {
                           <Select
                             testId="admin-labels-export-spaces"
                             isMulti
+                            isDisabled={
+                              pendingLabelJobs.some(
+                                (j) => j.jobKind === 'label-export',
+                              ) ||
+                              exportLoading ||
+                              exportSettling
+                            }
                             options={availableSpaces}
                             value={exportSpaceKeys}
                             onChange={(selected) => {
