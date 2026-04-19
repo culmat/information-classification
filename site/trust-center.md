@@ -57,6 +57,10 @@ Security is provided by the Atlassian Forge platform:
 - **Forge sandbox** - Forge restricts what the app can do at the platform level; outbound network calls require explicit allowlist approval from Atlassian
 - **Zero egress** - the app makes no external API calls; all processing occurs via the Forge `requestConfluence` bridge
 
+### Reporting a vulnerability
+
+Please do not open public GitHub issues for suspected vulnerabilities. Preferred: [report privately via GitHub](https://github.com/culmat/information-classification/security/advisories/new). Fallback: email <culm@culm.at>. The full policy lives in [SECURITY.md](https://github.com/culmat/information-classification/blob/main/SECURITY.md).
+
 ## Privacy & GDPR
 
 The app processes only Atlassian account IDs, which are opaque platform identifiers managed by Atlassian - not personal data that the Provider controls.
