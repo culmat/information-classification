@@ -21,6 +21,7 @@ Thumbs.db
 
 /.forge/
 coverage/
+src/shared/buildInfo.json
 .vscode
 .env
 /tmp

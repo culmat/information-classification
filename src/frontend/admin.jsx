@@ -63,6 +63,7 @@ import {
 import { SUPPORTED_LANGUAGES } from '../shared/defaults';
 import { localize, interpolate, formatEta } from '../shared/i18n';
 import StatisticsPanel from './StatisticsPanel';
+import AboutPanel from './AboutPanel';
 
 /**
  * Generates a simple unique ID for new items.
@@ -929,6 +930,7 @@ const App = () => {
             <Tab>{t('admin.tabs.links')}</Tab>
             <Tab>{t('admin.tabs.languages')}</Tab>
             <Tab>{t('admin.tabs.labels')}</Tab>
+            <Tab>{t('admin.tabs.about')}</Tab>
           </TabList>
 
           {/* Statistics Tab — visuals come from shared StatisticsPanel;
@@ -1704,9 +1706,16 @@ const App = () => {
               </Tabs>
             </Box>
           </TabPanel>
+
+          {/* About Tab — version info, environment, support links, privacy. */}
+          <TabPanel>
+            <Box xcss={tabPanelStyle}>
+              <AboutPanel />
+            </Box>
+          </TabPanel>
         </Tabs>
 
-        {/* Save button and messages — hidden on read-only tabs (Statistics=0, Labels=5) */}
+        {/* Save button and messages — hidden on read-only tabs (Statistics=0, Labels=5, About=6) */}
         {activeTab > 0 && activeTab < 5 && (
           <>
             {message && (

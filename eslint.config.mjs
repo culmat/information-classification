@@ -23,6 +23,11 @@ export default [
         setInterval: 'readonly',
         clearInterval: 'readonly',
         structuredClone: 'readonly',
+        // Browser global used from UI Kit frontends (e.g. clipboard,
+        // userAgent in the About panel). UI Kit iframes run in a browser.
+        navigator: 'readonly',
+        // Node global available in Forge backend runtime for env vars.
+        process: 'readonly',
       },
     },
     plugins: {

@@ -35,6 +35,7 @@ import {
   startLabelImportResolver,
   startLabelExportResolver,
 } from './importResolver';
+import { getVersionInfoResolver } from './versionInfoResolver';
 
 const resolver = new Resolver();
 
@@ -71,5 +72,8 @@ resolver.define('listLabels', listLabelsResolver);
 resolver.define('countLabelPages', countLabelPagesResolver);
 resolver.define('startLabelImport', startLabelImportResolver);
 resolver.define('startLabelExport', startLabelExportResolver);
+
+// About panel — returns Forge version + upgrade status for the admin UI
+resolver.define('getVersionInfo', getVersionInfoResolver);
 
 export const handler = resolver.getDefinitions();

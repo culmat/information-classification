@@ -39,7 +39,7 @@ jobs:
       site-development: dev-cul.atlassian.net
       site-staging: sta-cul.atlassian.net
       site-production: cul.atlassian.net
-      pre-build-command: npm run lint && npm run format:check && npx vitest run --coverage
+      pre-build-command: node scripts/write-build-info.mjs && npm run lint && npm run format:check && npx vitest run --coverage
     secrets:
       FORGE_EMAIL: ${{ secrets.FORGE_EMAIL }}
       FORGE_API_TOKEN: ${{ secrets.FORGE_API_TOKEN }}
