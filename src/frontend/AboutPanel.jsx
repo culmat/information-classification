@@ -322,7 +322,7 @@ const AboutPanel = () => {
         <Stack space="space.100">
           <Inline space="space.200" alignBlock="center" spread="space-between">
             <Heading size="small">{t('admin.about.debug_heading')}</Heading>
-            <Button onClick={handleCopy}>
+            <Button testId="about-debug-copy" onClick={handleCopy}>
               {copied
                 ? t('admin.about.debug_copied')
                 : t('admin.about.debug_copy')}

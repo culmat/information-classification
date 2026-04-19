@@ -163,7 +163,10 @@ const App = () => {
     }
   }, [spaceKey, globalConfig, t]);
 
-  const refreshStats = async () => {
+  // Memoised: StatisticsPanel's realtime-subscription effect keys on
+  // `onRefresh`. An unmemoised callback would tear down and rebuild that
+  // subscription on every parent render, flooding the Forge gateway.
+  const refreshStats = useCallback(async () => {
     setStatsLoading(true);
     try {
       const result = await invoke('getAuditData', { spaceKey });
@@ -173,7 +176,7 @@ const App = () => {
     } finally {
       setStatsLoading(false);
     }
-  };
+  }, [spaceKey]);
 
   // Load statistics — now the default tab, so load on mount
   const loadStats = useCallback(async () => {
@@ -282,6 +285,7 @@ const App = () => {
                       alignBlock="center"
                     >
                       <Checkbox
+                        testId={`space-settings-level-${level.id}`}
                         isChecked={enabledLevelIds.includes(level.id)}
                         onChange={() => handleToggleLevel(level.id)}
                         label=""
@@ -307,6 +311,7 @@ const App = () => {
                 {/* Action buttons */}
                 <ButtonGroup>
                   <Button
+                    testId="space-settings-save"
                     appearance="primary"
                     onClick={handleSave}
                     isLoading={saving}
@@ -315,6 +320,7 @@ const App = () => {
                     {t('space_settings.save_button')}
                   </Button>
                   <Button
+                    testId="space-settings-reset"
                     appearance="subtle"
                     onClick={handleReset}
                     isDisabled={saving}

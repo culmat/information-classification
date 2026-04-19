@@ -33,9 +33,14 @@ import {
   listLabelsResolver,
   countLabelPagesResolver,
   countLevelGapResolver,
+} from './importResolver';
+import {
   startLabelImportResolver,
   startLabelExportResolver,
-} from './importResolver';
+  processLabelBatchResolver,
+  cancelLabelJobResolver,
+  getUserPendingLabelJobsResolver,
+} from './labelJobResolver';
 import { getVersionInfoResolver } from './versionInfoResolver';
 
 const resolver = new Resolver();
@@ -72,8 +77,13 @@ resolver.define('listSpaces', listSpacesResolver);
 resolver.define('listLabels', listLabelsResolver);
 resolver.define('countLabelPages', countLabelPagesResolver);
 resolver.define('countLevelGap', countLevelGapResolver);
+
+// Client-driven label import/export (runs asUser, respects restrictions)
 resolver.define('startLabelImport', startLabelImportResolver);
 resolver.define('startLabelExport', startLabelExportResolver);
+resolver.define('processLabelBatch', processLabelBatchResolver);
+resolver.define('cancelLabelJob', cancelLabelJobResolver);
+resolver.define('getUserPendingLabelJobs', getUserPendingLabelJobsResolver);
 
 // About panel — returns Forge version + upgrade status for the admin UI
 resolver.define('getVersionInfo', getVersionInfoResolver);

@@ -7,6 +7,7 @@
 import api, { route } from '@forge/api';
 import { buildSpaceFilter, isValidLabel } from '../shared/constants';
 import { getRequester } from '../utils/requester';
+import { requestWithRetry } from '../utils/retry';
 
 /**
  * Finds pages with a specific label via CQL.
@@ -29,9 +30,11 @@ export async function findPagesByLabel(
   }
   const cql = `type=page AND label = "${labelName}"${buildSpaceFilter(spaceKey)}`;
   const requester = getRequester(useApp);
-  const response = await requester.requestConfluence(
-    route`/wiki/rest/api/search?cql=${cql}&limit=${limit}&start=${startIndex}`,
-    { headers: { Accept: 'application/json' } },
+  const response = await requestWithRetry(() =>
+    requester.requestConfluence(
+      route`/wiki/rest/api/search?cql=${cql}&limit=${limit}&start=${startIndex}`,
+      { headers: { Accept: 'application/json' } },
+    ),
   );
   if (!response.ok) return { results: [], totalSize: 0 };
   const data = await response.json();
@@ -78,9 +81,11 @@ export async function countPagesByLabels(
  */
 export async function removeLabelFromPage(pageId, labelName, useApp = false) {
   const requester = getRequester(useApp);
-  const response = await requester.requestConfluence(
-    route`/wiki/rest/api/content/${pageId}/label?name=${labelName}`,
-    { method: 'DELETE' },
+  const response = await requestWithRetry(() =>
+    requester.requestConfluence(
+      route`/wiki/rest/api/content/${pageId}/label?name=${labelName}`,
+      { method: 'DELETE' },
+    ),
   );
   return response.status === 204 || response.ok;
 }
@@ -91,16 +96,15 @@ export async function removeLabelFromPage(pageId, labelName, useApp = false) {
  */
 export async function addLabelToPage(pageId, labelName, useApp = false) {
   const requester = getRequester(useApp);
-  const response = await requester.requestConfluence(
-    route`/wiki/rest/api/content/${pageId}/label`,
-    {
+  const response = await requestWithRetry(() =>
+    requester.requestConfluence(route`/wiki/rest/api/content/${pageId}/label`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
       body: JSON.stringify([{ prefix: 'global', name: labelName }]),
-    },
+    }),
   );
   if (!response.ok) {
     console.error(

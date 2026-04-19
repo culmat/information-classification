@@ -54,7 +54,7 @@ import ForgeReconciler, {
   RequiredAsterisk,
   xcss,
 } from '@forge/react';
-import { invoke, requestConfluence, showFlag, realtime } from '@forge/bridge';
+import { invoke, requestConfluence, showFlag } from '@forge/bridge';
 import {
   COLOR_OPTIONS,
   colorToLozenge,
@@ -62,7 +62,28 @@ import {
   normalizeColor,
 } from '../shared/constants';
 import { SUPPORTED_LANGUAGES } from '../shared/defaults';
-import { localize, interpolate, formatEta } from '../shared/i18n';
+import { localize, interpolate, formatSessionEta } from '../shared/i18n';
+
+// Braille dots rendered as text so the activity indicator doesn't cause
+// layout shift (unlike a Spinner component). Same pattern as the byline.
+const ACTIVITY_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+// Labels involved in a label-sync job, formatted for status messages.
+// Export mappings carry a single `labelName`; import mappings carry an
+// array of source `labels`. Deduped + joined so banners and completion
+// messages can say *which* labels are / were in play without exposing
+// the whole level→label mapping shape to the admin.
+function formatMappingLabels(mappings, jobKind) {
+  const seen = new Set();
+  for (const m of mappings || []) {
+    if (jobKind === 'label-import') {
+      for (const l of m.labels || []) if (l) seen.add(l);
+    } else if (m?.labelName) {
+      seen.add(m.labelName);
+    }
+  }
+  return Array.from(seen).join(', ');
+}
 import StatisticsPanel from './StatisticsPanel';
 import AboutPanel from './AboutPanel';
 
@@ -134,7 +155,12 @@ const App = () => {
   const [editingLink, setEditingLink] = useState(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
 
-  const refreshAuditData = async () => {
+  // Memoised: StatisticsPanel subscribes to changes of this callback's
+  // identity (useEffect dep). When admin re-renders frequently (e.g. under
+  // the 120 ms activity-indicator tick during a label-sync job), an
+  // unmemoised function identity would tear down and rebuild the realtime
+  // subscription 8×/sec — a measurable gateway-call flood.
+  const refreshAuditData = useCallback(async () => {
     setAuditLoading(true);
     try {
       const auditResult = await invoke('getAuditData');
@@ -144,7 +170,7 @@ const App = () => {
     } finally {
       setAuditLoading(false);
     }
-  };
+  }, []);
 
   // Load config and audit data on mount — separate calls so config
   // still loads even if audit (SQL-dependent) fails
@@ -345,12 +371,13 @@ const App = () => {
 
     // Space mode but no valid keys entered — show zero record for all levels
     if (spaceKey === '') {
-      setImportCounts(
-        Object.fromEntries(allLevelIds.map((id) => [id, EMPTY_IMPORT_COUNT])),
+      const zero = Object.fromEntries(
+        allLevelIds.map((id) => [id, EMPTY_IMPORT_COUNT]),
       );
+      setImportCounts(zero);
       setImportCountLoading(false);
       setImportLevelLoading({});
-      return;
+      return zero;
     }
     const counts = {};
     const source = labelsOverride || importLabels;
@@ -384,6 +411,38 @@ const App = () => {
     setImportCounts(counts);
     setImportCountLoading(false);
     setImportLevelLoading({});
+    return counts;
+  };
+
+  // Post-sync refresh loop for import. Classification property updates also
+  // lag behind CQL searches, so the same settle pattern applies.
+  const importCountsFingerprint = (counts) =>
+    Object.entries(counts || {})
+      .map(
+        ([id, r]) => `${id}:${r?.toClassify ?? 0}/${r?.alreadyClassified ?? 0}`,
+      )
+      .sort()
+      .join('|');
+  const settleImportCounts = async () => {
+    setImportSettling(true);
+    try {
+      let lastPrint = null;
+      let stable = 0;
+      for (let i = 0; i < 12; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const snapshot = await refreshImportCounts();
+        const print = importCountsFingerprint(snapshot);
+        if (print === lastPrint) {
+          stable++;
+          if (stable >= 2) break;
+        } else {
+          stable = 0;
+          lastPrint = print;
+        }
+      }
+    } finally {
+      setImportSettling(false);
+    }
   };
 
   // Auto-refresh on scope change (no debounce needed — Select gives us clean values)
@@ -442,58 +501,147 @@ const App = () => {
     }
   }, [config, importInitialized, labelsLoading, availableLabels]);
 
-  // Subscribe to Realtime progress for import — subscribe once, persist via ref
-  const importSubRef = useRef(null);
-  useEffect(() => {
-    if (importStep !== 'running') return;
-    // Clean up any previous subscription
-    if (importSubRef.current) {
-      importSubRef.current.unsubscribe();
-      importSubRef.current = null;
-    }
-    realtime
-      .subscribeGlobal('classification-progress:label-import', (data) => {
-        setImportProgress((prev) => ({ ...prev, ...data }));
-        if (data.done) {
-          setImportStep('done');
-          refreshImportCounts();
-          if (importSubRef.current) {
-            importSubRef.current.unsubscribe();
-            importSubRef.current = null;
-          }
-        }
-      })
-      .then((sub) => {
-        importSubRef.current = sub;
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [importStep === 'running']);
+  // Client-driven label sync: refs for the loop to read stop requests and
+  // for the activity-indicator tick. Refs (not state) so the loop sees
+  // updates without waiting for a React render.
+  const importStopRef = useRef(false);
+  const exportStopRef = useRef(false);
+  const [labelActivityFrame, setLabelActivityFrame] = useState(0);
 
-  // Subscribe to Realtime progress for export — subscribe once, persist via ref
-  const exportSubRef = useRef(null);
-  const [exportListening, setExportListening] = useState(false);
-  useEffect(() => {
-    if (!exportListening) return;
-    if (exportSubRef.current) {
-      exportSubRef.current.unsubscribe();
-      exportSubRef.current = null;
+  // After a sync completes, Confluence's CQL label index lags the actual
+  // label writes by a minute or two. Without this, the admin would see
+  // "Already Labelled" stuck at a low number and the Start button would
+  // re-enable on a stale "To Label > 0" signal. While settling, we poll
+  // counts every few seconds until they stop changing; the Start button
+  // stays disabled for that whole window.
+  const [importSettling, setImportSettling] = useState(false);
+  const [exportSettling, setExportSettling] = useState(false);
+
+  // Paused label-sync jobs owned by this user — populated on mount from
+  // `getUserPendingLabelJobs`. When the browser tab refreshes or navigates
+  // away mid-job, the client loop stops but the KVS state survives; the
+  // admin can resume (loop continues from the next unconsumed chunk) or
+  // discard (cancelLabelJob deletes state). One entry per flow max in
+  // practice (import + export are separate buttons) but we keep an array
+  // so the data model matches the recursive-classify pattern.
+  const [pendingLabelJobs, setPendingLabelJobs] = useState([]);
+  const loadPendingLabelJobs = useCallback(async () => {
+    try {
+      const result = await invoke('getUserPendingLabelJobs');
+      if (result?.success) setPendingLabelJobs(result.jobs || []);
+    } catch (err) {
+      console.error('getUserPendingLabelJobs failed:', err);
     }
-    realtime
-      .subscribeGlobal('classification-progress:label-export', (data) => {
-        setExportProgress((prev) => ({ ...prev, ...data }));
-        if (data.done) {
-          setExportLoading(false);
-          setExportListening(false);
-          if (exportSubRef.current) {
-            exportSubRef.current.unsubscribe();
-            exportSubRef.current = null;
-          }
+  }, []);
+  useEffect(() => {
+    loadPendingLabelJobs();
+  }, [loadPendingLabelJobs]);
+
+  // Cycle the activity indicator while either flow is running.
+  useEffect(() => {
+    if (importStep !== 'running' && !exportLoading) return;
+    const id = setInterval(() => {
+      setLabelActivityFrame((f) => (f + 1) % ACTIVITY_FRAMES.length);
+    }, 120);
+    return () => clearInterval(id);
+  }, [importStep, exportLoading]);
+
+  // Drives one label-sync job — shared by startImport and startExport.
+  // Stop (user clicks the button) → cancelLabelJob, close with a "stopped"
+  // flag. Pause (tab close / navigate away) is implicit: the KVS state
+  // survives and the paused-jobs banner on next open can resume it.
+  const runLabelJobLoop = async ({
+    jobId,
+    kind, // 'import' | 'export'
+    stopRef,
+    setProgress,
+    setRunning,
+    startedAt,
+    sessionClassifiedStart,
+    onDone,
+  }) => {
+    const finish = ({ classified, failed, status, skipped = 0 }) => {
+      const durationMs = Date.now() - startedAt;
+      console.log(
+        `[label-job] ${kind} ${status} classified=${classified} failed=${failed} skipped=${skipped} durationMs=${durationMs}`,
+      );
+      setRunning(false);
+      setProgress((prev) => ({
+        ...(prev || {}),
+        classified,
+        failed,
+        skipped,
+        done: true,
+        status,
+      }));
+      if (onDone) onDone(status, { classified, failed, skipped });
+    };
+
+    while (true) {
+      if (stopRef.current) {
+        let result;
+        try {
+          result = await invoke('cancelLabelJob', { jobId });
+        } catch (err) {
+          console.error('cancelLabelJob failed:', err);
         }
-      })
-      .then((sub) => {
-        exportSubRef.current = sub;
-      });
-  }, [exportListening]);
+        finish({
+          classified: result?.classified || 0,
+          failed: result?.failed || 0,
+          skipped: result?.skipped || 0,
+          status: 'stopped',
+        });
+        return;
+      }
+      let batch;
+      try {
+        batch = await invoke('processLabelBatch', { jobId });
+      } catch (err) {
+        console.error('processLabelBatch failed:', err);
+        finish({ classified: 0, failed: 0, status: 'error' });
+        return;
+      }
+      if (!batch || !batch.success) {
+        finish({ classified: 0, failed: 0, status: 'error' });
+        return;
+      }
+      setProgress((prev) => ({
+        ...(prev || {}),
+        classified: batch.classified,
+        failed: batch.failed,
+        skipped: batch.skipped,
+        total: batch.totalEstimate,
+        discoveryDone: batch.discoveryDone,
+        sessionStartedAt: startedAt,
+        sessionClassifiedStart,
+      }));
+      if (batch.done) {
+        if (batch.cancelled) {
+          finish({
+            classified: batch.classified,
+            failed: batch.failed,
+            skipped: batch.skipped,
+            status: 'stopped',
+          });
+        } else if (batch.aborted) {
+          finish({
+            classified: batch.classified,
+            failed: batch.failed,
+            skipped: batch.skipped,
+            status: 'aborted',
+          });
+        } else {
+          finish({
+            classified: batch.classified,
+            failed: batch.failed,
+            skipped: batch.skipped,
+            status: 'completed',
+          });
+        }
+        return;
+      }
+    }
+  };
 
   // Export page count helpers (mirrors import count pattern)
   const exportScopeAllRef = useRef(exportScopeAll);
@@ -526,12 +674,13 @@ const App = () => {
     const spaceKey = getExportSpaceKey();
 
     if (spaceKey === '') {
-      setExportCounts(
-        Object.fromEntries(allLevelIds.map((id) => [id, EMPTY_EXPORT_COUNT])),
+      const zero = Object.fromEntries(
+        allLevelIds.map((id) => [id, EMPTY_EXPORT_COUNT]),
       );
+      setExportCounts(zero);
       setExportCountLoading(false);
       setExportLevelLoading({});
-      return;
+      return zero;
     }
 
     // Bump the per-level sequence before each invoke so any in-flight
@@ -567,6 +716,43 @@ const App = () => {
     setExportCounts(counts);
     setExportCountLoading(false);
     setExportLevelLoading({});
+    return counts;
+  };
+
+  // Post-sync refresh loop: CQL's label index lags actual writes by up to a
+  // minute, so we poll until counts stop moving (or we hit the time budget).
+  // Compares only the fields that can change from label writes (toLabel /
+  // alreadyLabelled); `classified` shouldn't change so it's not a stability
+  // signal. While this runs, `exportSettling` keeps the Start button
+  // disabled so the admin can't kick off a redundant no-op job.
+  const SETTLE_MAX_POLLS = 12; // ~36s ceiling
+  const SETTLE_STABLE_POLLS = 2; // two matching polls ⇒ settled
+  const SETTLE_INTERVAL_MS = 3000;
+  const countsFingerprint = (counts) =>
+    Object.entries(counts || {})
+      .map(([id, r]) => `${id}:${r?.toLabel ?? 0}/${r?.alreadyLabelled ?? 0}`)
+      .sort()
+      .join('|');
+  const settleExportCounts = async () => {
+    setExportSettling(true);
+    try {
+      let lastPrint = null;
+      let stable = 0;
+      for (let i = 0; i < SETTLE_MAX_POLLS; i++) {
+        await new Promise((r) => setTimeout(r, SETTLE_INTERVAL_MS));
+        const snapshot = await refreshExportCounts();
+        const print = countsFingerprint(snapshot);
+        if (print === lastPrint) {
+          stable++;
+          if (stable >= SETTLE_STABLE_POLLS) break;
+        } else {
+          stable = 0;
+          lastPrint = print;
+        }
+      }
+    } finally {
+      setExportSettling(false);
+    }
   };
 
   // Debounced per-level refresh when the user edits the target label name.
@@ -612,8 +798,87 @@ const App = () => {
     }
   }, [config, exportCountsInitialized]);
 
+  // Resume a paused label-sync job: re-attach the client loop to the same
+  // jobId. No call to startLabel(Import|Export) — the job header already
+  // has mappings, chunk chain, and counters; the loop simply continues
+  // from `nextChunkIdx`. Session-based ETA restarts from the resume moment
+  // so the time estimate reflects NEW throughput, not stale original.
+  const resumeLabelJob = (job) => {
+    setPendingLabelJobs((prev) => prev.filter((j) => j.jobId !== job.jobId));
+    const now = Date.now();
+    const total = job.totalEstimate || 0;
+    const startedClassified = job.classified || 0;
+    if (job.jobKind === 'label-import') {
+      importStopRef.current = false;
+      setImportStep('running');
+      setImportProgress({
+        classified: startedClassified,
+        failed: job.failed || 0,
+        skipped: job.skipped || 0,
+        total,
+        done: false,
+        startedAt: job.startedAt || now,
+        sessionStartedAt: now,
+        sessionClassifiedStart: startedClassified,
+        mappings: job.mappings || [],
+      });
+      runLabelJobLoop({
+        jobId: job.jobId,
+        kind: 'import',
+        stopRef: importStopRef,
+        setProgress: setImportProgress,
+        setRunning: () => {},
+        startedAt: now,
+        sessionClassifiedStart: startedClassified,
+        onDone: (status) => {
+          setImportStep('done');
+          refreshImportCounts();
+          if (status === 'completed') settleImportCounts();
+        },
+      });
+    } else {
+      exportStopRef.current = false;
+      setExportLoading(true);
+      setExportProgress({
+        classified: startedClassified,
+        failed: job.failed || 0,
+        skipped: job.skipped || 0,
+        total,
+        done: false,
+        startedAt: job.startedAt || now,
+        sessionStartedAt: now,
+        sessionClassifiedStart: startedClassified,
+        mappings: job.mappings || [],
+      });
+      runLabelJobLoop({
+        jobId: job.jobId,
+        kind: 'export',
+        stopRef: exportStopRef,
+        setProgress: setExportProgress,
+        setRunning: setExportLoading,
+        startedAt: now,
+        sessionClassifiedStart: startedClassified,
+        onDone: (status) => {
+          refreshExportCounts();
+          if (status === 'completed') settleExportCounts();
+        },
+      });
+    }
+  };
+
+  const discardLabelJob = async (job) => {
+    setPendingLabelJobs((prev) => prev.filter((j) => j.jobId !== job.jobId));
+    try {
+      await invoke('cancelLabelJob', { jobId: job.jobId });
+    } catch (err) {
+      console.error('cancelLabelJob failed:', err);
+    }
+    // Refresh counts so the stale "X to label" drops back to the true gap.
+    if (job.jobKind === 'label-import') refreshImportCounts();
+    else refreshExportCounts();
+  };
+
   const startImport = async () => {
-    // Build mappings from the label inputs
     const mappings = (config?.levels || [])
       .filter((l) => l.allowed)
       .map((level) => ({
@@ -626,13 +891,18 @@ const App = () => {
 
     if (mappings.length === 0) return;
 
+    importStopRef.current = false;
+    const startedAt = Date.now();
     setImportStep('running');
     setImportProgress({
       classified: 0,
       failed: 0,
       total: 0,
       done: false,
-      startedAt: Date.now(),
+      startedAt,
+      sessionStartedAt: startedAt,
+      sessionClassifiedStart: 0,
+      mappings,
     });
     try {
       const spaceKey = getImportSpaceKey() || null;
@@ -641,7 +911,45 @@ const App = () => {
         removeLabels: importRemoveLabels,
         spaceKey,
       });
-      setImportProgress((prev) => ({ ...prev, total: result.count || 0 }));
+      if (!result || !result.success) {
+        console.error('startLabelImport failed:', result);
+        setImportStep('idle');
+        setImportProgress(null);
+        return;
+      }
+      if (result.count === 0) {
+        // No work to do — server short-circuited.
+        setImportStep('done');
+        setImportProgress({
+          classified: 0,
+          failed: 0,
+          total: 0,
+          done: true,
+          startedAt,
+        });
+        return;
+      }
+      setImportProgress((prev) => ({
+        ...prev,
+        total: result.totalEstimate || 0,
+      }));
+      runLabelJobLoop({
+        jobId: result.jobId,
+        kind: 'import',
+        stopRef: importStopRef,
+        setProgress: setImportProgress,
+        setRunning: () => {},
+        startedAt,
+        sessionClassifiedStart: 0,
+        onDone: (status) => {
+          setImportStep('done');
+          // Fresh snapshot immediately, then poll until CQL index catches
+          // up (see settleImportCounts). Only run the loop on a clean
+          // completion — stop/error paths don't need it.
+          refreshImportCounts();
+          if (status === 'completed') settleImportCounts();
+        },
+      });
     } catch (error) {
       console.error('Import failed:', error);
       setImportStep('idle');
@@ -659,8 +967,21 @@ const App = () => {
         ).trim(),
       }))
       .filter((m) => m.labelName.length > 0 && isValidLabel(m.labelName));
+    if (mappings.length === 0) return;
+
+    exportStopRef.current = false;
+    const startedAt = Date.now();
     setExportLoading(true);
-    setExportProgress({ classified: 0, failed: 0, total: 0, done: false });
+    setExportProgress({
+      classified: 0,
+      failed: 0,
+      total: 0,
+      done: false,
+      startedAt,
+      sessionStartedAt: startedAt,
+      sessionClassifiedStart: 0,
+      mappings,
+    });
     try {
       const exportKeys = exportScopeAll
         ? null
@@ -669,19 +990,44 @@ const App = () => {
         mappings,
         spaceKey: exportKeys,
       });
-      if (result.success) {
+      if (!result || !result.success) {
+        console.error('startLabelExport failed:', result);
+        setExportProgress(null);
+        setExportLoading(false);
+        return;
+      }
+      if (result.count === 0) {
         setExportProgress({
           classified: 0,
           failed: 0,
-          total: result.count || 0,
-          done: false,
-          startedAt: Date.now(),
+          total: 0,
+          done: true,
+          startedAt,
         });
-        setExportListening(true);
-      } else {
-        setExportProgress(null);
         setExportLoading(false);
+        return;
       }
+      setExportProgress((prev) => ({
+        ...prev,
+        total: result.totalEstimate || 0,
+      }));
+      runLabelJobLoop({
+        jobId: result.jobId,
+        kind: 'export',
+        stopRef: exportStopRef,
+        setProgress: setExportProgress,
+        setRunning: setExportLoading,
+        startedAt,
+        sessionClassifiedStart: 0,
+        onDone: (status) => {
+          // Fresh snapshot immediately, then poll until the label index
+          // catches up (see settleExportCounts) — otherwise the button
+          // would re-enable on a stale "To Label > 0" count for pages we
+          // just labelled but Confluence hasn't indexed yet.
+          refreshExportCounts();
+          if (status === 'completed') settleExportCounts();
+        },
+      });
     } catch (error) {
       console.error('Export failed:', error);
       setExportProgress(null);
@@ -878,10 +1224,18 @@ const App = () => {
             >
               {t('admin.levels.move_down')}
             </Button>
-            <Button appearance="subtle" onClick={() => editLevel(level)}>
+            <Button
+              testId={`admin-level-edit-${level.id}`}
+              appearance="subtle"
+              onClick={() => editLevel(level)}
+            >
               {t('admin.levels.edit_button')}
             </Button>
-            <Button appearance="danger" onClick={() => deleteLevel(level.id)}>
+            <Button
+              testId={`admin-level-delete-${level.id}`}
+              appearance="danger"
+              onClick={() => deleteLevel(level.id)}
+            >
               {t('admin.levels.delete_button')}
             </Button>
           </ButtonGroup>
@@ -931,10 +1285,15 @@ const App = () => {
         key: 'actions',
         content: (
           <ButtonGroup>
-            <Button appearance="subtle" onClick={() => editContact(contact)}>
+            <Button
+              testId={`admin-contact-edit-${contact.id}`}
+              appearance="subtle"
+              onClick={() => editContact(contact)}
+            >
               {t('admin.levels.edit_button')}
             </Button>
             <Button
+              testId={`admin-contact-delete-${contact.id}`}
               appearance="danger"
               onClick={() => deleteContact(contact.id)}
             >
@@ -988,10 +1347,18 @@ const App = () => {
         key: 'actions',
         content: (
           <ButtonGroup>
-            <Button appearance="subtle" onClick={() => editLink(link)}>
+            <Button
+              testId={`admin-link-edit-${link.id}`}
+              appearance="subtle"
+              onClick={() => editLink(link)}
+            >
               {t('admin.levels.edit_button')}
             </Button>
-            <Button appearance="danger" onClick={() => deleteLink(link.id)}>
+            <Button
+              testId={`admin-link-delete-${link.id}`}
+              appearance="danger"
+              onClick={() => deleteLink(link.id)}
+            >
               {t('admin.levels.delete_button')}
             </Button>
           </ButtonGroup>
@@ -1043,7 +1410,11 @@ const App = () => {
                   spread="space-between"
                 >
                   <Heading size="medium">{t('admin.levels.title')}</Heading>
-                  <Button appearance="primary" onClick={addLevel}>
+                  <Button
+                    testId="admin-level-add"
+                    appearance="primary"
+                    onClick={addLevel}
+                  >
                     {t('admin.levels.add_button')}
                   </Button>
                 </Inline>
@@ -1102,7 +1473,11 @@ const App = () => {
                   spread="space-between"
                 >
                   <Heading size="medium">{t('admin.contacts.title')}</Heading>
-                  <Button appearance="primary" onClick={addContact}>
+                  <Button
+                    testId="admin-contact-add"
+                    appearance="primary"
+                    onClick={addContact}
+                  >
                     {t('admin.contacts.add_button')}
                   </Button>
                 </Inline>
@@ -1137,7 +1512,11 @@ const App = () => {
                   spread="space-between"
                 >
                   <Heading size="medium">{t('admin.links.title')}</Heading>
-                  <Button appearance="primary" onClick={addLink}>
+                  <Button
+                    testId="admin-link-add"
+                    appearance="primary"
+                    onClick={addLink}
+                  >
                     {t('admin.links.add_button')}
                   </Button>
                 </Inline>
@@ -1322,6 +1701,49 @@ const App = () => {
                 <TabPanel>
                   <Box xcss={tabPanelStyle}>
                     <Stack space="space.200">
+                      {pendingLabelJobs
+                        .filter((j) => j.jobKind === 'label-import')
+                        .map((job) => (
+                          <SectionMessage
+                            key={job.jobId}
+                            appearance="information"
+                            actions={[
+                              <Button
+                                key="resume"
+                                testId={`admin-labels-import-resume-${job.jobId}`}
+                                appearance="primary"
+                                onClick={() => resumeLabelJob(job)}
+                                isDisabled={
+                                  importStep === 'running' || importSettling
+                                }
+                              >
+                                {t('admin.import.resume_button')}
+                              </Button>,
+                              <Button
+                                key="discard"
+                                testId={`admin-labels-import-discard-${job.jobId}`}
+                                appearance="subtle"
+                                onClick={() => discardLabelJob(job)}
+                                isDisabled={
+                                  importStep === 'running' || importSettling
+                                }
+                              >
+                                {t('admin.import.discard_button')}
+                              </Button>,
+                            ]}
+                          >
+                            <Text>
+                              {interpolate(t('admin.import.paused_banner'), {
+                                classified: job.classified || 0,
+                                total: job.totalEstimate || 0,
+                                labels: formatMappingLabels(
+                                  job.mappings,
+                                  'label-import',
+                                ),
+                              })}
+                            </Text>
+                          </SectionMessage>
+                        ))}
                       <DynamicTable
                         head={{
                           cells: [
@@ -1365,6 +1787,7 @@ const App = () => {
                                     </Button>
                                   </Tooltip>
                                   <Button
+                                    testId="admin-labels-import-refresh"
                                     appearance="subtle"
                                     spacing="compact"
                                     iconBefore="refresh"
@@ -1416,6 +1839,7 @@ const App = () => {
                                   key: 'labels',
                                   content: (
                                     <Select
+                                      testId={`admin-labels-import-labels-${level.id}`}
                                       isMulti
                                       isSearchable
                                       isClearable
@@ -1500,6 +1924,7 @@ const App = () => {
                         <Inline space="space.200" alignBlock="center">
                           <Inline space="space.100" alignBlock="center">
                             <Radio
+                              testId="admin-labels-import-scope-all"
                               value="all"
                               isChecked={importScopeAll}
                               onChange={() => {
@@ -1512,6 +1937,7 @@ const App = () => {
                           </Inline>
                           <Inline space="space.100" alignBlock="center">
                             <Radio
+                              testId="admin-labels-import-scope-space"
                               value="space"
                               isChecked={!importScopeAll}
                               onChange={() => {
@@ -1525,6 +1951,7 @@ const App = () => {
                         </Inline>
                         {!importScopeAll && (
                           <Select
+                            testId="admin-labels-import-spaces"
                             isMulti
                             options={availableSpaces}
                             value={importSpaceKeys}
@@ -1543,6 +1970,7 @@ const App = () => {
                       {/* Remove labels option */}
                       <Inline space="space.100" alignBlock="center">
                         <Toggle
+                          testId="admin-labels-import-remove-labels"
                           id="import-remove-labels"
                           isChecked={importRemoveLabels}
                           onChange={() =>
@@ -1564,27 +1992,49 @@ const App = () => {
 
                       {/* Actions */}
                       <Button
+                        testId="admin-labels-import-start"
                         appearance="primary"
                         onClick={startImport}
                         isDisabled={
                           importStep === 'running' ||
+                          importSettling ||
                           exportLoading ||
+                          exportSettling ||
+                          pendingLabelJobs.some(
+                            (j) => j.jobKind === 'label-import',
+                          ) ||
                           Object.values(importCounts).reduce(
                             (s, c) => s + (c?.toClassify || 0),
                             0,
                           ) === 0
                         }
-                        isLoading={importStep === 'running'}
+                        isLoading={importStep === 'running' || importSettling}
                       >
                         {t('admin.import.start_button')}
                       </Button>
 
                       {importStep === 'running' && importProgress && (
-                        <Stack space="space.050">
-                          <Text>
-                            {importProgress.classified || 0} /{' '}
-                            {importProgress.total || '?'}
-                          </Text>
+                        <Stack
+                          space="space.050"
+                          testId="admin-labels-import-progress"
+                        >
+                          <Inline space="space.100" alignBlock="center">
+                            <Text>
+                              {ACTIVITY_FRAMES[labelActivityFrame]}{' '}
+                              {importProgress.classified || 0} /{' '}
+                              {importProgress.total || '?'}
+                            </Text>
+                            <Button
+                              testId="admin-labels-import-stop"
+                              appearance="subtle"
+                              spacing="compact"
+                              onClick={() => {
+                                importStopRef.current = true;
+                              }}
+                            >
+                              {t('classify.stop_button')}
+                            </Button>
+                          </Inline>
                           <ProgressBar
                             value={
                               importProgress.total > 0
@@ -1594,12 +2044,18 @@ const App = () => {
                             }
                           />
                           {(importProgress.classified || 0) > 0 &&
-                            importProgress.startedAt &&
+                            importProgress.sessionStartedAt &&
                             (() => {
-                              const eta = formatEta(
-                                importProgress.startedAt,
-                                importProgress.classified || 0,
-                                importProgress.total,
+                              const remaining = Math.max(
+                                0,
+                                (importProgress.total || 0) -
+                                  (importProgress.classified || 0),
+                              );
+                              const eta = formatSessionEta(
+                                importProgress.sessionStartedAt,
+                                (importProgress.classified || 0) -
+                                  (importProgress.sessionClassifiedStart || 0),
+                                remaining,
                                 t,
                               );
                               return eta ? <Text>{eta}</Text> : null;
@@ -1611,8 +2067,17 @@ const App = () => {
                           <Text>
                             {interpolate(t('admin.import.complete'), {
                               classified: importProgress.classified || 0,
+                              labels: formatMappingLabels(
+                                importProgress.mappings,
+                                'label-import',
+                              ),
                             })}
                           </Text>
+                        </SectionMessage>
+                      )}
+                      {importSettling && (
+                        <SectionMessage appearance="information">
+                          <Text>{t('admin.import.settling_hint')}</Text>
                         </SectionMessage>
                       )}
 
@@ -1631,6 +2096,45 @@ const App = () => {
                   <Box xcss={tabPanelStyle}>
                     <Stack space="space.100">
                       <Text>{t('admin.export.description')}</Text>
+                      {pendingLabelJobs
+                        .filter((j) => j.jobKind === 'label-export')
+                        .map((job) => (
+                          <SectionMessage
+                            key={job.jobId}
+                            appearance="information"
+                            actions={[
+                              <Button
+                                key="resume"
+                                testId={`admin-labels-export-resume-${job.jobId}`}
+                                appearance="primary"
+                                onClick={() => resumeLabelJob(job)}
+                                isDisabled={exportLoading || exportSettling}
+                              >
+                                {t('admin.export.resume_button')}
+                              </Button>,
+                              <Button
+                                key="discard"
+                                testId={`admin-labels-export-discard-${job.jobId}`}
+                                appearance="subtle"
+                                onClick={() => discardLabelJob(job)}
+                                isDisabled={exportLoading || exportSettling}
+                              >
+                                {t('admin.export.discard_button')}
+                              </Button>,
+                            ]}
+                          >
+                            <Text>
+                              {interpolate(t('admin.export.paused_banner'), {
+                                classified: job.classified || 0,
+                                total: job.totalEstimate || 0,
+                                labels: formatMappingLabels(
+                                  job.mappings,
+                                  'label-export',
+                                ),
+                              })}
+                            </Text>
+                          </SectionMessage>
+                        ))}
                       <DynamicTable
                         head={{
                           cells: [
@@ -1660,6 +2164,7 @@ const App = () => {
                                     {t('admin.export.to_label_column')}
                                   </Text>
                                   <Button
+                                    testId="admin-labels-export-refresh"
                                     appearance="subtle"
                                     spacing="compact"
                                     iconBefore="refresh"
@@ -1714,6 +2219,7 @@ const App = () => {
                                   return (
                                     <Stack space="space.050">
                                       <Textfield
+                                        testId={`admin-labels-export-label-${level.id}`}
                                         value={value}
                                         isInvalid={invalid}
                                         onChange={(e) => {
@@ -1808,6 +2314,7 @@ const App = () => {
                         <Inline space="space.200" alignBlock="center">
                           <Inline space="space.100" alignBlock="center">
                             <Radio
+                              testId="admin-labels-export-scope-all"
                               value="all"
                               isChecked={exportScopeAll}
                               onChange={() => {
@@ -1820,6 +2327,7 @@ const App = () => {
                           </Inline>
                           <Inline space="space.100" alignBlock="center">
                             <Radio
+                              testId="admin-labels-export-scope-space"
                               value="space"
                               isChecked={!exportScopeAll}
                               onChange={() => {
@@ -1833,6 +2341,7 @@ const App = () => {
                         </Inline>
                         {!exportScopeAll && (
                           <Select
+                            testId="admin-labels-export-spaces"
                             isMulti
                             options={availableSpaces}
                             value={exportSpaceKeys}
@@ -1849,11 +2358,17 @@ const App = () => {
                       </Stack>
 
                       <Button
+                        testId="admin-labels-export-start"
                         appearance="primary"
                         onClick={startExport}
-                        isLoading={exportLoading}
+                        isLoading={exportLoading || exportSettling}
                         isDisabled={
                           exportLoading ||
+                          exportSettling ||
+                          importSettling ||
+                          pendingLabelJobs.some(
+                            (j) => j.jobKind === 'label-export',
+                          ) ||
                           (exportProgress && !exportProgress.done) ||
                           (Object.keys(exportCounts).length > 0 &&
                             Object.values(exportCounts).reduce(
@@ -1865,11 +2380,27 @@ const App = () => {
                         {t('admin.export.start_button')}
                       </Button>
                       {exportProgress && !exportProgress.done && (
-                        <Stack space="space.050">
-                          <Text>
-                            {exportProgress.classified || 0} /{' '}
-                            {exportProgress.total || '?'}
-                          </Text>
+                        <Stack
+                          space="space.050"
+                          testId="admin-labels-export-progress"
+                        >
+                          <Inline space="space.100" alignBlock="center">
+                            <Text>
+                              {ACTIVITY_FRAMES[labelActivityFrame]}{' '}
+                              {exportProgress.classified || 0} /{' '}
+                              {exportProgress.total || '?'}
+                            </Text>
+                            <Button
+                              testId="admin-labels-export-stop"
+                              appearance="subtle"
+                              spacing="compact"
+                              onClick={() => {
+                                exportStopRef.current = true;
+                              }}
+                            >
+                              {t('classify.stop_button')}
+                            </Button>
+                          </Inline>
                           <ProgressBar
                             value={
                               exportProgress.total > 0
@@ -1879,12 +2410,18 @@ const App = () => {
                             }
                           />
                           {(exportProgress.classified || 0) > 0 &&
-                            exportProgress.startedAt &&
+                            exportProgress.sessionStartedAt &&
                             (() => {
-                              const eta = formatEta(
-                                exportProgress.startedAt,
-                                exportProgress.classified || 0,
-                                exportProgress.total,
+                              const remaining = Math.max(
+                                0,
+                                (exportProgress.total || 0) -
+                                  (exportProgress.classified || 0),
+                              );
+                              const eta = formatSessionEta(
+                                exportProgress.sessionStartedAt,
+                                (exportProgress.classified || 0) -
+                                  (exportProgress.sessionClassifiedStart || 0),
+                                remaining,
                                 t,
                               );
                               return eta ? <Text>{eta}</Text> : null;
@@ -1896,8 +2433,17 @@ const App = () => {
                           <Text>
                             {interpolate(t('admin.export.complete'), {
                               exported: exportProgress.classified || 0,
+                              labels: formatMappingLabels(
+                                exportProgress.mappings,
+                                'label-export',
+                              ),
                             })}
                           </Text>
+                        </SectionMessage>
+                      )}
+                      {exportSettling && (
+                        <SectionMessage appearance="information">
+                          <Text>{t('admin.export.settling_hint')}</Text>
                         </SectionMessage>
                       )}
                     </Stack>
@@ -1927,6 +2473,7 @@ const App = () => {
             )}
 
             <Button
+              testId="admin-save"
               appearance="primary"
               onClick={handleSave}
               isLoading={saving}

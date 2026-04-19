@@ -701,7 +701,11 @@ const App = () => {
               {/* Change classification button (editors only) */}
               {canEdit && (
                 <Box xcss={sectionStyle}>
-                  <Button appearance="default" onClick={openModal}>
+                  <Button
+                    testId="byline-change"
+                    appearance="default"
+                    onClick={openModal}
+                  >
                     {t('byline.change_button')}
                   </Button>
                 </Box>
@@ -822,6 +826,7 @@ const App = () => {
                     actions={[
                       <Button
                         key="resume"
+                        testId="byline-owner-resume"
                         appearance="primary"
                         onClick={() => resumePendingJob(ownerJob)}
                       >
@@ -829,6 +834,7 @@ const App = () => {
                       </Button>,
                       <Button
                         key="stop"
+                        testId="byline-owner-stop"
                         appearance="subtle"
                         onClick={() => stopPendingJob(ownerJob)}
                       >
@@ -875,6 +881,7 @@ const App = () => {
                         actions={[
                           <Button
                             key="resume"
+                            testId={`byline-pending-resume-${job.jobId}`}
                             appearance="primary"
                             onClick={() => resumePendingJob(job)}
                           >
@@ -882,6 +889,7 @@ const App = () => {
                           </Button>,
                           <Button
                             key="stop"
+                            testId={`byline-pending-stop-${job.jobId}`}
                             appearance="subtle"
                             onClick={() => stopPendingJob(job)}
                           >
@@ -929,6 +937,7 @@ const App = () => {
                       // but de-emphasized so users don't hit it accidentally.
                       <Button
                         key="abandon"
+                        testId="byline-stop-keep-going"
                         appearance="primary"
                         onClick={abandonStop}
                       >
@@ -936,6 +945,7 @@ const App = () => {
                       </Button>,
                       <Button
                         key="confirm"
+                        testId="byline-stop-confirm"
                         appearance="subtle"
                         onClick={confirmStop}
                       >
@@ -972,6 +982,7 @@ const App = () => {
                           alignBlock="center"
                         >
                           <Radio
+                            testId={`byline-level-${level.id}`}
                             value={level.id}
                             isChecked={selectedLevel === level.id}
                             isDisabled={!!asyncJob || saving}
@@ -1027,6 +1038,7 @@ const App = () => {
                     <Stack space="space.050">
                       <Inline space="space.100" alignBlock="center">
                         <Toggle
+                          testId="byline-recursive-toggle"
                           id="recursive-toggle"
                           isChecked={recursive}
                           onChange={() => setRecursive(!recursive)}
@@ -1133,19 +1145,32 @@ const App = () => {
                     {/* Stop is destructive but NOT the default; keep it
                         subtle on the left so Pause (the safe close) is the
                         visually prominent primary action on the right. */}
-                    <Button appearance="subtle" onClick={requestStop}>
+                    <Button
+                      testId="byline-stop"
+                      appearance="subtle"
+                      onClick={requestStop}
+                    >
                       {t('classify.stop_button')}
                     </Button>
-                    <Button appearance="primary" onClick={closeModal}>
+                    <Button
+                      testId="byline-pause"
+                      appearance="primary"
+                      onClick={closeModal}
+                    >
                       {t('classify.pause_button')}
                     </Button>
                   </>
                 ) : (
                   <>
-                    <Button appearance="subtle" onClick={closeModal}>
+                    <Button
+                      testId="byline-cancel"
+                      appearance="subtle"
+                      onClick={closeModal}
+                    >
                       {t('classify.cancel_button')}
                     </Button>
                     <Button
+                      testId="byline-classify-submit"
                       appearance="primary"
                       onClick={handleClassify}
                       isLoading={saving}
