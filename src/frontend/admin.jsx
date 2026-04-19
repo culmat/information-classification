@@ -56,8 +56,8 @@ import ForgeReconciler, {
 import { invoke, requestConfluence, showFlag, realtime } from '@forge/bridge';
 import {
   COLOR_OPTIONS,
-  buildSpaceFilter,
   colorToLozenge,
+  isValidLabel,
   normalizeColor,
 } from '../shared/constants';
 import { SUPPORTED_LANGUAGES } from '../shared/defaults';
@@ -323,6 +323,16 @@ const App = () => {
     return keys.length > 0 ? keys.join(',') : '';
   };
 
+  // Default / empty record used when no labels are selected or the space
+  // filter is empty. Keeping the record shape consistent simplifies the
+  // render code — it doesn't have to branch on `undefined`.
+  const EMPTY_IMPORT_COUNT = {
+    labelled: 0,
+    alreadyClassified: 0,
+    toClassify: 0,
+    cql: { labelled: '', alreadyClassified: '', toClassify: '' },
+  };
+
   const refreshImportCounts = async (labelsOverride) => {
     setImportCountLoading(true);
     const allowedLevels = (config?.levels || []).filter((l) => l.allowed);
@@ -332,32 +342,43 @@ const App = () => {
     );
     const spaceKey = getImportSpaceKey();
 
-    // Space mode but no valid keys entered — show 0 for all levels
+    // Space mode but no valid keys entered — show zero record for all levels
     if (spaceKey === '') {
-      setImportCounts(Object.fromEntries(allLevelIds.map((id) => [id, 0])));
+      setImportCounts(
+        Object.fromEntries(allLevelIds.map((id) => [id, EMPTY_IMPORT_COUNT])),
+      );
       setImportCountLoading(false);
       setImportLevelLoading({});
       return;
     }
     const counts = {};
     const source = labelsOverride || importLabels;
-    // One call per level with all its labels — CQL OR deduplicates pages
+    // One resolver call per level: server returns {labelled, alreadyClassified,
+    // toClassify, cql{...}} so the frontend can render three linked counts.
     const results = await Promise.all(
       allowedLevels.map(async (level) => {
         const labels = (source[level.id] || [])
           .map((o) => o.value)
           .filter(Boolean);
-        if (labels.length === 0) return { level: level.id, count: 0 };
+        if (labels.length === 0)
+          return { level: level.id, record: EMPTY_IMPORT_COUNT };
         try {
-          const result = await invoke('countLabelPages', { labels, spaceKey });
-          return { level: level.id, count: result.success ? result.count : 0 };
+          const result = await invoke('countLabelPages', {
+            labels,
+            levelId: level.id,
+            spaceKey,
+          });
+          return {
+            level: level.id,
+            record: result.success ? result : EMPTY_IMPORT_COUNT,
+          };
         } catch (_) {
-          return { level: level.id, count: 0 };
+          return { level: level.id, record: EMPTY_IMPORT_COUNT };
         }
       }),
     );
-    for (const { level, count } of results) {
-      counts[level] = count;
+    for (const { level, record } of results) {
+      counts[level] = record;
     }
     setImportCounts(counts);
     setImportCountLoading(false);
@@ -378,7 +399,7 @@ const App = () => {
       setImportLevelLoading((prev) => ({ ...prev, [levelId]: true }));
       const spaceKey = getImportSpaceKey();
       if (spaceKey === '') {
-        setImportCounts((prev) => ({ ...prev, [levelId]: 0 }));
+        setImportCounts((prev) => ({ ...prev, [levelId]: EMPTY_IMPORT_COUNT }));
         setImportLevelLoading((prev) => ({ ...prev, [levelId]: false }));
         return;
       }
@@ -386,16 +407,20 @@ const App = () => {
         .map((o) => o.value)
         .filter(Boolean);
       if (labels.length === 0) {
-        setImportCounts((prev) => ({ ...prev, [levelId]: 0 }));
+        setImportCounts((prev) => ({ ...prev, [levelId]: EMPTY_IMPORT_COUNT }));
         setImportLevelLoading((prev) => ({ ...prev, [levelId]: false }));
         return;
       }
-      let total = 0;
+      let record = EMPTY_IMPORT_COUNT;
       try {
-        const result = await invoke('countLabelPages', { labels, spaceKey });
-        total = result.success ? result.count : 0;
+        const result = await invoke('countLabelPages', {
+          labels,
+          levelId,
+          spaceKey,
+        });
+        if (result.success) record = result;
       } catch (_) {}
-      setImportCounts((prev) => ({ ...prev, [levelId]: total }));
+      setImportCounts((prev) => ({ ...prev, [levelId]: record }));
       setImportLevelLoading((prev) => ({ ...prev, [levelId]: false }));
     }, 600);
   };
@@ -483,6 +508,13 @@ const App = () => {
     return keys.length > 0 ? keys.join(',') : '';
   };
 
+  const EMPTY_EXPORT_COUNT = {
+    classified: 0,
+    alreadyLabelled: 0,
+    toLabel: 0,
+    cql: { classified: '', alreadyLabelled: '', toLabel: '' },
+  };
+
   const refreshExportCounts = async () => {
     setExportCountLoading(true);
     const allLevels = config?.levels || [];
@@ -492,34 +524,82 @@ const App = () => {
     );
     const spaceKey = getExportSpaceKey();
 
-    // Space mode but no valid keys entered — show 0 for all levels
     if (spaceKey === '') {
-      setExportCounts(Object.fromEntries(allLevelIds.map((id) => [id, 0])));
+      setExportCounts(
+        Object.fromEntries(allLevelIds.map((id) => [id, EMPTY_EXPORT_COUNT])),
+      );
       setExportCountLoading(false);
       setExportLevelLoading({});
       return;
     }
 
+    // Bump the per-level sequence before each invoke so any in-flight
+    // per-level call issued from the Textfield won't land on top of the
+    // bulk-refresh result (or vice versa).
+    const seqs = {};
+    for (const id of allLevelIds) {
+      seqs[id] = (exportSeqRef.current[id] || 0) + 1;
+      exportSeqRef.current[id] = seqs[id];
+    }
     const results = await Promise.all(
       allLevels.map(async (level) => {
+        const labelName = exportMappings[level.id] ?? level.id;
         try {
-          const result = await invoke('countLevelUsage', {
+          const result = await invoke('countLevelGap', {
             levelId: level.id,
+            labelName,
             spaceKey,
           });
-          return { level: level.id, count: result.success ? result.count : 0 };
+          return {
+            level: level.id,
+            record: result.success ? result : EMPTY_EXPORT_COUNT,
+          };
         } catch (_) {
-          return { level: level.id, count: 0 };
+          return { level: level.id, record: EMPTY_EXPORT_COUNT };
         }
       }),
     );
-    const counts = {};
-    for (const { level, count } of results) {
-      counts[level] = count;
+    const counts = { ...exportCounts };
+    for (const { level, record } of results) {
+      if (exportSeqRef.current[level] === seqs[level]) counts[level] = record;
     }
     setExportCounts(counts);
     setExportCountLoading(false);
     setExportLevelLoading({});
+  };
+
+  // Debounced per-level refresh when the user edits the target label name.
+  // Sequence guard: if the user types faster than the server answers, older
+  // invokes can resolve after newer ones. We tag every invoke with a per-level
+  // sequence number and drop the response if a newer invoke has been issued
+  // since — otherwise a stale "blank label → toLabel=0" reply would overwrite
+  // the correct counts for the label currently in the field.
+  const exportDebounceRef = useRef({});
+  const exportSeqRef = useRef({});
+  const refreshExportLevelCount = (levelId, labelName) => {
+    clearTimeout(exportDebounceRef.current[levelId]);
+    exportDebounceRef.current[levelId] = setTimeout(async () => {
+      const spaceKey = getExportSpaceKey();
+      if (spaceKey === '') {
+        setExportCounts((prev) => ({ ...prev, [levelId]: EMPTY_EXPORT_COUNT }));
+        return;
+      }
+      const mySeq = (exportSeqRef.current[levelId] || 0) + 1;
+      exportSeqRef.current[levelId] = mySeq;
+      setExportLevelLoading((prev) => ({ ...prev, [levelId]: true }));
+      let record = EMPTY_EXPORT_COUNT;
+      try {
+        const result = await invoke('countLevelGap', {
+          levelId,
+          labelName,
+          spaceKey,
+        });
+        if (result.success) record = result;
+      } catch (_) {}
+      if (exportSeqRef.current[levelId] !== mySeq) return; // stale — newer invoke pending
+      setExportCounts((prev) => ({ ...prev, [levelId]: record }));
+      setExportLevelLoading((prev) => ({ ...prev, [levelId]: false }));
+    }, 600);
   };
 
   // Auto-refresh export counts when config loads
@@ -577,7 +657,7 @@ const App = () => {
           : level.id
         ).trim(),
       }))
-      .filter((m) => m.labelName.length > 0);
+      .filter((m) => m.labelName.length > 0 && isValidLabel(m.labelName));
     setExportLoading(true);
     setExportProgress({ classified: 0, failed: 0, total: 0, done: false });
     try {
@@ -1253,10 +1333,22 @@ const App = () => {
                               content: t('admin.import.labels_column'),
                             },
                             {
-                              key: 'pages',
+                              key: 'labelled',
+                              content: t('admin.import.labelled_column'),
+                            },
+                            {
+                              key: 'alreadyClassified',
+                              content: t(
+                                'admin.import.already_classified_column',
+                              ),
+                            },
+                            {
+                              key: 'toClassify',
                               content: (
                                 <Inline space="space.050" alignBlock="center">
-                                  <Text>{t('admin.import.pages_column')}</Text>
+                                  <Text>
+                                    {t('admin.import.to_classify_column')}
+                                  </Text>
                                   <Button
                                     appearance="subtle"
                                     spacing="compact"
@@ -1274,21 +1366,23 @@ const App = () => {
                         rows={(config?.levels || [])
                           .filter((l) => l.allowed)
                           .map((level) => {
-                            const count = importCounts[level.id];
+                            const record =
+                              importCounts[level.id] || EMPTY_IMPORT_COUNT;
                             const selected = importLabels[level.id] || [];
-                            const labels = selected
-                              .map((o) => o.value)
-                              .filter(Boolean);
-                            const selectedKeys = importScopeAll
-                              ? []
-                              : (importSpaceKeys || []).map((o) => o.value);
-                            const spaceFilter = buildSpaceFilter(
-                              selectedKeys.join(','),
-                            );
-                            const cql =
-                              labels.length > 0
-                                ? `type=page AND (${labels.map((l) => `label = "${l}"`).join(' OR ')})${spaceFilter}`
-                                : null;
+                            const renderCount = (n, cql) => {
+                              if (importLevelLoading[level.id]) {
+                                return <Spinner size="small" />;
+                              }
+                              if (!cql) return <Text>{String(n ?? 0)}</Text>;
+                              return (
+                                <Link
+                                  href={`/wiki/search?cql=${encodeURIComponent(cql)}`}
+                                  openNewTab
+                                >
+                                  {String(n)}
+                                </Link>
+                              );
+                            };
                             return {
                               key: level.id,
                               cells: [
@@ -1329,24 +1423,24 @@ const App = () => {
                                   ),
                                 },
                                 {
-                                  key: 'pages',
-                                  content: importLevelLoading[level.id] ? (
-                                    <Spinner size="small" />
-                                  ) : count !== undefined && cql ? (
-                                    <Text>
-                                      <Link
-                                        href={`/wiki/search?cql=${encodeURIComponent(cql)}`}
-                                        openNewTab
-                                      >
-                                        {count}
-                                      </Link>
-                                    </Text>
-                                  ) : (
-                                    <Text>
-                                      {count !== undefined
-                                        ? String(count)
-                                        : '—'}
-                                    </Text>
+                                  key: 'labelled',
+                                  content: renderCount(
+                                    record.labelled,
+                                    record.cql?.labelled,
+                                  ),
+                                },
+                                {
+                                  key: 'alreadyClassified',
+                                  content: renderCount(
+                                    record.alreadyClassified,
+                                    record.cql?.alreadyClassified,
+                                  ),
+                                },
+                                {
+                                  key: 'toClassify',
+                                  content: renderCount(
+                                    record.toClassify,
+                                    record.cql?.toClassify,
                                   ),
                                 },
                               ],
@@ -1357,7 +1451,7 @@ const App = () => {
                       {/* Info message when no pages match selected labels */}
                       {!importCountLoading &&
                         Object.values(importCounts).reduce(
-                          (s, c) => s + c,
+                          (s, c) => s + (c?.labelled || 0),
                           0,
                         ) === 0 &&
                         Object.values(importLabels).some(
@@ -1365,6 +1459,24 @@ const App = () => {
                         ) && (
                           <SectionMessage appearance="information">
                             <Text>{t('admin.import.no_pages_found')}</Text>
+                          </SectionMessage>
+                        )}
+
+                      {/* Nothing to classify: labels matched, but every page
+                          is already at the target level. */}
+                      {!importCountLoading &&
+                        Object.values(importCounts).reduce(
+                          (s, c) => s + (c?.labelled || 0),
+                          0,
+                        ) > 0 &&
+                        Object.values(importCounts).reduce(
+                          (s, c) => s + (c?.toClassify || 0),
+                          0,
+                        ) === 0 && (
+                          <SectionMessage appearance="information">
+                            <Text>
+                              {t('admin.import.nothing_to_classify_hint')}
+                            </Text>
                           </SectionMessage>
                         )}
 
@@ -1426,9 +1538,14 @@ const App = () => {
                           {t('admin.import.remove_labels')}
                         </Label>
                       </Inline>
-                      <SectionMessage appearance="information">
-                        <Text>{t('admin.import.remove_labels_help')}</Text>
-                      </SectionMessage>
+                      {/* Only show the "stale label" caveat when the toggle is
+                          OFF — if removal is enabled (the recommended default),
+                          the concern doesn't apply. */}
+                      {!importRemoveLabels && (
+                        <SectionMessage appearance="information">
+                          <Text>{t('admin.import.remove_labels_help')}</Text>
+                        </SectionMessage>
+                      )}
 
                       {/* Actions */}
                       <Button
@@ -1438,7 +1555,7 @@ const App = () => {
                           importStep === 'running' ||
                           exportLoading ||
                           Object.values(importCounts).reduce(
-                            (s, c) => s + c,
+                            (s, c) => s + (c?.toClassify || 0),
                             0,
                           ) === 0
                         }
@@ -1511,10 +1628,22 @@ const App = () => {
                               content: t('admin.export.label_name'),
                             },
                             {
-                              key: 'pages',
+                              key: 'classified',
+                              content: t('admin.export.classified_column'),
+                            },
+                            {
+                              key: 'alreadyLabelled',
+                              content: t(
+                                'admin.export.already_labelled_column',
+                              ),
+                            },
+                            {
+                              key: 'toLabel',
                               content: (
                                 <Inline space="space.050" alignBlock="center">
-                                  <Text>{t('admin.export.pages_column')}</Text>
+                                  <Text>
+                                    {t('admin.export.to_label_column')}
+                                  </Text>
                                   <Button
                                     appearance="subtle"
                                     spacing="compact"
@@ -1530,14 +1659,22 @@ const App = () => {
                           ],
                         }}
                         rows={(config?.levels || []).map((level) => {
-                          const expCount = exportCounts[level.id];
-                          const selectedKeys = exportScopeAll
-                            ? []
-                            : (exportSpaceKeys || []).map((o) => o.value);
-                          const spaceFilter = buildSpaceFilter(
-                            selectedKeys.join(','),
-                          );
-                          const cql = `type=page AND culmat_classification_level = "${level.id}"${spaceFilter}`;
+                          const record =
+                            exportCounts[level.id] || EMPTY_EXPORT_COUNT;
+                          const renderCount = (n, cql) => {
+                            if (exportLevelLoading[level.id]) {
+                              return <Spinner size="small" />;
+                            }
+                            if (!cql) return <Text>{String(n ?? 0)}</Text>;
+                            return (
+                              <Link
+                                href={`/wiki/search?cql=${encodeURIComponent(cql)}`}
+                                openNewTab
+                              >
+                                {String(n)}
+                              </Link>
+                            );
+                          };
                           return {
                             key: level.id,
                             cells: [
@@ -1554,37 +1691,67 @@ const App = () => {
                               },
                               {
                                 key: 'label',
-                                content: (
-                                  <Textfield
-                                    value={exportMappings[level.id] ?? level.id}
-                                    onChange={(e) =>
-                                      setExportMappings((prev) => ({
-                                        ...prev,
-                                        [level.id]: e.target.value,
-                                      }))
-                                    }
-                                  />
+                                content: (() => {
+                                  const value =
+                                    exportMappings[level.id] ?? level.id;
+                                  const invalid =
+                                    value.length > 0 && !isValidLabel(value);
+                                  return (
+                                    <Stack space="space.050">
+                                      <Textfield
+                                        value={value}
+                                        isInvalid={invalid}
+                                        onChange={(e) => {
+                                          // Whitespace is not allowed in
+                                          // Confluence labels — strip it on
+                                          // every keystroke so the field can
+                                          // never hold a whitespace-only or
+                                          // padded value. Eliminates the
+                                          // "blank-then-type" race where a
+                                          // transient blank would fire a
+                                          // bogus opt-out invoke.
+                                          const next = e.target.value.replace(
+                                            /\s+/g,
+                                            '',
+                                          );
+                                          setExportMappings((prev) => ({
+                                            ...prev,
+                                            [level.id]: next,
+                                          }));
+                                          refreshExportLevelCount(
+                                            level.id,
+                                            next,
+                                          );
+                                        }}
+                                      />
+                                      <Text>
+                                        {invalid
+                                          ? t('admin.export.label_invalid_hint')
+                                          : ''}
+                                      </Text>
+                                    </Stack>
+                                  );
+                                })(),
+                              },
+                              {
+                                key: 'classified',
+                                content: renderCount(
+                                  record.classified,
+                                  record.cql?.classified,
                                 ),
                               },
                               {
-                                key: 'pages',
-                                content: exportLevelLoading[level.id] ? (
-                                  <Spinner size="small" />
-                                ) : expCount !== undefined && expCount > 0 ? (
-                                  <Text>
-                                    <Link
-                                      href={`/wiki/search?cql=${encodeURIComponent(cql)}`}
-                                      openNewTab
-                                    >
-                                      {expCount}
-                                    </Link>
-                                  </Text>
-                                ) : (
-                                  <Text>
-                                    {expCount !== undefined
-                                      ? String(expCount)
-                                      : '—'}
-                                  </Text>
+                                key: 'alreadyLabelled',
+                                content: renderCount(
+                                  record.alreadyLabelled,
+                                  record.cql?.alreadyLabelled,
+                                ),
+                              },
+                              {
+                                key: 'toLabel',
+                                content: renderCount(
+                                  record.toLabel,
+                                  record.cql?.toLabel,
                                 ),
                               },
                             ],
@@ -1592,14 +1759,32 @@ const App = () => {
                         })}
                       />
 
-                      {/* Warning when no pages are classified */}
+                      {/* Warning when no pages are classified at all */}
                       {Object.keys(exportCounts).length > 0 &&
                         Object.values(exportCounts).reduce(
-                          (s, c) => s + c,
+                          (s, c) => s + (c?.classified || 0),
                           0,
                         ) === 0 && (
                           <SectionMessage appearance="warning">
                             <Text>{t('admin.export.no_classifications')}</Text>
+                          </SectionMessage>
+                        )}
+
+                      {/* Nothing to label: pages classified but all already
+                          carry the target label. */}
+                      {Object.keys(exportCounts).length > 0 &&
+                        Object.values(exportCounts).reduce(
+                          (s, c) => s + (c?.classified || 0),
+                          0,
+                        ) > 0 &&
+                        Object.values(exportCounts).reduce(
+                          (s, c) => s + (c?.toLabel || 0),
+                          0,
+                        ) === 0 && (
+                          <SectionMessage appearance="information">
+                            <Text>
+                              {t('admin.export.nothing_to_label_hint')}
+                            </Text>
                           </SectionMessage>
                         )}
 
@@ -1657,7 +1842,7 @@ const App = () => {
                           (exportProgress && !exportProgress.done) ||
                           (Object.keys(exportCounts).length > 0 &&
                             Object.values(exportCounts).reduce(
-                              (s, c) => s + c,
+                              (s, c) => s + (c?.toLabel || 0),
                               0,
                             ) === 0)
                         }

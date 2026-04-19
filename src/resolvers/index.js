@@ -32,6 +32,7 @@ import {
   listSpacesResolver,
   listLabelsResolver,
   countLabelPagesResolver,
+  countLevelGapResolver,
   startLabelImportResolver,
   startLabelExportResolver,
 } from './importResolver';
@@ -70,6 +71,7 @@ resolver.define('resetSpaceConfig', resetSpaceConfigResolver);
 resolver.define('listSpaces', listSpacesResolver);
 resolver.define('listLabels', listLabelsResolver);
 resolver.define('countLabelPages', countLabelPagesResolver);
+resolver.define('countLevelGap', countLevelGapResolver);
 resolver.define('startLabelImport', startLabelImportResolver);
 resolver.define('startLabelExport', startLabelExportResolver);
 
