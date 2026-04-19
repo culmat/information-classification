@@ -98,6 +98,23 @@ const containerStyle = xcss({ padding: 'space.400', maxWidth: '960px' });
 /* TabPanel renders no top padding — add it manually (same workaround as byline.jsx). */
 const tabPanelStyle = xcss({ paddingTop: 'space.100' });
 
+// Default / empty record used when no labels are selected or the space
+// filter is empty. Keeping the record shape consistent simplifies the
+// render code — it doesn't have to branch on `undefined`.
+const EMPTY_IMPORT_COUNT = {
+  labelled: 0,
+  alreadyClassified: 0,
+  toClassify: 0,
+  cql: { labelled: '', alreadyClassified: '', toClassify: '' },
+};
+
+const EMPTY_EXPORT_COUNT = {
+  classified: 0,
+  alreadyLabelled: 0,
+  toLabel: 0,
+  cql: { classified: '', alreadyLabelled: '', toLabel: '' },
+};
+
 const App = () => {
   const context = useProductContext();
   const { t } = useTranslation();
@@ -191,7 +208,7 @@ const App = () => {
 
       setLoading(false);
     })();
-  }, [t]);
+  }, [t, refreshAuditData]);
 
   // Save configuration
   const handleSave = useCallback(async () => {
@@ -285,25 +302,28 @@ const App = () => {
   // Label import wizard actions
   // Generate default label selections from level ID + all translations,
   // filtered to only include labels that actually exist in the instance.
-  const getDefaultImportLabels = (labelOptions) => {
-    const existingNames = new Set(
-      (labelOptions || availableLabels).map((o) => o.value),
-    );
-    const result = {};
-    for (const level of (config?.levels || []).filter((l) => l.allowed)) {
-      const candidates = new Set();
-      candidates.add(level.id);
-      if (level.name) {
-        for (const val of Object.values(level.name)) {
-          if (val) candidates.add(val.toLowerCase());
+  const getDefaultImportLabels = useCallback(
+    (labelOptions) => {
+      const existingNames = new Set(
+        (labelOptions || availableLabels).map((o) => o.value),
+      );
+      const result = {};
+      for (const level of (config?.levels || []).filter((l) => l.allowed)) {
+        const candidates = new Set();
+        candidates.add(level.id);
+        if (level.name) {
+          for (const val of Object.values(level.name)) {
+            if (val) candidates.add(val.toLowerCase());
+          }
         }
+        result[level.id] = [...candidates]
+          .filter((n) => existingNames.has(n))
+          .map((n) => ({ label: n, value: n }));
       }
-      result[level.id] = [...candidates]
-        .filter((n) => existingNames.has(n))
-        .map((n) => ({ label: n, value: n }));
-    }
-    return result;
-  };
+      return result;
+    },
+    [availableLabels, config],
+  );
 
   // Initialize import labels and auto-load counts on first render
   const [importInitialized, setImportInitialized] = useState(false);
@@ -342,86 +362,79 @@ const App = () => {
   importSpaceKeysRef.current = importSpaceKeys;
 
   // Returns null for "all", comma-separated keys for "space", or '' if space mode but no keys selected
-  const getImportSpaceKey = () => {
+  const getImportSpaceKey = useCallback(() => {
     if (importScopeAllRef.current) return null;
     const keys = (importSpaceKeysRef.current || [])
       .map((o) => o.value)
       .filter(Boolean);
     return keys.length > 0 ? keys.join(',') : '';
-  };
+  }, []);
 
-  // Default / empty record used when no labels are selected or the space
-  // filter is empty. Keeping the record shape consistent simplifies the
-  // render code — it doesn't have to branch on `undefined`.
-  const EMPTY_IMPORT_COUNT = {
-    labelled: 0,
-    alreadyClassified: 0,
-    toClassify: 0,
-    cql: { labelled: '', alreadyClassified: '', toClassify: '' },
-  };
-
-  const refreshImportCounts = async (labelsOverride) => {
-    setImportCountLoading(true);
-    const allowedLevels = (config?.levels || []).filter((l) => l.allowed);
-    const allLevelIds = allowedLevels.map((l) => l.id);
-    setImportLevelLoading(
-      Object.fromEntries(allLevelIds.map((id) => [id, true])),
-    );
-    const spaceKey = getImportSpaceKey();
-
-    // Space mode but no valid keys entered — show zero record for all levels
-    if (spaceKey === '') {
-      const zero = Object.fromEntries(
-        allLevelIds.map((id) => [id, EMPTY_IMPORT_COUNT]),
+  const refreshImportCounts = useCallback(
+    async (labelsOverride) => {
+      setImportCountLoading(true);
+      const allowedLevels = (config?.levels || []).filter((l) => l.allowed);
+      const allLevelIds = allowedLevels.map((l) => l.id);
+      setImportLevelLoading(
+        Object.fromEntries(allLevelIds.map((id) => [id, true])),
       );
-      setImportCounts(zero);
+      const spaceKey = getImportSpaceKey();
+
+      // Space mode but no valid keys entered — show zero record for all levels
+      if (spaceKey === '') {
+        const zero = Object.fromEntries(
+          allLevelIds.map((id) => [id, EMPTY_IMPORT_COUNT]),
+        );
+        setImportCounts(zero);
+        setImportCountLoading(false);
+        setImportLevelLoading({});
+        return zero;
+      }
+      // Bump per-level sequence numbers before the bulk invoke so any
+      // in-flight per-level call (from a Select change while the bulk is
+      // still running) won't land on top of the bulk result. Mirrors the
+      // export-side guard around `exportSeqRef`.
+      const seqs = {};
+      for (const id of allLevelIds) {
+        seqs[id] = (importSeqRef.current[id] || 0) + 1;
+        importSeqRef.current[id] = seqs[id];
+      }
+      const counts = { ...importCounts };
+      const source = labelsOverride || importLabels;
+      // One resolver call per level: server returns {labelled, alreadyClassified,
+      // toClassify, cql{...}} so the frontend can render three linked counts.
+      const results = await Promise.all(
+        allowedLevels.map(async (level) => {
+          const labels = (source[level.id] || [])
+            .map((o) => o.value)
+            .filter(Boolean);
+          if (labels.length === 0)
+            return { level: level.id, record: EMPTY_IMPORT_COUNT };
+          try {
+            const result = await invoke('countLabelPages', {
+              labels,
+              levelId: level.id,
+              spaceKey,
+            });
+            return {
+              level: level.id,
+              record: result.success ? result : EMPTY_IMPORT_COUNT,
+            };
+          } catch (_) {
+            return { level: level.id, record: EMPTY_IMPORT_COUNT };
+          }
+        }),
+      );
+      for (const { level, record } of results) {
+        if (importSeqRef.current[level] === seqs[level]) counts[level] = record;
+      }
+      setImportCounts(counts);
       setImportCountLoading(false);
       setImportLevelLoading({});
-      return zero;
-    }
-    // Bump per-level sequence numbers before the bulk invoke so any
-    // in-flight per-level call (from a Select change while the bulk is
-    // still running) won't land on top of the bulk result. Mirrors the
-    // export-side guard around `exportSeqRef`.
-    const seqs = {};
-    for (const id of allLevelIds) {
-      seqs[id] = (importSeqRef.current[id] || 0) + 1;
-      importSeqRef.current[id] = seqs[id];
-    }
-    const counts = { ...importCounts };
-    const source = labelsOverride || importLabels;
-    // One resolver call per level: server returns {labelled, alreadyClassified,
-    // toClassify, cql{...}} so the frontend can render three linked counts.
-    const results = await Promise.all(
-      allowedLevels.map(async (level) => {
-        const labels = (source[level.id] || [])
-          .map((o) => o.value)
-          .filter(Boolean);
-        if (labels.length === 0)
-          return { level: level.id, record: EMPTY_IMPORT_COUNT };
-        try {
-          const result = await invoke('countLabelPages', {
-            labels,
-            levelId: level.id,
-            spaceKey,
-          });
-          return {
-            level: level.id,
-            record: result.success ? result : EMPTY_IMPORT_COUNT,
-          };
-        } catch (_) {
-          return { level: level.id, record: EMPTY_IMPORT_COUNT };
-        }
-      }),
-    );
-    for (const { level, record } of results) {
-      if (importSeqRef.current[level] === seqs[level]) counts[level] = record;
-    }
-    setImportCounts(counts);
-    setImportCountLoading(false);
-    setImportLevelLoading({});
-    return counts;
-  };
+      return counts;
+    },
+    [config, importCounts, importLabels, getImportSpaceKey],
+  );
 
   // Post-sync refresh loop for import. Classification property updates also
   // lag behind CQL searches, so the same settle pattern applies.
@@ -516,7 +529,14 @@ const App = () => {
         refreshImportCounts(defaults);
       }
     }
-  }, [config, importInitialized, labelsLoading, availableLabels]);
+  }, [
+    config,
+    importInitialized,
+    labelsLoading,
+    availableLabels,
+    getDefaultImportLabels,
+    refreshImportCounts,
+  ]);
 
   // Client-driven label sync: refs for the loop to read stop requests and
   // for the activity-indicator tick. Refs (not state) so the loop sees
@@ -666,22 +686,15 @@ const App = () => {
   exportScopeAllRef.current = exportScopeAll;
   exportSpaceKeysRef.current = exportSpaceKeys;
 
-  const getExportSpaceKey = () => {
+  const getExportSpaceKey = useCallback(() => {
     if (exportScopeAllRef.current) return null;
     const keys = (exportSpaceKeysRef.current || [])
       .map((o) => o.value)
       .filter(Boolean);
     return keys.length > 0 ? keys.join(',') : '';
-  };
+  }, []);
 
-  const EMPTY_EXPORT_COUNT = {
-    classified: 0,
-    alreadyLabelled: 0,
-    toLabel: 0,
-    cql: { classified: '', alreadyLabelled: '', toLabel: '' },
-  };
-
-  const refreshExportCounts = async () => {
+  const refreshExportCounts = useCallback(async () => {
     setExportCountLoading(true);
     const allLevels = config?.levels || [];
     const allLevelIds = allLevels.map((l) => l.id);
@@ -734,7 +747,7 @@ const App = () => {
     setExportCountLoading(false);
     setExportLevelLoading({});
     return counts;
-  };
+  }, [config, exportCounts, exportMappings, getExportSpaceKey]);
 
   // Post-sync refresh loop: CQL's label index lags actual writes by up to a
   // minute, so we poll until counts stop moving (or we hit the time budget).
@@ -813,7 +826,7 @@ const App = () => {
       setExportCountsInitialized(true);
       refreshExportCounts();
     }
-  }, [config, exportCountsInitialized]);
+  }, [config, exportCountsInitialized, refreshExportCounts]);
 
   // Resume a paused label-sync job: re-attach the client loop to the same
   // jobId. No call to startLabel(Import|Export) — the job header already

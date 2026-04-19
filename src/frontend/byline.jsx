@@ -107,6 +107,10 @@ const App = () => {
   // waiting for a React render cycle.
   const pauseRequestedRef = useRef(false);
   const stopRequestedRef = useRef(false);
+  // Captures the job's startedAt timestamp so the loop's `finish()` can log
+  // elapsed duration without depending on `asyncJob` (which would otherwise
+  // force the loop's useCallback to re-create mid-run).
+  const startedAtRef = useRef(null);
   // Paused jobs on OTHER pages — populated when the modal opens.
   const [pendingJobs, setPendingJobs] = useState([]);
 
@@ -272,12 +276,13 @@ const App = () => {
       const finish = (kind, { classified, failed }) => {
         // Browser-console marker so we can compare run durations when tuning
         // concurrency / chunk size. Mirror of the server-side log.
-        if (asyncJob?.startedAt) {
-          const durationMs = Date.now() - asyncJob.startedAt;
+        if (startedAtRef.current) {
+          const durationMs = Date.now() - startedAtRef.current;
           console.log(
             `[classify-job] ${kind} classified=${classified} failed=${failed} durationMs=${durationMs}`,
           );
         }
+        startedAtRef.current = null;
         setShowModal(false);
         setAsyncJob(null);
         setAsyncProgress(null);
@@ -451,6 +456,7 @@ const App = () => {
         });
         return;
       }
+      startedAtRef.current = Date.now();
       setAsyncJob({
         jobId: start.jobId,
         total: start.totalEstimate,
@@ -566,6 +572,7 @@ const App = () => {
       setSelectedLevel(job.levelId);
       setRecursive(true);
       setPendingJobs((prev) => prev.filter((j) => j.jobId !== job.jobId));
+      startedAtRef.current = job.startedAt;
       setAsyncJob({
         jobId: job.jobId,
         total: job.totalEstimate,
