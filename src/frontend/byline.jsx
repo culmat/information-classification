@@ -29,7 +29,6 @@ import ForgeReconciler, {
   Stack,
   Inline,
   Lozenge,
-  Radio,
   Spinner,
   SectionMessage,
   Modal,
@@ -38,21 +37,24 @@ import ForgeReconciler, {
   ModalTitle,
   ModalBody,
   ModalFooter,
-  Toggle,
-  Label,
   Link,
   User,
   Tabs,
   Tab,
   TabList,
   TabPanel,
-  ProgressBar,
   EmptyState,
   xcss,
 } from '@forge/react';
 import { invoke, view, showFlag } from '@forge/bridge';
 import { colorToLozenge } from '../shared/constants';
 import { localize, interpolate, formatSessionEta } from '../shared/i18n';
+import ContactItem from './byline/ContactItem';
+import OwnerJobBanner from './byline/OwnerJobBanner';
+import PendingJobsList from './byline/PendingJobsList';
+import StopConfirmation from './byline/StopConfirmation';
+import LevelPicker from './byline/LevelPicker';
+import AsyncProgressBar from './byline/AsyncProgressBar';
 
 // Fixed-width Unicode Braille dots used as a plain-text activity spinner.
 // All characters live in the same Unicode block (U+2800–U+28FF), so every
@@ -828,145 +830,40 @@ const App = () => {
                  * here would conflict.
                  */}
                 {ownerJob && (
-                  <SectionMessage
-                    appearance="information"
-                    actions={[
-                      <Button
-                        key="resume"
-                        testId="byline-owner-resume"
-                        appearance="primary"
-                        onClick={() => resumePendingJob(ownerJob)}
-                      >
-                        {t('classify.resume_button')}
-                      </Button>,
-                      <Button
-                        key="stop"
-                        testId="byline-owner-stop"
-                        appearance="subtle"
-                        onClick={() => stopPendingJob(ownerJob)}
-                      >
-                        {t('classify.stop_button')}
-                      </Button>,
-                    ]}
-                  >
-                    <Stack space="space.050">
-                      <Inline space="space.050" alignBlock="center">
-                        <Text>
-                          {ownerJob.isSelf
-                            ? t('classify.paused_here_prefix')
-                            : interpolate(
-                                t('classify.paused_ancestor_prefix'),
-                                { title: ownerJob.rootTitle || '' },
-                              )}
-                        </Text>
-                        <Text>→</Text>
-                        <Lozenge
-                          isBold
-                          appearance={levelAppearance(ownerJob.levelId)}
-                        >
-                          {resolveLevelName(ownerJob.levelId)}
-                        </Lozenge>
-                      </Inline>
-                      <Text>
-                        {interpolate(t('classify.paused_progress'), {
-                          classified: ownerJob.classified,
-                          total: ownerJob.totalEstimate,
-                        })}
-                      </Text>
-                    </Stack>
-                  </SectionMessage>
+                  <OwnerJobBanner
+                    ownerJob={ownerJob}
+                    t={t}
+                    resumePendingJob={resumePendingJob}
+                    stopPendingJob={stopPendingJob}
+                    resolveLevelName={resolveLevelName}
+                    levelAppearance={levelAppearance}
+                  />
                 )}
 
                 {/* Paused jobs on unrelated pages — compact list above the
                     normal picker. Never auto-resumes; user decides. */}
                 {otherJobs.length > 0 && (
-                  <Stack space="space.100">
-                    {otherJobs.slice(0, 3).map((job) => (
-                      <SectionMessage
-                        key={job.jobId}
-                        appearance="information"
-                        actions={[
-                          <Button
-                            key="resume"
-                            testId={`byline-pending-resume-${job.jobId}`}
-                            appearance="primary"
-                            onClick={() => resumePendingJob(job)}
-                          >
-                            {t('classify.resume_button')}
-                          </Button>,
-                          <Button
-                            key="stop"
-                            testId={`byline-pending-stop-${job.jobId}`}
-                            appearance="subtle"
-                            onClick={() => stopPendingJob(job)}
-                          >
-                            {t('classify.stop_button')}
-                          </Button>,
-                        ]}
-                      >
-                        <Stack space="space.050">
-                          <Inline space="space.050" alignBlock="center">
-                            <Text>
-                              {job.rootTitle
-                                ? interpolate(
-                                    t('classify.paused_other_prefix'),
-                                    { title: job.rootTitle },
-                                  )
-                                : t('classify.paused_other_prefix_notitle')}
-                            </Text>
-                            <Text>→</Text>
-                            <Lozenge
-                              isBold
-                              appearance={levelAppearance(job.levelId)}
-                            >
-                              {resolveLevelName(job.levelId)}
-                            </Lozenge>
-                          </Inline>
-                          <Text>
-                            {interpolate(t('classify.paused_progress'), {
-                              classified: job.classified,
-                              total: job.totalEstimate,
-                            })}
-                          </Text>
-                        </Stack>
-                      </SectionMessage>
-                    ))}
-                  </Stack>
+                  <PendingJobsList
+                    otherJobs={otherJobs}
+                    t={t}
+                    resumePendingJob={resumePendingJob}
+                    stopPendingJob={stopPendingJob}
+                    resolveLevelName={resolveLevelName}
+                    levelAppearance={levelAppearance}
+                  />
                 )}
 
                 {/* Stop-confirmation — inline SectionMessage over the picker.
                     Avoids nested Modal complexity; covers the dialog contextually. */}
                 {stopConfirmVisible && asyncJob && (
-                  <SectionMessage
-                    appearance="warning"
-                    actions={[
-                      // Keep going is the default; Yes, stop is destructive
-                      // but de-emphasized so users don't hit it accidentally.
-                      <Button
-                        key="abandon"
-                        testId="byline-stop-keep-going"
-                        appearance="primary"
-                        onClick={abandonStop}
-                      >
-                        {t('classify.stop_keep_going_button')}
-                      </Button>,
-                      <Button
-                        key="confirm"
-                        testId="byline-stop-confirm"
-                        appearance="subtle"
-                        onClick={confirmStop}
-                      >
-                        {t('classify.stop_confirm_button')}
-                      </Button>,
-                    ]}
-                  >
-                    <Text>
-                      {interpolate(t('classify.stop_confirm_message'), {
-                        classified: asyncProgress?.classified || 0,
-                        level: resolveLevelName(asyncJob.levelId),
-                      })}
-                    </Text>
-                  </SectionMessage>
+                  <StopConfirmation
+                    asyncJob={asyncJob}
+                    asyncProgress={asyncProgress}
+                    t={t}
+                    abandonStop={abandonStop}
+                    confirmStop={confirmStop}
+                    resolveLevelName={resolveLevelName}
+                  />
                 )}
 
                 {/*
@@ -980,154 +877,36 @@ const App = () => {
                  * owner-job banner above is the only path forward.
                  */}
                 {!asyncJob && !ownerJob && (
-                  <>
-                    <Stack space="space.075">
-                      {(config?.levels || []).map((level) => (
-                        <Inline
-                          key={level.id}
-                          space="space.100"
-                          alignBlock="center"
-                        >
-                          <Radio
-                            testId={`byline-level-${level.id}`}
-                            value={level.id}
-                            isChecked={selectedLevel === level.id}
-                            isDisabled={!!asyncJob || saving}
-                            onChange={() => setSelectedLevel(level.id)}
-                            label=""
-                          />
-                          <Lozenge
-                            isBold
-                            appearance={colorToLozenge(level.color)}
-                          >
-                            {localize(level.name, locale)}
-                          </Lozenge>
-                          {!level.allowed && (
-                            <Text>({t('classify.not_allowed')})</Text>
-                          )}
-                        </Inline>
-                      ))}
-                    </Stack>
-
-                    {/* Show description for selected level, or error message if disallowed */}
-                    {selectedLevel &&
-                      (() => {
-                        const level = config?.levels?.find(
-                          (l) => l.id === selectedLevel,
-                        );
-                        if (!level) return null;
-
-                        if (!level.allowed) {
-                          // Always show an error for disallowed levels — custom message
-                          // if configured, otherwise a generic "not allowed" notice.
-                          const customMessage = level.errorMessage
-                            ? localize(level.errorMessage, locale)
-                            : '';
-                          return (
-                            <SectionMessage appearance="error">
-                              <Text>
-                                {customMessage || t('classify.not_allowed')}
-                              </Text>
-                            </SectionMessage>
-                          );
-                        }
-
-                        if (level.description) {
-                          return (
-                            <Text>{localize(level.description, locale)}</Text>
-                          );
-                        }
-
-                        return null;
-                      })()}
-
-                    {/* Recursive toggle with descendant count */}
-                    <Stack space="space.050">
-                      <Inline space="space.100" alignBlock="center">
-                        <Toggle
-                          testId="byline-recursive-toggle"
-                          id="recursive-toggle"
-                          isChecked={recursive}
-                          onChange={() => setRecursive(!recursive)}
-                          isDisabled={
-                            !!asyncJob || saving || !selectedLevelAllowed
-                          }
-                        />
-                        <Label labelFor="recursive-toggle">
-                          {t('classify.apply_recursive')}
-                        </Label>
-                        {countLoading && <Spinner size="small" />}
-                      </Inline>
-                      {recursive && !countLoading && totalDescendants === 0 && (
-                        <Text>{t('classify.no_subpages')}</Text>
-                      )}
-                      {/* Total pages to update = descendants needing change + current page if it needs change */}
-                      {(() => {
-                        if (
-                          !recursive ||
-                          countLoading ||
-                          asyncJob ||
-                          !selectedLevelAllowed
-                        )
-                          return null;
-                        const currentNeedsUpdate =
-                          selectedLevel !== currentLevelId;
-                        const totalToUpdate =
-                          (descendantCount || 0) + (currentNeedsUpdate ? 1 : 0);
-                        if (totalDescendants === 0) return null; // handled above
-                        if (totalToUpdate === 0) {
-                          return (
-                            <Text>{t('classify.all_subpages_classified')}</Text>
-                          );
-                        }
-                        // The Apply button's isLoading already signals progress;
-                        // swapping this row for a spinner would change height and
-                        // briefly toggle the modal scrollbar.
-                        return (
-                          <Text>
-                            {interpolate(t('classify.apply_recursive_count'), {
-                              count: totalToUpdate,
-                            })}
-                          </Text>
-                        );
-                      })()}
-                    </Stack>
-                  </>
+                  <LevelPicker
+                    config={config}
+                    locale={locale}
+                    t={t}
+                    selectedLevel={selectedLevel}
+                    setSelectedLevel={setSelectedLevel}
+                    asyncJob={asyncJob}
+                    saving={saving}
+                    selectedLevelAllowed={selectedLevelAllowed}
+                    recursive={recursive}
+                    setRecursive={setRecursive}
+                    countLoading={countLoading}
+                    totalDescendants={totalDescendants}
+                    descendantCount={descendantCount}
+                    currentLevelId={currentLevelId}
+                  />
                 )}
 
                 {/* Async progress bar — spinner placeholder until first live
                     Realtime event arrives, to avoid flashing "0 of X" when
                     KVS state hasn't been updated yet. */}
                 {asyncJob && asyncProgress && (
-                  <Stack space="space.100">
-                    {asyncProgress.fromRealtime ? (
-                      <>
-                        <Text>
-                          {ACTIVITY_FRAMES[activityFrame]}
-                          {'  '}
-                          {interpolate(t('classify.async_progress'), {
-                            classified: asyncProgress.classified || 0,
-                            total: asyncJob.total,
-                            level: resolveLevelName(asyncJob.levelId),
-                          })}
-                        </Text>
-                        <ProgressBar
-                          value={
-                            asyncJob.total > 0
-                              ? (asyncProgress.classified || 0) / asyncJob.total
-                              : 0
-                          }
-                        />
-                        {etaText ? <Text>{etaText}</Text> : null}
-                      </>
-                    ) : (
-                      <Inline space="space.100" alignBlock="center">
-                        <Spinner size="small" />
-                        <Text>{t('classify.async_loading_progress')}</Text>
-                      </Inline>
-                    )}
-                    <Text>{t('classify.async_close_hint')}</Text>
-                  </Stack>
+                  <AsyncProgressBar
+                    asyncJob={asyncJob}
+                    asyncProgress={asyncProgress}
+                    activityFrame={activityFrame}
+                    etaText={etaText}
+                    resolveLevelName={resolveLevelName}
+                    t={t}
+                  />
                 )}
 
                 {/* Error and info messages stay inside the modal.
@@ -1202,40 +981,6 @@ const App = () => {
         )}
       </ModalTransition>
     </Box>
-  );
-};
-
-/**
- * Renders a single contact item.
- * Supports user (with avatar), email (as link), and free text types.
- */
-const ContactItem = ({ contact, locale }) => {
-  const role = localize(contact.role, locale);
-
-  if (contact.type === 'user') {
-    return (
-      <Inline space="space.100" alignBlock="center">
-        <User accountId={contact.value} />
-        {role && <Text> — {role}</Text>}
-      </Inline>
-    );
-  }
-
-  if (contact.type === 'email') {
-    return (
-      <Inline space="space.100">
-        <Link href={`mailto:${contact.value}`}>{contact.value}</Link>
-        {role && <Text> — {role}</Text>}
-      </Inline>
-    );
-  }
-
-  // Free text
-  return (
-    <Text>
-      {contact.value}
-      {role ? ` — ${role}` : ''}
-    </Text>
   );
 };
 
