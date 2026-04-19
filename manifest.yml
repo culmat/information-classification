@@ -34,6 +34,7 @@ modules:
         i18n: macro.stats.title
       description:
         i18n: macro.stats.description
+      icon: resource:app-icons;app-icon.png
       resource: stats-macro-ui
       render: native
       resolver:
@@ -80,6 +81,8 @@ resources:
     path: src/frontend/spaceSettings.jsx
   - key: stats-macro-ui
     path: src/frontend/statsMacro.jsx
+  - key: app-icons
+    path: icon
 translations:
   resources:
     - key: en-US

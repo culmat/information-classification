@@ -27,16 +27,20 @@ import ForgeReconciler, {
   Tab,
   TabList,
   TabPanel,
+  Image,
   xcss,
 } from '@forge/react';
 import { invoke, showFlag } from '@forge/bridge';
 import { colorToLozenge } from '../shared/constants';
 import { localize } from '../shared/i18n';
 import StatisticsPanel from './StatisticsPanel';
+import appIcon from './assets/app-icon.png';
 
 const containerStyle = xcss({ padding: 'space.400', maxWidth: '640px' });
 /* TabPanel renders no top padding — add it manually (same workaround as byline.jsx). */
 const tabPanelStyle = xcss({ paddingTop: 'space.100' });
+/* See admin.jsx for why we clamp the header logo via a Box wrapper. */
+const headerIconStyle = xcss({ width: '28px', height: '28px' });
 
 const App = () => {
   const context = useProductContext();
@@ -229,7 +233,12 @@ const App = () => {
   return (
     <Box xcss={containerStyle}>
       <Stack space="space.300">
-        <Heading size="large">{t('space_settings.title')}</Heading>
+        <Inline space="space.100" alignBlock="center" alignInline="start">
+          <Box xcss={headerIconStyle}>
+            <Image src={appIcon} alt="" width={28} height={28} />
+          </Box>
+          <Heading size="large">{t('space_settings.title')}</Heading>
+        </Inline>
 
         <Tabs id="space-settings-tabs">
           <TabList>

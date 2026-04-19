@@ -1,6 +1,7 @@
 {
   "name": "information-classification-for-confluence",
   "version": "0.1.0",
+  "description": "Forge app that adds information classification levels to Confluence Cloud pages.",
   "main": "index.js",
   "license": "AGPLv3",
   "private": true,

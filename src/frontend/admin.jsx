@@ -921,8 +921,6 @@ const App = () => {
   return (
     <Box xcss={containerStyle}>
       <Stack space="space.300">
-        <Heading size="large">{t('app.admin_title')}</Heading>
-
         <Tabs id="admin-tabs" onChange={(index) => setActiveTab(index)}>
           <TabList>
             <Tab>{t('admin.tabs.statistics')}</Tab>
