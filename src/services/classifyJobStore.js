@@ -19,12 +19,7 @@
  */
 
 import { kvs } from '@forge/kvs';
-import {
-  CLASSIFY_CHUNK_SIZE,
-  jobChunkKey,
-  jobHeaderKey,
-  userJobsKey,
-} from '../shared/constants';
+import { jobChunkKey, jobHeaderKey, userJobsKey } from '../shared/constants';
 
 // --- user-jobs index ---
 
@@ -76,13 +71,22 @@ async function deleteChunk(accountId, rootPageId, idx) {
 // --- high-level operations ---
 
 /**
- * Appends a list of page IDs into chunks of CLASSIFY_CHUNK_SIZE, starting
- * at `startIdx`. Returns the new `totalChunks` after append.
+ * Appends a list of page IDs into chunks of `chunkSize`, starting at
+ * `startIdx`. Returns the new `totalChunks` after append.
  */
-export async function appendIdsAsChunks(accountId, rootPageId, startIdx, ids) {
+export async function appendIdsAsChunks(
+  accountId,
+  rootPageId,
+  startIdx,
+  ids,
+  chunkSize,
+) {
+  if (!chunkSize || chunkSize < 1) {
+    throw new Error('appendIdsAsChunks: chunkSize must be >= 1');
+  }
   let idx = startIdx;
-  for (let i = 0; i < ids.length; i += CLASSIFY_CHUNK_SIZE) {
-    const slice = ids.slice(i, i + CLASSIFY_CHUNK_SIZE);
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const slice = ids.slice(i, i + chunkSize);
     await writeChunk(accountId, rootPageId, idx, slice);
     idx++;
   }
@@ -107,17 +111,29 @@ export async function consumeChunk(accountId, rootPageId, idx) {
 }
 
 /**
- * Writes a new job: header + initial chunks + user-jobs entry. Overwrites
- * any existing job on the same rootPageId — caller guards against that.
+ * Writes a new job: header + initial chunks + user-jobs entry. `chunkSize`
+ * is stored in the header so `processClassifyBatch` uses the same size when
+ * discovery appends more chunks later.
  */
-export async function createJob(accountId, rootPageId, header, initialIds) {
+export async function createJob(
+  accountId,
+  rootPageId,
+  header,
+  initialIds,
+  chunkSize,
+) {
   const totalChunks = await appendIdsAsChunks(
     accountId,
     rootPageId,
     0,
     initialIds,
+    chunkSize,
   );
-  await writeJobHeader(accountId, rootPageId, { ...header, totalChunks });
+  await writeJobHeader(accountId, rootPageId, {
+    ...header,
+    totalChunks,
+    chunkSize,
+  });
   await addToUserJobs(accountId, rootPageId);
 }
 

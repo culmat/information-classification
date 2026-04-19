@@ -83,10 +83,27 @@ export function buildSpaceFilter(spaceKey) {
 export const ASYNC_JOB_KEY_PREFIX = 'async-job:';
 export const asyncJobKey = (pageId) => `${ASYNC_JOB_KEY_PREFIX}${pageId}`;
 
-// Client-driven recursive classification: per-batch chunk size.
-// ~10 pages × ~1.2 s each = ~12 s per processClassifyBatch invoke,
-// safely under the 25 s Forge resolver timeout.
-export const CLASSIFY_CHUNK_SIZE = 10;
+// Client-driven recursive classification tuning.
+//
+// Chunk size is DYNAMIC: computed per job from the total page estimate so
+// small trees get tiny chunks (smooth progress, fast first update) and big
+// trees get larger chunks (fewer invokes, less overhead dominating wall
+// time). Targets ~15 batches per job inside [3, 20] bounds.
+//
+// Concurrency controls how many pages are classified in parallel inside a
+// single invoke. 3 is empirically safe against Confluence rate limits and
+// gives ~3× speedup per invoke; `requestWithRetry` absorbs any one-off 429s.
+export const CLASSIFY_CONCURRENCY = 3;
+const CLASSIFY_MIN_CHUNK = 3;
+const CLASSIFY_MAX_CHUNK = 20;
+const CLASSIFY_TARGET_BATCHES = 15;
+
+export function computeClassifyChunkSize(totalPages) {
+  const n = Number(totalPages) || 0;
+  if (n <= 0) return CLASSIFY_MIN_CHUNK;
+  const size = Math.ceil(n / CLASSIFY_TARGET_BATCHES);
+  return Math.min(CLASSIFY_MAX_CHUNK, Math.max(CLASSIFY_MIN_CHUNK, size));
+}
 
 // KVS keys for the client-driven job state.
 export const userJobsKey = (accountId) => `user-jobs:${accountId}`;

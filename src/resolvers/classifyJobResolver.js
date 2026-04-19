@@ -9,9 +9,11 @@
  *   startRecursiveClassify → processClassifyBatch (repeat) → done
  *                         └─ cancelClassifyJob (anytime) → cleanup
  *
- * The whole thing is scaled by chunk size (CLASSIFY_CHUNK_SIZE). Trees of
- * any size are handled by interleaving discovery and classification across
- * batches — no single invoke ever exceeds Forge's 25 s resolver budget.
+ * Chunk size is computed per job from the total page estimate (see
+ * computeClassifyChunkSize) — small trees get tiny chunks for snappy first
+ * updates, big trees get larger chunks so invoke overhead doesn't dominate.
+ * Discovery and classification interleave across batches so no single
+ * invoke ever exceeds Forge's 25 s resolver budget.
  */
 
 import api, { route } from '@forge/api';
@@ -24,7 +26,12 @@ import {
 import { getAncestorIds } from '../services/restrictionService';
 import { getEffectiveConfig } from '../storage/configStore';
 import { getSpaceConfig } from '../storage/spaceConfigStore';
-import { CLASSIFY_CHUNK_SIZE, STALE_JOB_MS } from '../shared/constants';
+import {
+  CLASSIFY_CONCURRENCY,
+  STALE_JOB_MS,
+  computeClassifyChunkSize,
+} from '../shared/constants';
+import { runWithConcurrency } from '../utils/concurrency';
 import {
   appendIdsAsChunks,
   consumeChunk,
@@ -127,6 +134,12 @@ export async function startRecursiveClassifyResolver(req) {
     const discoveryCursor =
       firstIds.length < totalSize ? firstIds.length : null;
 
+    // Dynamic chunk sizing: small trees get tiny chunks (smooth progress),
+    // big trees get larger chunks (fewer invokes → less overhead dominating
+    // wall time). Chosen once based on the CQL-reported totalSize and
+    // stored in the header so all subsequent discovery appends use it too.
+    const chunkSize = computeClassifyChunkSize(totalSize);
+
     const now = Date.now();
     const header = {
       rootPageId: String(pageId),
@@ -145,9 +158,10 @@ export async function startRecursiveClassifyResolver(req) {
       status: 'active',
       nextChunkIdx: 0,
       totalChunks: 0, // filled by createJob
+      chunkSize, // filled by createJob (kept here for clarity)
       discoveryCursor,
     };
-    await createJob(accountId, String(pageId), header, firstIds);
+    await createJob(accountId, String(pageId), header, firstIds, chunkSize);
 
     return successResponse({
       jobId: String(pageId),
@@ -220,13 +234,21 @@ export async function processClassifyBatchResolver(req) {
       );
       const newIds = (results || []).map((r) => r.id).filter(isPositiveId);
       if (newIds.length > 0) {
+        // Fallback: older job headers (pre-dynamic-chunk-size) lack
+        // `chunkSize`. Derive it from totalEstimate so in-flight jobs from a
+        // previous deploy don't throw when discovery appends new chunks.
+        const chunkSize =
+          header.chunkSize ||
+          computeClassifyChunkSize(header.totalEstimate || 0);
         const newTotalChunks = await appendIdsAsChunks(
           accountId,
           String(jobId),
           header.totalChunks,
           newIds,
+          chunkSize,
         );
         header.totalChunks = newTotalChunks;
+        if (!header.chunkSize) header.chunkSize = chunkSize;
       }
       const advanced = header.discoveryCursor + (results?.length || 0);
       header.discoveryCursor =
@@ -237,6 +259,9 @@ export async function processClassifyBatchResolver(req) {
     }
 
     // Classification step — consume the next chunk if there is one.
+    // Pages classify in parallel (CLASSIFY_CONCURRENCY) so each invoke
+    // finishes in ~1.2 s instead of ~N × 1.2 s. Any 429s are absorbed by
+    // requestWithRetry inside contentPropertyService.
     let batchClassified = 0;
     let batchSkipped = 0;
     let batchFailed = 0;
@@ -247,27 +272,33 @@ export async function processClassifyBatchResolver(req) {
         header.nextChunkIdx,
       );
       if (ids && ids.length > 0) {
-        for (const id of ids) {
-          try {
-            const outcome = await classifySinglePage({
-              childPageId: String(id),
-              spaceKey: header.spaceKey,
-              levelId: header.levelId,
-              accountId,
-              locale: header.locale,
-              level,
-              asApp: false, // <-- asUser; the whole point of client-driven
-            });
-            if (outcome === true) batchClassified++;
-            else if (outcome === null) batchSkipped++;
-            else batchFailed++;
-          } catch (err) {
-            console.error(
-              `[processClassifyBatch] page=${id} threw:`,
-              err?.message || err,
-            );
-            batchFailed++;
-          }
+        const outcomes = await runWithConcurrency(
+          ids,
+          CLASSIFY_CONCURRENCY,
+          async (id) => {
+            try {
+              return await classifySinglePage({
+                childPageId: String(id),
+                spaceKey: header.spaceKey,
+                levelId: header.levelId,
+                accountId,
+                locale: header.locale,
+                level,
+                asApp: false, // <-- asUser; the whole point of client-driven
+              });
+            } catch (err) {
+              console.error(
+                `classifySinglePage threw for page=${id}:`,
+                err?.message || err,
+              );
+              return false;
+            }
+          },
+        );
+        for (const outcome of outcomes) {
+          if (outcome === true) batchClassified++;
+          else if (outcome === null) batchSkipped++;
+          else batchFailed++;
         }
       }
       await consumeChunk(accountId, String(jobId), header.nextChunkIdx);
@@ -433,4 +464,4 @@ export async function getUserPendingJobsResolver(req) {
   }
 }
 
-export const __testExports = { DISCOVERY_LIMIT, CLASSIFY_CHUNK_SIZE };
+export const __testExports = { DISCOVERY_LIMIT };

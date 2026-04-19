@@ -114,14 +114,15 @@ describe('startRecursiveClassifyResolver', () => {
     expect(result.totalEstimate).toBe(26); // 25 descendants + parent
     expect(result.discoveryDone).toBe(true);
     expect(mockClassifyPage).toHaveBeenCalledOnce();
-    // Header + 3 chunks (25 / 10 = 2 full + 1 partial) + user-jobs entry.
+    // CLASSIFY_CHUNK_SIZE=3 → 25 ids = 8 full chunks of 3 + 1 chunk of 1.
     expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}`)).toBeTruthy();
     expect(kvsStore.get(`user-jobs:${ACCOUNT}`)).toEqual({
       rootPageIds: [PAGE],
     });
-    expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}:chunk:0`).ids).toHaveLength(10);
-    expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}:chunk:1`).ids).toHaveLength(10);
-    expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}:chunk:2`).ids).toHaveLength(5);
+    const header = kvsStore.get(`job:${ACCOUNT}:${PAGE}`);
+    expect(header.totalChunks).toBe(9);
+    expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}:chunk:0`).ids).toHaveLength(3);
+    expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}:chunk:8`).ids).toHaveLength(1);
   });
 
   it('sets discoveryCursor when more descendants remain', async () => {
@@ -142,7 +143,10 @@ describe('startRecursiveClassifyResolver', () => {
     const header = kvsStore.get(`job:${ACCOUNT}:${PAGE}`);
     expect(header.discoveryCursor).toBe(200);
     expect(header.totalEstimate).toBe(500);
-    expect(header.totalChunks).toBe(20);
+    // Dynamic chunk size: computeClassifyChunkSize(500) = clamp(ceil(500/15),
+    // 3, 20) = 20. First discovery produced 200 ids → 10 chunks of 20.
+    expect(header.chunkSize).toBe(20);
+    expect(header.totalChunks).toBe(10);
   });
 
   it('does NOT count parent when already at target', async () => {
@@ -211,7 +215,8 @@ describe('processClassifyBatchResolver', () => {
   }
 
   it('classifies a chunk per invoke and advances nextChunkIdx', async () => {
-    const ids = Array.from({ length: 10 }, (_, i) => String(100 + i));
+    // 3 ids = exactly one CLASSIFY_CHUNK_SIZE=3 chunk → 1 batch to completion.
+    const ids = ['100', '101', '102'];
     await seedJob({ ids });
 
     const before = kvsStore.get(`job:${ACCOUNT}:${PAGE}`);
@@ -223,7 +228,7 @@ describe('processClassifyBatchResolver', () => {
     });
 
     expect(batch.success).toBe(true);
-    expect(batch.classified).toBe(11); // 10 descendants + 1 parent (seeded)
+    expect(batch.classified).toBe(4); // 3 descendants + 1 parent (seeded)
     expect(batch.done).toBe(true);
     // Job deleted on completion.
     expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}`)).toBeUndefined();
@@ -287,44 +292,47 @@ describe('processClassifyBatchResolver', () => {
   });
 
   it('continues discovery across multiple batches', async () => {
-    // Initial seed: 10 ids, totalSize 20 (more to discover).
-    const firstIds = Array.from({ length: 10 }, (_, i) => ({
+    // 6 descendants total, seeded in batches of 3. With CLASSIFY_CHUNK_SIZE=3
+    // that produces 2 chunks and discovery finishes on the second fetch.
+    const firstIds = Array.from({ length: 3 }, (_, i) => ({
       id: String(i),
       title: 't',
     }));
     mockFindDescendants.mockResolvedValueOnce({
       results: firstIds,
-      totalSize: 20,
+      totalSize: 6,
     });
     await startRecursiveClassifyResolver({
       context: { accountId: ACCOUNT },
       payload: { pageId: PAGE, spaceKey: 'IC', levelId: 'public' },
     });
     const header = kvsStore.get(`job:${ACCOUNT}:${PAGE}`);
-    expect(header.discoveryCursor).toBe(10);
+    expect(header.discoveryCursor).toBe(3);
+    expect(header.totalChunks).toBe(1);
 
-    // Next batch's discovery returns the remaining 10 ids.
-    const secondIds = Array.from({ length: 10 }, (_, i) => ({
+    // batch1: discovery fetches the last 3; classification consumes chunk 0.
+    const secondIds = Array.from({ length: 3 }, (_, i) => ({
       id: String(100 + i),
       title: 't',
     }));
     mockFindDescendants.mockResolvedValueOnce({
       results: secondIds,
-      totalSize: 20,
+      totalSize: 6,
     });
     const batch1 = await processClassifyBatchResolver({
       context: { accountId: ACCOUNT },
       payload: { jobId: PAGE },
     });
     expect(batch1.discoveryDone).toBe(true);
-    expect(batch1.done).toBe(false); // still one chunk to classify
+    expect(batch1.done).toBe(false); // chunk 1 still pending
 
+    // batch2: consumes chunk 1 → done.
     const batch2 = await processClassifyBatchResolver({
       context: { accountId: ACCOUNT },
       payload: { jobId: PAGE },
     });
     expect(batch2.done).toBe(true);
-    expect(batch2.classified).toBe(21); // 20 descendants + 1 parent
+    expect(batch2.classified).toBe(7); // 6 descendants + 1 parent
   });
 
   it('aborts if the target level was deleted mid-job', async () => {

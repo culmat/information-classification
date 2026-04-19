@@ -15,6 +15,7 @@ import {
   MAX_HISTORY_ENTRIES,
 } from '../shared/constants';
 import { getRequester } from '../utils/requester';
+import { requestWithRetry } from '../utils/retry';
 
 /**
  * Reads the classification content property from a page.
@@ -103,10 +104,13 @@ export async function appendHistory(
  */
 async function getProperty(pageId, key, useApp = false) {
   try {
-    // v2 API: list all properties, then find by key
-    const response = await getRequester(useApp).requestConfluence(
-      route`/wiki/api/v2/pages/${pageId}/properties?key=${key}`,
-      { headers: { Accept: 'application/json' } },
+    // v2 API: list all properties, then find by key. Wrapped in retry so a
+    // transient 429 doesn't turn into a false "no property" read.
+    const response = await requestWithRetry(() =>
+      getRequester(useApp).requestConfluence(
+        route`/wiki/api/v2/pages/${pageId}/properties?key=${key}`,
+        { headers: { Accept: 'application/json' } },
+      ),
     );
 
     if (!response.ok) {
@@ -136,9 +140,11 @@ async function getProperty(pageId, key, useApp = false) {
 async function upsertProperty(pageId, key, value, useApp = false) {
   try {
     // First check if property exists
-    const listResponse = await getRequester(useApp).requestConfluence(
-      route`/wiki/api/v2/pages/${pageId}/properties?key=${key}`,
-      { headers: { Accept: 'application/json' } },
+    const listResponse = await requestWithRetry(() =>
+      getRequester(useApp).requestConfluence(
+        route`/wiki/api/v2/pages/${pageId}/properties?key=${key}`,
+        { headers: { Accept: 'application/json' } },
+      ),
     );
 
     if (!listResponse.ok && listResponse.status !== 404) {
@@ -158,16 +164,18 @@ async function upsertProperty(pageId, key, value, useApp = false) {
 
     if (!existing) {
       // Property doesn't exist — create it
-      const createResponse = await getRequester(useApp).requestConfluence(
-        route`/wiki/api/v2/pages/${pageId}/properties`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
+      const createResponse = await requestWithRetry(() =>
+        getRequester(useApp).requestConfluence(
+          route`/wiki/api/v2/pages/${pageId}/properties`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify({ key, value }),
           },
-          body: JSON.stringify({ key, value }),
-        },
+        ),
       );
 
       if (!createResponse.ok) {
@@ -186,20 +194,22 @@ async function upsertProperty(pageId, key, value, useApp = false) {
     const propId = existing.id;
     const version = existing.version?.number || 1;
 
-    const updateResponse = await getRequester(useApp).requestConfluence(
-      route`/wiki/api/v2/pages/${pageId}/properties/${propId}`,
-      {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
+    const updateResponse = await requestWithRetry(() =>
+      getRequester(useApp).requestConfluence(
+        route`/wiki/api/v2/pages/${pageId}/properties/${propId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
+            key,
+            value,
+            version: { number: version + 1 },
+          }),
         },
-        body: JSON.stringify({
-          key,
-          value,
-          version: { number: version + 1 },
-        }),
-      },
+      ),
     );
 
     if (!updateResponse.ok) {

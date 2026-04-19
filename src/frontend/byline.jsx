@@ -10,7 +10,13 @@
  * via the getClassification resolver.
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
 import ForgeReconciler, {
   useProductContext,
   useTranslation,
@@ -198,6 +204,33 @@ const App = () => {
   // Recursive classification is driven client-side (runRecursiveLoop) — no
   // Realtime subscription needed. Kept a slim stub only if we ever need to
   // listen to server-side admin flows.
+
+  // ETA text memoised against `classified`. Without this, the ~8 fps
+  // activity-indicator re-renders were causing `elapsed` to tick every
+  // frame while `classified` stood still between batch completions, which
+  // made `rate = classified/elapsed` drift downward and the rendered
+  // "~X sec remaining" text grow. Keyed on classified so it only
+  // recomputes when a batch returns — stable between batches, accurate
+  // on each completion.
+  const etaText = useMemo(() => {
+    if (!asyncJob?.sessionStartedAt) return '';
+    const classified = asyncProgress?.classified || 0;
+    const sessionProgressed =
+      classified - (asyncJob.sessionClassifiedStart || 0);
+    const remainingCount = Math.max(0, asyncJob.total - classified);
+    return formatSessionEta(
+      asyncJob.sessionStartedAt,
+      sessionProgressed,
+      remainingCount,
+      t,
+    );
+  }, [
+    asyncProgress?.classified,
+    asyncJob?.sessionStartedAt,
+    asyncJob?.sessionClassifiedStart,
+    asyncJob?.total,
+    t,
+  ]);
 
   // Cycle the activity-indicator frame at ~8 fps while a job is active.
   // Only the text content of the progress line changes — no DOM structure
@@ -1066,28 +1099,7 @@ const App = () => {
                               : 0
                           }
                         />
-                        {asyncJob.sessionStartedAt &&
-                          (() => {
-                            // Rate is measured over the CURRENT session so
-                            // pause/resume gaps don't inflate the ETA, and
-                            // a warm-up gate hides the ETA until we have
-                            // enough data to extrapolate honestly.
-                            const classified = asyncProgress.classified || 0;
-                            const sessionProgressed =
-                              classified -
-                              (asyncJob.sessionClassifiedStart || 0);
-                            const remainingCount = Math.max(
-                              0,
-                              asyncJob.total - classified,
-                            );
-                            const eta = formatSessionEta(
-                              asyncJob.sessionStartedAt,
-                              sessionProgressed,
-                              remainingCount,
-                              t,
-                            );
-                            return eta ? <Text>{eta}</Text> : null;
-                          })()}
+                        {etaText ? <Text>{etaText}</Text> : null}
                       </>
                     ) : (
                       <Inline space="space.100" alignBlock="center">
