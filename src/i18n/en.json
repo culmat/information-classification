@@ -202,6 +202,7 @@
       "labelled_column": "Labelled",
       "already_classified_column": "Already Classified",
       "to_classify_column": "To Classify",
+      "to_classify_tooltip": "Upper bound. Pages already classified to a more restrictive level will not be updated.",
       "nothing_to_classify_hint": "All labeled pages are already at the target level. Nothing to classify.",
       "refresh_button": "Refresh counts",
       "scope_all": "Entire instance",

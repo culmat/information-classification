@@ -204,6 +204,7 @@
       "labelled_column": "ラベル付き",
       "already_classified_column": "分類済み",
       "to_classify_column": "分類対象",
+      "to_classify_tooltip": "上限値です。より制限の厳しいレベルに既に分類されているページは更新されません。",
       "nothing_to_classify_hint": "ラベル付きのページはすべて既に対象レベルに分類されています。分類対象はありません。",
       "refresh_button": "カウントを更新",
       "scope_all": "インスタンス全体",

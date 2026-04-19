@@ -204,6 +204,7 @@
       "labelled_column": "Mit Label",
       "already_classified_column": "Bereits klassifiziert",
       "to_classify_column": "Zu klassifizieren",
+      "to_classify_tooltip": "Obergrenze. Seiten, die bereits auf einer restriktiveren Stufe klassifiziert sind, werden nicht aktualisiert.",
       "nothing_to_classify_hint": "Alle Seiten mit Label sind bereits auf der Zielstufe. Nichts zu klassifizieren.",
       "refresh_button": "Anzahl aktualisieren",
       "scope_all": "Gesamte Instanz",

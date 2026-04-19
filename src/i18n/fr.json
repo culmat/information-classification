@@ -204,6 +204,7 @@
       "labelled_column": "Étiquetées",
       "already_classified_column": "Déjà classifiées",
       "to_classify_column": "À classifier",
+      "to_classify_tooltip": "Limite supérieure. Les pages déjà classifiées à un niveau plus restrictif ne seront pas mises à jour.",
       "nothing_to_classify_hint": "Toutes les pages étiquetées sont déjà au niveau cible. Rien à classifier.",
       "refresh_button": "Actualiser le comptage",
       "scope_all": "Toute l'instance",

@@ -48,6 +48,7 @@ import ForgeReconciler, {
   EmptyState,
   Tag,
   TagGroup,
+  Tooltip,
   Form,
   FormFooter,
   RequiredAsterisk,
@@ -1349,6 +1350,20 @@ const App = () => {
                                   <Text>
                                     {t('admin.import.to_classify_column')}
                                   </Text>
+                                  <Tooltip
+                                    content={t(
+                                      'admin.import.to_classify_tooltip',
+                                    )}
+                                  >
+                                    <Button
+                                      appearance="subtle"
+                                      spacing="compact"
+                                      iconBefore="editor-info"
+                                      onClick={() => {}}
+                                    >
+                                      {' '}
+                                    </Button>
+                                  </Tooltip>
                                   <Button
                                     appearance="subtle"
                                     spacing="compact"
