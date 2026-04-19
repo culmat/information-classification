@@ -52,10 +52,11 @@ import { interpolate } from '../shared/i18n';
 const panelStyle = xcss({ paddingTop: 'space.100' });
 const tabPanelPadding = xcss({ paddingTop: 'space.100' });
 
-// Auto-reload intervals (ms)
-const POLL_FAST = 10000; // data still changing
-const POLL_SLOW = 120000; // data stable
-const POLL_INITIAL = 15000; // first auto-poll after initial load
+// Poll interval while data is actively changing (ms).
+// Once a poll returns unchanged data we stop polling entirely and rely on the
+// realtime subscription below to trigger the next refresh. This keeps KV reads
+// bounded to "load + while things are moving" instead of forever.
+const POLL_FAST = 10000;
 
 /**
  * Formats an ISO date string as a relative time string.
@@ -97,10 +98,12 @@ const StatisticsPanel = ({
   const timerRef = useRef(null);
   const isFirstLoad = useRef(true);
 
-  // Track when data finishes loading; schedule next auto-reload
+  // Keep polling only while data is actively changing. Once stable, stop —
+  // the realtime subscription below will pull us back in when a classification
+  // commits. The realtime handler's refresh will see a change, re-enter this
+  // fast-poll loop, and auto-stop again once things settle.
   useEffect(() => {
     if (!isLoading && data) {
-      // Compare with previous data to pick poll interval
       const prevJson = prevDataRef.current;
       const newJson = JSON.stringify({
         d: data.distribution,
@@ -112,10 +115,10 @@ const StatisticsPanel = ({
       prevDataRef.current = newJson;
       isFirstLoad.current = false;
 
-      // Schedule next auto-reload
       clearTimeout(timerRef.current);
-      const delay = isFirst ? POLL_INITIAL : changed ? POLL_FAST : POLL_SLOW;
-      timerRef.current = setTimeout(onRefresh, delay);
+      if (changed && !isFirst) {
+        timerRef.current = setTimeout(onRefresh, POLL_FAST);
+      }
     }
     return () => clearTimeout(timerRef.current);
   }, [isLoading, data, onRefresh]);
