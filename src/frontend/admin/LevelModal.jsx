@@ -17,7 +17,7 @@ import {
   FormFooter,
 } from '@forge/react';
 import { COLOR_OPTIONS, colorToLozenge } from '../../shared/constants';
-import TranslatableField from './TranslatableField';
+import LanguageTabs from './LanguageTabs';
 
 /**
  * Modal for adding/editing a classification level.
@@ -26,6 +26,44 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
   const [data, setData] = useState({ ...level });
   const update = (field, value) =>
     setData((prev) => ({ ...prev, [field]: value }));
+
+  const fields = [
+    {
+      idPrefix: 'level-name',
+      label: t('admin.levels.name'),
+      obj: data.name,
+      onChange: (code, value) =>
+        setData((prev) => ({
+          ...prev,
+          name: { ...prev.name, [code]: value },
+        })),
+      required: true,
+    },
+    {
+      idPrefix: 'level-description',
+      label: t('admin.levels.description'),
+      obj: data.description,
+      onChange: (code, value) =>
+        setData((prev) => ({
+          ...prev,
+          description: { ...prev.description, [code]: value },
+        })),
+      multiline: true,
+    },
+  ];
+  if (!data.allowed) {
+    fields.push({
+      idPrefix: 'level-error-message',
+      label: t('admin.levels.error_message'),
+      obj: data.errorMessage,
+      onChange: (code, value) =>
+        setData((prev) => ({
+          ...prev,
+          errorMessage: { ...(prev.errorMessage || {}), [code]: value },
+        })),
+      multiline: true,
+    });
+  }
 
   return (
     <Modal onClose={onClose}>
@@ -39,18 +77,6 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
       <Form onSubmit={() => onSave(data)}>
         <ModalBody>
           <Stack space="space.200">
-            <TranslatableField
-              languages={languages}
-              label={t('admin.levels.name')}
-              obj={data.name}
-              onChange={(code, value) =>
-                setData((prev) => ({
-                  ...prev,
-                  name: { ...prev.name, [code]: value },
-                }))
-              }
-              t={t}
-            />
             <Stack space="space.050">
               <Label labelFor="level-color">{t('admin.levels.color')}</Label>
               <Select
@@ -73,19 +99,6 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
                 </Inline>
               )}
             </Stack>
-            <TranslatableField
-              languages={languages}
-              label={t('admin.levels.description')}
-              obj={data.description}
-              onChange={(code, value) =>
-                setData((prev) => ({
-                  ...prev,
-                  description: { ...prev.description, [code]: value },
-                }))
-              }
-              multiline
-              t={t}
-            />
             <Inline space="space.100" alignBlock="center">
               <Toggle
                 id="level-allowed"
@@ -113,24 +126,12 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
                 {t('admin.levels.requires_protection')}
               </Label>
             </Inline>
-            {!data.allowed && (
-              <TranslatableField
-                languages={languages}
-                label={t('admin.levels.error_message')}
-                obj={data.errorMessage}
-                onChange={(code, value) =>
-                  setData((prev) => ({
-                    ...prev,
-                    errorMessage: {
-                      ...(prev.errorMessage || {}),
-                      [code]: value,
-                    },
-                  }))
-                }
-                multiline
-                t={t}
-              />
-            )}
+            <LanguageTabs
+              id="level-lang-tabs"
+              languages={languages}
+              fields={fields}
+              t={t}
+            />
           </Stack>
         </ModalBody>
         <ModalFooter>

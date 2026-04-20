@@ -19,7 +19,7 @@ import {
 } from '@forge/react';
 import { requestConfluence } from '@forge/bridge';
 import { localize } from '../../shared/i18n';
-import TranslatableField from './TranslatableField';
+import LanguageTabs from './LanguageTabs';
 
 /**
  * Modal for adding/editing a link.
@@ -100,16 +100,22 @@ const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
                 }}
               />
             </Stack>
-            <TranslatableField
+            <LanguageTabs
+              id="link-lang-tabs"
               languages={languages}
-              label={t('admin.links.label')}
-              obj={data.label}
-              onChange={(code, value) =>
-                setData((prev) => ({
-                  ...prev,
-                  label: { ...prev.label, [code]: value },
-                }))
-              }
+              fields={[
+                {
+                  idPrefix: 'link-label',
+                  label: t('admin.links.label'),
+                  obj: data.label,
+                  onChange: (code, value) =>
+                    setData((prev) => ({
+                      ...prev,
+                      label: { ...prev.label, [code]: value },
+                    })),
+                  required: true,
+                },
+              ]}
               t={t}
             />
             <Stack space="space.050">

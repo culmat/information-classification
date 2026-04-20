@@ -16,7 +16,7 @@ import {
   RequiredAsterisk,
 } from '@forge/react';
 import { localize } from '../../shared/i18n';
-import TranslatableField from './TranslatableField';
+import LanguageTabs from './LanguageTabs';
 
 /**
  * Modal for adding/editing a contact.
@@ -73,16 +73,21 @@ const ContactModal = ({ contact, levels, languages, onSave, onClose, t }) => {
                 />
               )}
             </Stack>
-            <TranslatableField
+            <LanguageTabs
+              id="contact-lang-tabs"
               languages={languages}
-              label={t('admin.contacts.role')}
-              obj={data.role}
-              onChange={(code, value) =>
-                setData((prev) => ({
-                  ...prev,
-                  role: { ...prev.role, [code]: value },
-                }))
-              }
+              fields={[
+                {
+                  idPrefix: 'contact-role',
+                  label: t('admin.contacts.role'),
+                  obj: data.role,
+                  onChange: (code, value) =>
+                    setData((prev) => ({
+                      ...prev,
+                      role: { ...prev.role, [code]: value },
+                    })),
+                },
+              ]}
               t={t}
             />
             <Stack space="space.050">
