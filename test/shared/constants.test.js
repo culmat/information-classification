@@ -6,10 +6,9 @@ import {
   SPACE_CONFIG_KEY_PREFIX,
   spaceConfigKey,
   COLOR_TO_LOZENGE,
-  TAG_COLORS,
+  COLOR_TO_HEX,
+  LEVEL_COLORS,
   COLOR_OPTIONS,
-  VALID_COLORS,
-  normalizeColor,
   colorToLozenge,
 } from '../../src/shared/constants';
 
@@ -30,7 +29,26 @@ describe('constants', () => {
     );
   });
 
-  it('should have valid lozenge appearances for all lozenge-mapped colors', () => {
+  it('should have 7 canonical level colors', () => {
+    expect(LEVEL_COLORS).toEqual([
+      'green',
+      'blue',
+      'red',
+      'yellow',
+      'purple',
+      'orange',
+      'grey',
+    ]);
+  });
+
+  it('should map every LEVEL_COLOR in COLOR_TO_LOZENGE and COLOR_TO_HEX', () => {
+    for (const color of LEVEL_COLORS) {
+      expect(COLOR_TO_LOZENGE).toHaveProperty(color);
+      expect(COLOR_TO_HEX).toHaveProperty(color);
+    }
+  });
+
+  it('should have valid lozenge appearances for all mapped colors', () => {
     const validAppearances = [
       'default',
       'inprogress',
@@ -44,12 +62,6 @@ describe('constants', () => {
     }
   });
 
-  it('should map all 21 Tag colors in COLOR_TO_LOZENGE', () => {
-    for (const color of TAG_COLORS) {
-      expect(COLOR_TO_LOZENGE).toHaveProperty(color);
-    }
-  });
-
   it('COLOR_TO_LOZENGE should map key color families correctly', () => {
     expect(COLOR_TO_LOZENGE.green).toBe('success');
     expect(COLOR_TO_LOZENGE.blue).toBe('inprogress');
@@ -59,61 +71,12 @@ describe('constants', () => {
     expect(COLOR_TO_LOZENGE.grey).toBe('default');
   });
 
-  it('should include all original colors in VALID_COLORS', () => {
-    expect(VALID_COLORS).toContain('green');
-    expect(VALID_COLORS).toContain('yellow');
-    expect(VALID_COLORS).toContain('orange');
-    expect(VALID_COLORS).toContain('red');
-    expect(VALID_COLORS).toContain('blue');
-  });
-
-  it('should have 21 Tag colors', () => {
-    expect(TAG_COLORS).toHaveLength(21);
-  });
-
-  it('should include all Tag color variants', () => {
-    // Spot-check some of the expanded colors
-    expect(TAG_COLORS).toContain('greenLight');
-    expect(TAG_COLORS).toContain('teal');
-    expect(TAG_COLORS).toContain('purple');
-    expect(TAG_COLORS).toContain('magenta');
-    expect(TAG_COLORS).toContain('lime');
-    expect(TAG_COLORS).toContain('standard');
-  });
-
-  it('should have VALID_COLORS covering TAG_COLORS plus legacy gray', () => {
-    expect(VALID_COLORS).toEqual(expect.arrayContaining(TAG_COLORS));
-    expect(VALID_COLORS).toContain('gray');
-    expect(VALID_COLORS).toHaveLength(TAG_COLORS.length + 1);
-  });
-
-  it('should have COLOR_OPTIONS as a subset of Tag colors (base colors only)', () => {
-    expect(COLOR_OPTIONS.length).toBeGreaterThan(0);
-    expect(COLOR_OPTIONS.length).toBeLessThanOrEqual(TAG_COLORS.length);
+  it('COLOR_OPTIONS values should equal LEVEL_COLORS in order', () => {
+    expect(COLOR_OPTIONS.map((o) => o.value)).toEqual(LEVEL_COLORS);
     for (const option of COLOR_OPTIONS) {
       expect(option).toHaveProperty('label');
       expect(option).toHaveProperty('value');
-      expect(TAG_COLORS).toContain(option.value);
     }
-    // No light variants in the selectable options
-    for (const option of COLOR_OPTIONS) {
-      expect(option.value).not.toMatch(/Light$/);
-    }
-  });
-
-  it('should normalize gray to grey', () => {
-    expect(normalizeColor('gray')).toBe('grey');
-  });
-
-  it('should pass through valid Tag colors unchanged', () => {
-    expect(normalizeColor('green')).toBe('green');
-    expect(normalizeColor('teal')).toBe('teal');
-    expect(normalizeColor('purpleLight')).toBe('purpleLight');
-  });
-
-  it('should fall back to standard for unknown colors', () => {
-    expect(normalizeColor('pink')).toBe('standard');
-    expect(normalizeColor(undefined)).toBe('standard');
   });
 
   it('colorToLozenge should map known colors to Lozenge appearances', () => {
@@ -123,11 +86,6 @@ describe('constants', () => {
     expect(colorToLozenge('red')).toBe('removed');
     expect(colorToLozenge('purple')).toBe('new');
     expect(colorToLozenge('grey')).toBe('default');
-  });
-
-  it('colorToLozenge should handle legacy gray via normalizeColor fallback', () => {
-    // 'gray' is in COLOR_TO_LOZENGE directly so it resolves without normalizeColor
-    expect(colorToLozenge('gray')).toBe('default');
   });
 
   it('colorToLozenge should fall back to default for unknown colors', () => {

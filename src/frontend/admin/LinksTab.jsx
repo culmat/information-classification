@@ -14,7 +14,6 @@ import {
   EmptyState,
   xcss,
 } from '@forge/react';
-import { normalizeColor } from '../../shared/constants';
 import { localize } from '../../shared/i18n';
 
 const tabPanelStyle = xcss({ paddingTop: 'space.100' });
@@ -49,7 +48,7 @@ const LinksTab = ({ t, config, addLink, editLink, deleteLink }) => {
                   <Tag
                     key={id}
                     text={level ? localize(level.name, 'en') : id}
-                    color={level ? normalizeColor(level.color) : 'standard'}
+                    color={level?.color || 'grey'}
                   />
                 );
               })}

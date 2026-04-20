@@ -37,7 +37,7 @@ export default function useConfigEditing({ config, setConfig, t }) {
       id: '',
       name: { en: '' },
       description: { en: '' },
-      color: 'neutral',
+      color: 'grey',
       allowed: true,
       requiresProtection: false,
     });

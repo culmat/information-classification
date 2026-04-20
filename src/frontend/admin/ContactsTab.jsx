@@ -14,7 +14,6 @@ import {
   EmptyState,
   xcss,
 } from '@forge/react';
-import { normalizeColor } from '../../shared/constants';
 import { localize } from '../../shared/i18n';
 
 const tabPanelStyle = xcss({ paddingTop: 'space.100' });
@@ -48,7 +47,7 @@ const ContactsTab = ({ t, config, addContact, editContact, deleteContact }) => {
                   <Tag
                     key={id}
                     text={level ? localize(level.name, 'en') : id}
-                    color={level ? normalizeColor(level.color) : 'standard'}
+                    color={level?.color || 'grey'}
                   />
                 );
               })}

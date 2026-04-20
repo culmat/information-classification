@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DEFAULT_LEVELS, getDefaultConfig } from '../../src/shared/defaults';
-import { VALID_COLORS } from '../../src/shared/constants';
+import { LEVEL_COLORS } from '../../src/shared/constants';
 
 describe('DEFAULT_LEVELS', () => {
   it('should have exactly 4 default levels', () => {
@@ -19,7 +19,7 @@ describe('DEFAULT_LEVELS', () => {
 
   it('should have valid colors for all levels', () => {
     for (const level of DEFAULT_LEVELS) {
-      expect(VALID_COLORS).toContain(level.color);
+      expect(LEVEL_COLORS).toContain(level.color);
     }
   });
 

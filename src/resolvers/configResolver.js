@@ -14,7 +14,7 @@ import {
   errorResponse,
   validationError,
 } from '../utils/responseHelper';
-import { VALID_COLORS, isValidSpaceKey } from '../shared/constants';
+import { LEVEL_COLORS, isValidSpaceKey } from '../shared/constants';
 import { enqueueJob } from '../utils/jobQueue';
 
 /**
@@ -275,10 +275,10 @@ function validateConfig(config) {
         error: `Level "${level.id}" must have an English name.`,
       };
     }
-    if (!VALID_COLORS.includes(level.color)) {
+    if (!LEVEL_COLORS.includes(level.color)) {
       return {
         valid: false,
-        error: `Level "${level.id}" has invalid color "${level.color}". Valid: ${VALID_COLORS.join(', ')}`,
+        error: `Level "${level.id}" has invalid color "${level.color}". Valid: ${LEVEL_COLORS.join(', ')}`,
       };
     }
   }
