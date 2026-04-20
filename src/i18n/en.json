@@ -97,6 +97,7 @@
       "debug_heading": "Debug info",
       "debug_copy": "Copy",
       "debug_copied": "Copied",
+      "debug_copy_failed": "Copy failed",
       "tracking": "We don't track usage and don't know if and how you are using Information Classification for Confluence — that's why we especially appreciate your {feedback} or {review}.",
       "tracking_feedback": "feedback",
       "tracking_review": "review",

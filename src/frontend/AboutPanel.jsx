@@ -71,14 +71,30 @@ function adminHubUrl(cloudId) {
 }
 
 /**
- * Best-effort clipboard write. UI Kit iframes are typically same-origin for
- * clipboard purposes; on the rare failure we just leave the button state
- * unchanged — user can still select+copy the visible text.
+ * Best-effort clipboard write. The Clipboard API throws NotAllowedError in
+ * Forge UI Kit iframes when the host doesn't grant `clipboard-write`; fall
+ * back to the legacy `execCommand('copy')` path, which works under a user
+ * gesture (the button click supplies one).
  */
 async function copyToClipboard(text) {
   try {
     await navigator.clipboard.writeText(text);
     return true;
+  } catch {
+    // fall through to the textarea fallback
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
   } catch {
     return false;
   }
@@ -134,7 +150,7 @@ const AboutPanel = () => {
 
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState('idle');
 
   useEffect(() => {
     let cancelled = false;
@@ -178,10 +194,8 @@ const AboutPanel = () => {
 
   const handleCopy = useCallback(async () => {
     const ok = await copyToClipboard(debugBlob);
-    if (ok) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    setCopyState(ok ? 'copied' : 'failed');
+    setTimeout(() => setCopyState('idle'), 2000);
   }, [debugBlob]);
 
   /* Build the DynamicTable rows eagerly — the data is already resolved by the
@@ -323,9 +337,11 @@ const AboutPanel = () => {
           <Inline space="space.200" alignBlock="center" spread="space-between">
             <Heading size="small">{t('admin.about.debug_heading')}</Heading>
             <Button testId="about-debug-copy" onClick={handleCopy}>
-              {copied
+              {copyState === 'copied'
                 ? t('admin.about.debug_copied')
-                : t('admin.about.debug_copy')}
+                : copyState === 'failed'
+                  ? t('admin.about.debug_copy_failed')
+                  : t('admin.about.debug_copy')}
             </Button>
           </Inline>
           <Box xcss={codeBlockWrap}>

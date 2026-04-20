@@ -1,36 +1,37 @@
 import api, { route } from '@forge/api';
 
 /**
- * Checks if the given user is a Confluence administrator.
- * Used to gate access to admin-only resolvers (config changes, audit viewing).
- * Defence-in-depth: module gating controls UI visibility, but all modules share
- * one resolver function so we verify at runtime too.
+ * Checks if the invoking user is a Confluence administrator.
  *
- * @param {string} accountId - Atlassian account ID
- * @returns {Promise<boolean>} true if user is in confluence-administrators group
+ * Probes an admin-only endpoint as the invoking user. A 200 response means the
+ * user is a Confluence admin — either via the `confluence-administrators` group
+ * OR via a site-admin role — and a 403 means they are not. This is broader than
+ * a group-membership check, which misses site admins who aren't explicitly
+ * added to the group.
+ *
+ * Defence-in-depth: the `confluence:globalSettings` module gate hides the admin
+ * UI, but the byline module is rendered for every logged-in user and shares one
+ * resolver function, so any user could `invoke()` admin resolvers by name. This
+ * re-check at the resolver level is load-bearing.
+ *
+ * @param {string} accountId - Atlassian account ID (sanity check only; the real
+ *   identity check is asUser() on the probe call).
+ * @returns {Promise<boolean>}
  */
 export async function isConfluenceAdmin(accountId) {
+  if (!accountId) return false;
   try {
     const response = await api
-      .asApp()
-      .requestConfluence(
-        route`/wiki/rest/api/user/memberof?accountId=${accountId}`,
-        {
-          headers: { Accept: 'application/json' },
-        },
-      );
-
-    if (!response.ok) {
-      console.error('Failed to check admin status:', response.status);
-      return false;
-    }
-
-    const data = await response.json();
-    return data.results.some(
-      (group) => group.name === 'confluence-administrators',
-    );
+      .asUser()
+      .requestConfluence(route`/wiki/rest/atlassian-connect/1/addons`, {
+        headers: { Accept: 'application/json' },
+      });
+    if (response.status === 403) return false;
+    if (response.ok) return true;
+    console.error('Admin probe failed:', response.status);
+    return false;
   } catch (error) {
-    console.error('Error checking admin status:', error);
+    console.error('Error probing admin status:', error);
     return false;
   }
 }

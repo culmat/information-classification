@@ -97,6 +97,7 @@
       "debug_heading": "デバッグ情報",
       "debug_copy": "コピー",
       "debug_copied": "コピーしました",
+      "debug_copy_failed": "コピーに失敗しました",
       "tracking": "Information Classification for Confluence の使用状況は追跡しておらず、ご利用の有無や方法も把握していません。そのため、{feedback} や {review} をいただけると大変ありがたいです。",
       "tracking_feedback": "フィードバック",
       "tracking_review": "レビュー",
