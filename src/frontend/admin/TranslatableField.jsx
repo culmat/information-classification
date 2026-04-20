@@ -28,13 +28,13 @@ const TranslatableField = ({
         {multiline ? (
           <TextArea
             id={`${label}-${code}`}
-            value={obj?.[code] || ''}
+            defaultValue={obj?.[code] || ''}
             onChange={(e) => onChange(code, e.target.value)}
           />
         ) : (
           <Textfield
             id={`${label}-${code}`}
-            value={obj?.[code] || ''}
+            defaultValue={obj?.[code] || ''}
             onChange={(e) => onChange(code, e.target.value)}
           />
         )}

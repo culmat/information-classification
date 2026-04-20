@@ -27,7 +27,8 @@ import TranslatableField from './TranslatableField';
  */
 const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
   const [data, setData] = useState({ ...link });
-  const update = (field, value) => setData({ ...data, [field]: value });
+  const update = (field, value) =>
+    setData((prev) => ({ ...prev, [field]: value }));
 
   // Page search state
   const [pageOptions, setPageOptions] = useState([]);
@@ -104,7 +105,10 @@ const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
               label={t('admin.links.label')}
               obj={data.label}
               onChange={(code, value) =>
-                update('label', { ...data.label, [code]: value })
+                setData((prev) => ({
+                  ...prev,
+                  label: { ...prev.label, [code]: value },
+                }))
               }
               t={t}
             />
@@ -183,7 +187,7 @@ const LinkModal = ({ link, levels, languages, onSave, onClose, t }) => {
               ) : (
                 <Textfield
                   id="link-url"
-                  value={data.url || ''}
+                  defaultValue={data.url || ''}
                   onChange={(e) => update('url', e.target.value)}
                   placeholder="https://..."
                 />

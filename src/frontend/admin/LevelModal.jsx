@@ -24,7 +24,8 @@ import TranslatableField from './TranslatableField';
  */
 const LevelModal = ({ level, languages, onSave, onClose, t }) => {
   const [data, setData] = useState({ ...level });
-  const update = (field, value) => setData({ ...data, [field]: value });
+  const update = (field, value) =>
+    setData((prev) => ({ ...prev, [field]: value }));
 
   return (
     <Modal onClose={onClose}>
@@ -43,7 +44,10 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
               label={t('admin.levels.name')}
               obj={data.name}
               onChange={(code, value) =>
-                update('name', { ...data.name, [code]: value })
+                setData((prev) => ({
+                  ...prev,
+                  name: { ...prev.name, [code]: value },
+                }))
               }
               t={t}
             />
@@ -74,7 +78,10 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
               label={t('admin.levels.description')}
               obj={data.description}
               onChange={(code, value) =>
-                update('description', { ...data.description, [code]: value })
+                setData((prev) => ({
+                  ...prev,
+                  description: { ...prev.description, [code]: value },
+                }))
               }
               multiline
               t={t}
@@ -83,7 +90,9 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
               <Toggle
                 id="level-allowed"
                 isChecked={data.allowed}
-                onChange={() => update('allowed', !data.allowed)}
+                onChange={() =>
+                  setData((prev) => ({ ...prev, allowed: !prev.allowed }))
+                }
               />
               <Label labelFor="level-allowed">
                 {t('admin.levels.allowed')}
@@ -94,7 +103,10 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
                 id="level-protection"
                 isChecked={data.requiresProtection}
                 onChange={() =>
-                  update('requiresProtection', !data.requiresProtection)
+                  setData((prev) => ({
+                    ...prev,
+                    requiresProtection: !prev.requiresProtection,
+                  }))
                 }
               />
               <Label labelFor="level-protection">
@@ -107,10 +119,13 @@ const LevelModal = ({ level, languages, onSave, onClose, t }) => {
                 label={t('admin.levels.error_message')}
                 obj={data.errorMessage}
                 onChange={(code, value) =>
-                  update('errorMessage', {
-                    ...(data.errorMessage || {}),
-                    [code]: value,
-                  })
+                  setData((prev) => ({
+                    ...prev,
+                    errorMessage: {
+                      ...(prev.errorMessage || {}),
+                      [code]: value,
+                    },
+                  }))
                 }
                 multiline
                 t={t}

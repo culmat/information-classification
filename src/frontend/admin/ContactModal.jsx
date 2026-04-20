@@ -23,7 +23,8 @@ import TranslatableField from './TranslatableField';
  */
 const ContactModal = ({ contact, levels, languages, onSave, onClose, t }) => {
   const [data, setData] = useState({ ...contact });
-  const update = (field, value) => setData({ ...data, [field]: value });
+  const update = (field, value) =>
+    setData((prev) => ({ ...prev, [field]: value }));
 
   return (
     <Modal onClose={onClose}>
@@ -62,7 +63,7 @@ const ContactModal = ({ contact, levels, languages, onSave, onClose, t }) => {
               ) : (
                 <Textfield
                   id="contact-value"
-                  value={data.value || ''}
+                  defaultValue={data.value || ''}
                   onChange={(e) => update('value', e.target.value)}
                   placeholder={
                     data.type === 'email'
@@ -77,7 +78,10 @@ const ContactModal = ({ contact, levels, languages, onSave, onClose, t }) => {
               label={t('admin.contacts.role')}
               obj={data.role}
               onChange={(code, value) =>
-                update('role', { ...data.role, [code]: value })
+                setData((prev) => ({
+                  ...prev,
+                  role: { ...prev.role, [code]: value },
+                }))
               }
               t={t}
             />
