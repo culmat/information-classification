@@ -10,26 +10,20 @@
  * All failure modes degrade silently — the panel falls back to showing the
  * bundled commit SHA only.
  *
- * Access control: defense-in-depth. `confluence:globalSettings` gates the UI
- * to Confluence admins, but resolvers are shared across modules, so we
- * re-check.
+ * Access control: the `confluence:globalSettings` module is gated in the
+ * manifest by `displayConditions.isSiteAdmin`, so only site admins can reach
+ * this resolver via its module.
  */
 
 import { getAppContext } from '@forge/api';
-import { isConfluenceAdmin } from '../utils/adminAuth';
-import { successResponse, errorResponse } from '../utils/responseHelper';
+import { successResponse } from '../utils/responseHelper';
 
 /** Extract the major-version int from a canonical "X.Y.Z" string. */
 function majorOf(canonicalVersion) {
   return Number.parseInt(canonicalVersion.split('.')[0], 10);
 }
 
-export async function getVersionInfoResolver(req) {
-  const accountId = req?.context?.accountId;
-  if (!accountId || !(await isConfluenceAdmin(accountId))) {
-    return errorResponse('Admin access required', 403);
-  }
-
+export function getVersionInfoResolver() {
   let appContext;
   try {
     appContext = getAppContext();

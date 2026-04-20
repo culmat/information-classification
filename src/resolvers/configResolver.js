@@ -1,13 +1,12 @@
 /**
  * Resolvers for global admin configuration.
- * Access control: module-level gating (confluence:globalSettings) restricts UI
- * visibility to Confluence admins, but all modules share one resolver function,
- * so we enforce admin access at runtime as defense-in-depth.
+ * Access control: the `confluence:globalSettings` module is gated in the
+ * manifest by `displayConditions.isSiteAdmin`, so only site admins reach these
+ * resolvers through the admin UI.
  */
 
 import api, { route } from '@forge/api';
 import { getGlobalConfig, setGlobalConfig } from '../storage/configStore';
-import { isConfluenceAdmin } from '../utils/adminAuth';
 import { findPagesByLevel } from '../services/classificationService';
 import {
   successResponse,
@@ -21,12 +20,7 @@ import { enqueueJob } from '../utils/jobQueue';
  * Resolver: getConfig
  * Returns the global classification configuration.
  */
-export async function getConfigResolver(req) {
-  const accountId = req.context.accountId;
-  if (!accountId || !(await isConfluenceAdmin(accountId))) {
-    return errorResponse('Admin access required', 403);
-  }
-
+export async function getConfigResolver() {
   try {
     const config = await getGlobalConfig();
     return successResponse({ config });
@@ -42,11 +36,6 @@ export async function getConfigResolver(req) {
  * Validates the config before saving.
  */
 export async function setConfigResolver(req) {
-  const accountId = req.context.accountId;
-  if (!accountId || !(await isConfluenceAdmin(accountId))) {
-    return errorResponse('Admin access required', 403);
-  }
-
   const { config } = req.payload;
   if (!config) {
     return validationError('config is required');
@@ -111,19 +100,9 @@ async function cqlSearch(cql, limit = 0, { expandProperties = false } = {}) {
  * Scoping options (all optional, combine as needed):
  * - spaceKey: restrict to a single space
  * - ancestorId: restrict to a page tree (the page and its descendants)
- * - source: 'macro' bypasses admin check (CQL runs as user, enforcing visibility)
  */
 export async function getAuditDataResolver(req) {
-  const { spaceKey, ancestorId, source, recentLimit } = req.payload || {};
-
-  // Macros run as the viewing user — CQL already enforces page visibility.
-  // Only require admin for unrestricted global queries from the admin panel.
-  if (!spaceKey && !ancestorId && source !== 'macro') {
-    const accountId = req.context.accountId;
-    if (!accountId || !(await isConfluenceAdmin(accountId))) {
-      return errorResponse('Admin access required', 403);
-    }
-  }
+  const { spaceKey, ancestorId, recentLimit } = req.payload || {};
 
   // Validate inputs before embedding in CQL
   if (spaceKey && !isValidSpaceKey(spaceKey)) {
@@ -301,11 +280,6 @@ function validateConfig(config) {
  * Returns the number of pages classified with a given level.
  */
 export async function countLevelUsageResolver(req) {
-  const accountId = req.context.accountId;
-  if (!accountId || !(await isConfluenceAdmin(accountId))) {
-    return errorResponse('Admin access required', 403);
-  }
-
   const { levelId, spaceKey } = req.payload || {};
   if (!levelId) return validationError('levelId is required');
 
@@ -326,10 +300,6 @@ export async function countLevelUsageResolver(req) {
  */
 export async function reclassifyLevelResolver(req) {
   const accountId = req.context.accountId;
-  if (!accountId || !(await isConfluenceAdmin(accountId))) {
-    return errorResponse('Admin access required', 403);
-  }
-
   const { fromLevelId, toLevelId } = req.payload || {};
   const locale = req.context.locale || 'en';
 

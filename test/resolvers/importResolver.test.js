@@ -1,10 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Admin-check bypassed so we only cover the business logic here.
-vi.mock('../../src/utils/adminAuth', () => ({
-  isConfluenceAdmin: vi.fn().mockResolvedValue(true),
-}));
-
 vi.mock('../../src/services/labelService', () => ({
   countPagesByLabels: vi.fn(),
   getAllLabels: vi.fn().mockResolvedValue([]),

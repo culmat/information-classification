@@ -18,10 +18,6 @@ vi.mock('@forge/realtime', () => ({
   publishGlobal: (...args) => mockPublishGlobal(...args),
 }));
 
-vi.mock('../../src/utils/adminAuth', () => ({
-  isConfluenceAdmin: vi.fn().mockResolvedValue(true),
-}));
-
 const mockAddLabelToPage = vi.fn();
 const mockRemoveLabelFromPage = vi.fn();
 vi.mock('../../src/services/labelService', () => ({

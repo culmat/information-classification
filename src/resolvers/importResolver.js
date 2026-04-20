@@ -1,13 +1,13 @@
 /**
  * Resolvers for the label import/export wizards.
  * Discovers labels, matches them to levels, and starts import/export jobs.
- * Runtime admin check enforced as defense-in-depth (all modules share one resolver).
+ * Access control: the admin module is gated in the manifest by
+ * `displayConditions.isSiteAdmin`; these resolvers run off that surface.
  */
 
 import api, { route } from '@forge/api';
 import { countPagesByLabels, getAllLabels } from '../services/labelService';
 import { successResponse, errorResponse } from '../utils/responseHelper';
-import { isConfluenceAdmin } from '../utils/adminAuth';
 import { buildSpaceFilter, isValidLabel } from '../shared/constants';
 
 // Helpers to build the CQL strings shown to the admin alongside the counts.
@@ -51,12 +51,7 @@ async function cqlCount(cql) {
  * Resolver: listSpaces
  * Returns all spaces for the space picker.
  */
-export async function listSpacesResolver(req) {
-  const accountId = req.context.accountId;
-  if (!accountId || !(await isConfluenceAdmin(accountId))) {
-    return errorResponse('Admin access required', 403);
-  }
-
+export async function listSpacesResolver() {
   try {
     const response = await api
       .asUser()
@@ -80,12 +75,7 @@ export async function listSpacesResolver(req) {
  * Resolver: listLabels
  * Returns all global labels from the instance for the label chooser.
  */
-export async function listLabelsResolver(req) {
-  const accountId = req.context.accountId;
-  if (!accountId || !(await isConfluenceAdmin(accountId))) {
-    return errorResponse('Admin access required', 403);
-  }
-
+export async function listLabelsResolver() {
   try {
     const labels = await getAllLabels();
     return successResponse({ labels });
@@ -112,11 +102,6 @@ export async function listLabelsResolver(req) {
  * return only { labelled, cql: { labelled } }.
  */
 export async function countLabelPagesResolver(req) {
-  const accountId = req.context.accountId;
-  if (!accountId || !(await isConfluenceAdmin(accountId))) {
-    return errorResponse('Admin access required', 403);
-  }
-
   const { label, labels, levelId, spaceKey } = req.payload || {};
 
   // Normalise to an array; accept either single label or labels array
@@ -197,11 +182,6 @@ export async function countLabelPagesResolver(req) {
  * Payload: { levelId: string, labelName: string, spaceKey?: string }
  */
 export async function countLevelGapResolver(req) {
-  const accountId = req.context.accountId;
-  if (!accountId || !(await isConfluenceAdmin(accountId))) {
-    return errorResponse('Admin access required', 403);
-  }
-
   const { levelId, labelName, spaceKey } = req.payload || {};
   if (!levelId) return errorResponse('levelId is required', 400);
 

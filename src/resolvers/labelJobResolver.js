@@ -52,7 +52,6 @@ import {
   readJobHeader,
   writeJobHeader,
 } from '../services/classifyJobStore';
-import { isConfluenceAdmin } from '../utils/adminAuth';
 import {
   successResponse,
   errorResponse,
@@ -193,9 +192,7 @@ async function sortMappingsByRestrictiveness(mappings) {
 
 export async function startLabelImportResolver(req) {
   const accountId = req.context?.accountId;
-  if (!accountId || !(await isConfluenceAdmin(accountId))) {
-    return errorResponse('Admin access required', 403);
-  }
+  if (!accountId) return errorResponse('Authentication required', 401);
 
   const { mappings, removeLabels, spaceKey } = req.payload || {};
   const locale = req.context?.locale || 'en';
@@ -341,9 +338,7 @@ async function validateExportMappings(mappings) {
 
 export async function startLabelExportResolver(req) {
   const accountId = req.context?.accountId;
-  if (!accountId || !(await isConfluenceAdmin(accountId))) {
-    return errorResponse('Admin access required', 403);
-  }
+  if (!accountId) return errorResponse('Authentication required', 401);
 
   const { mappings, spaceKey } = req.payload || {};
   const locale = req.context?.locale || 'en';
@@ -781,9 +776,6 @@ export async function cancelLabelJobResolver(req) {
 export async function getUserPendingLabelJobsResolver(req) {
   const accountId = req.context?.accountId;
   if (!accountId) return errorResponse('Authentication required', 401);
-  if (!(await isConfluenceAdmin(accountId))) {
-    return successResponse({ jobs: [] });
-  }
 
   try {
     const roots = await getUserJobRoots(accountId);

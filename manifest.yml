@@ -19,6 +19,8 @@ modules:
       render: native
       resolver:
         function: resolver
+      displayConditions:
+        isSiteAdmin: true
   confluence:spaceSettings:
     - key: classification-space-settings
       title:
