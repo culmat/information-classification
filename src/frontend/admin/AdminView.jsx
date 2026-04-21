@@ -2,9 +2,11 @@ import React from 'react';
 import {
   Box,
   Stack,
+  Inline,
   Button,
   Text,
   SectionMessage,
+  Lozenge,
   Tabs,
   Tab,
   TabList,
@@ -12,6 +14,7 @@ import {
   ModalTransition,
   xcss,
 } from '@forge/react';
+import { invoke } from '@forge/bridge';
 import StatisticsPanel from '../StatisticsPanel';
 import AboutPanel from '../AboutPanel';
 import LevelModal from './LevelModal';
@@ -23,15 +26,67 @@ import LevelsTab from './LevelsTab';
 import ContactsTab from './ContactsTab';
 import LinksTab from './LinksTab';
 import LanguagesTab from './LanguagesTab';
+import BulkClassifyTab from './BulkClassifyTab';
 import DeleteLevelModal from './DeleteLevelModal';
+import { interpolate } from '../../shared/i18n';
 
 const containerStyle = xcss({ padding: 'space.400', maxWidth: '960px' });
 const tabPanelStyle = xcss({ paddingTop: 'space.100' });
+
+// Tab indices that already render a full view of the active job (progress
+// + stop controls). When the admin is on one of those tabs, the banner
+// above the tabs would just duplicate what's already on screen, so we
+// suppress it. Must match the TabList order below.
+const BULK_CLASSIFY_TAB_INDEX = 5;
+const LABELS_TAB_INDEX = 6;
+
+const ActiveJobBanner = ({ t, activeJob, activeTab, onOpen, onStop }) => {
+  if (!activeJob) return null;
+  const isBulk = activeJob.jobKind === 'bulk-classify';
+  const isLabel =
+    activeJob.jobKind === 'label-import' ||
+    activeJob.jobKind === 'label-export';
+  // Suppress the banner when the user is already on the job's home tab.
+  if (isBulk && activeTab === BULK_CLASSIFY_TAB_INDEX) return null;
+  if (isLabel && activeTab === LABELS_TAB_INDEX) return null;
+  const title = isBulk
+    ? t('admin.bulkClassify.banner_bulk_active')
+    : activeJob.jobKind === 'label-import'
+      ? t('admin.bulkClassify.banner_label_import_active')
+      : t('admin.bulkClassify.banner_label_export_active');
+  const progressText = interpolate(t('classify.paused_progress'), {
+    classified: activeJob.classified,
+    total: activeJob.totalEstimate,
+  });
+  return (
+    <SectionMessage
+      appearance="information"
+      actions={[
+        <Button key="open" appearance="primary" onClick={onOpen}>
+          {t('admin.bulkClassify.banner_open')}
+        </Button>,
+        <Button key="stop" appearance="subtle" onClick={onStop}>
+          {t('classify.stop_button')}
+        </Button>,
+      ]}
+    >
+      <Inline space="space.100" alignBlock="center">
+        <Lozenge appearance="inprogress">
+          {t('admin.bulkClassify.status_active')}
+        </Lozenge>
+        <Text>{title}</Text>
+        <Text>·</Text>
+        <Text>{progressText}</Text>
+      </Inline>
+    </SectionMessage>
+  );
+};
 
 const AdminView = ({
   t,
   config,
   setConfig,
+  locale,
   message,
   saving,
   isDirty,
@@ -47,16 +102,46 @@ const AdminView = ({
   exportApi,
   jobsApi,
   editor,
+  jobQueue,
+  hasActiveJob,
+  bulkClassifyInitialSource,
+  clearBulkClassifyInitialSource,
+  openBulkClassify,
 }) => (
   <Box xcss={containerStyle}>
     <Stack space="space.300">
-      <Tabs id="admin-tabs" onChange={(index) => setActiveTab(index)}>
+      <ActiveJobBanner
+        t={t}
+        activeJob={jobQueue?.activeJob}
+        activeTab={activeTab}
+        onOpen={() => openBulkClassify?.(null)}
+        onStop={async () => {
+          const job = jobQueue.activeJob;
+          if (!job) return;
+          try {
+            if (job.jobKind === 'bulk-classify') {
+              await invoke('cancelClassifyJob', { jobId: job.jobId });
+            } else {
+              await invoke('cancelLabelJob', { jobId: job.jobId });
+            }
+          } finally {
+            jobQueue.refresh();
+          }
+        }}
+      />
+
+      <Tabs
+        id="admin-tabs"
+        selected={activeTab}
+        onChange={(index) => setActiveTab(index)}
+      >
         <TabList>
           <Tab>{t('admin.tabs.statistics')}</Tab>
           <Tab>{t('admin.tabs.levels')}</Tab>
           <Tab>{t('admin.tabs.contacts')}</Tab>
           <Tab>{t('admin.tabs.links')}</Tab>
           <Tab>{t('admin.tabs.languages')}</Tab>
+          <Tab>{t('admin.tabs.bulk_classify')}</Tab>
           <Tab>{t('admin.tabs.labels')}</Tab>
           <Tab>{t('admin.tabs.about')}</Tab>
         </TabList>
@@ -110,6 +195,18 @@ const AdminView = ({
 
         <TabPanel>
           <LanguagesTab t={t} config={config} setConfig={setConfig} />
+        </TabPanel>
+
+        <TabPanel>
+          <BulkClassifyTab
+            t={t}
+            config={config}
+            locale={locale}
+            jobQueue={jobQueue}
+            initialSourceLevelId={bulkClassifyInitialSource}
+            clearInitialSource={clearBulkClassifyInitialSource}
+            onStartedOrQueued={jobQueue.refresh}
+          />
         </TabPanel>
 
         <TabPanel>
@@ -206,12 +303,18 @@ const AdminView = ({
             </SectionMessage>
           )}
 
+          {hasActiveJob && (
+            <SectionMessage appearance="warning">
+              <Text>{t('admin.bulkClassify.save_blocked')}</Text>
+            </SectionMessage>
+          )}
+
           <Button
             testId="admin-save"
             appearance="primary"
             onClick={handleSave}
             isLoading={saving}
-            isDisabled={!isDirty}
+            isDisabled={!isDirty || hasActiveJob}
           >
             {t('admin.save_button')}
           </Button>
@@ -235,12 +338,11 @@ const AdminView = ({
       {editor.deleteConfirm && (
         <DeleteLevelModal
           t={t}
-          config={config}
           deleteConfirm={editor.deleteConfirm}
           setDeleteConfirm={editor.setDeleteConfirm}
           deleteLoading={editor.deleteLoading}
           removeLevelFromConfig={editor.removeLevelFromConfig}
-          handleReclassifyAndDelete={editor.handleReclassifyAndDelete}
+          openBulkClassifyFromDelete={editor.openBulkClassifyFromDelete}
         />
       )}
     </ModalTransition>

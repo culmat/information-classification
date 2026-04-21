@@ -10,60 +10,84 @@ import {
 import { interpolate } from '../../shared/i18n';
 
 /**
- * Banner for a paused job owning the current page or an ancestor.
- * Replaces the level picker — the only path forward is resume or stop.
+ * Banner for a bulk-classify job owning the current page or an ancestor.
+ * Replaces the level picker — the only path forward is resume/stop (paused)
+ * or view/stop (running).
  */
 const OwnerJobBanner = ({
   ownerJob,
+  isRunning,
   t,
   resumePendingJob,
   stopPendingJob,
   resolveLevelName,
   levelAppearance,
-}) => (
-  <SectionMessage
-    appearance="information"
-    actions={[
-      <Button
-        key="resume"
-        testId="byline-owner-resume"
-        appearance="primary"
-        onClick={() => resumePendingJob(ownerJob)}
-      >
-        {t('classify.resume_button')}
-      </Button>,
-      <Button
-        key="stop"
-        testId="byline-owner-stop"
-        appearance="subtle"
-        onClick={() => stopPendingJob(ownerJob)}
-      >
-        {t('classify.stop_button')}
-      </Button>,
-    ]}
-  >
-    <Stack space="space.050">
-      <Inline space="space.050" alignBlock="center">
+}) => {
+  const prefixKey = isRunning
+    ? ownerJob.isSelf
+      ? 'classify.running_here_prefix'
+      : 'classify.running_ancestor_prefix'
+    : ownerJob.isSelf
+      ? 'classify.paused_here_prefix'
+      : 'classify.paused_ancestor_prefix';
+  return (
+    <SectionMessage
+      appearance="information"
+      actions={
+        isRunning
+          ? [
+              <Button
+                key="stop"
+                testId="byline-owner-stop"
+                appearance="subtle"
+                onClick={() => stopPendingJob(ownerJob)}
+              >
+                {t('classify.stop_button')}
+              </Button>,
+            ]
+          : [
+              <Button
+                key="resume"
+                testId="byline-owner-resume"
+                appearance="primary"
+                onClick={() => resumePendingJob(ownerJob)}
+              >
+                {t('classify.resume_button')}
+              </Button>,
+              <Button
+                key="stop"
+                testId="byline-owner-stop"
+                appearance="subtle"
+                onClick={() => stopPendingJob(ownerJob)}
+              >
+                {t('classify.stop_button')}
+              </Button>,
+            ]
+      }
+    >
+      <Stack space="space.050">
+        <Inline space="space.050" alignBlock="center">
+          <Text>
+            {ownerJob.isSelf
+              ? t(prefixKey)
+              : interpolate(t(prefixKey), {
+                  title: ownerJob.rootTitle || '',
+                })}
+          </Text>
+          <Text>→</Text>
+          <Lozenge isBold appearance={levelAppearance(ownerJob.levelId)}>
+            {resolveLevelName(ownerJob.levelId)}
+          </Lozenge>
+        </Inline>
         <Text>
-          {ownerJob.isSelf
-            ? t('classify.paused_here_prefix')
-            : interpolate(t('classify.paused_ancestor_prefix'), {
-                title: ownerJob.rootTitle || '',
-              })}
+          {interpolate(t('classify.paused_progress'), {
+            classified: ownerJob.classified,
+            total: ownerJob.totalEstimate,
+          })}
         </Text>
-        <Text>→</Text>
-        <Lozenge isBold appearance={levelAppearance(ownerJob.levelId)}>
-          {resolveLevelName(ownerJob.levelId)}
-        </Lozenge>
-      </Inline>
-      <Text>
-        {interpolate(t('classify.paused_progress'), {
-          classified: ownerJob.classified,
-          total: ownerJob.totalEstimate,
-        })}
-      </Text>
-    </Stack>
-  </SectionMessage>
-);
+      </Stack>
+    </SectionMessage>
+  );
+};
 
 export default OwnerJobBanner;

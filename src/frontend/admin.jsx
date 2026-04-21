@@ -24,8 +24,13 @@ import useImportState from './admin/useImportState';
 import useExportState from './admin/useExportState';
 import useLabelSyncJobs from './admin/useLabelSyncJobs';
 import useConfigEditing from './admin/useConfigEditing';
+import useJobQueue from './shared/useJobQueue';
+import useBulkClassifyDriver from './shared/useBulkClassifyDriver';
 import AdminView from './admin/AdminView';
 import BootstrapPanel from './admin/BootstrapPanel';
+
+// The new Bulk Classify tab sits between Languages and Labels.
+const BULK_CLASSIFY_TAB_INDEX = 5;
 
 const containerStyle = xcss({ padding: 'space.400', maxWidth: '960px' });
 
@@ -52,7 +57,23 @@ const App = () => {
   const importApi = useImportState({ config });
   const exportApi = useExportState({ config });
   const jobsApi = useLabelSyncJobs({ config, importApi, exportApi });
-  const editor = useConfigEditing({ config, setConfig, t });
+  const jobQueue = useJobQueue({ poll: true });
+  useBulkClassifyDriver({
+    activeJob: jobQueue.activeJob,
+    onTick: jobQueue.refresh,
+  });
+  const [bulkClassifyInitialSource, setBulkClassifyInitialSource] =
+    useState(null);
+  const openBulkClassify = useCallback((levelId) => {
+    setBulkClassifyInitialSource(levelId || null);
+    setActiveTab(BULK_CLASSIFY_TAB_INDEX);
+  }, []);
+  const editor = useConfigEditing({
+    config,
+    setConfig,
+    openBulkClassify,
+  });
+  const hasActiveJob = !!jobQueue.activeJob;
 
   // Memoised: StatisticsPanel subscribes to changes of this callback's
   // identity (useEffect dep). When admin re-renders frequently (e.g. under
@@ -203,6 +224,7 @@ const App = () => {
       t={t}
       config={config}
       setConfig={setConfig}
+      locale={context?.locale}
       message={message}
       saving={saving}
       isDirty={isDirty}
@@ -218,6 +240,11 @@ const App = () => {
       exportApi={exportApi}
       jobsApi={jobsApi}
       editor={editor}
+      jobQueue={jobQueue}
+      hasActiveJob={hasActiveJob}
+      bulkClassifyInitialSource={bulkClassifyInitialSource}
+      clearBulkClassifyInitialSource={() => setBulkClassifyInitialSource(null)}
+      openBulkClassify={openBulkClassify}
     />
   );
 };

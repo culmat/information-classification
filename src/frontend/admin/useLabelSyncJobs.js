@@ -65,10 +65,25 @@ export default function useLabelSyncJobs({ config, importApi, exportApi }) {
 
   const loadPendingLabelJobs = useCallback(async () => {
     try {
-      const result = await invoke('getUserPendingLabelJobs');
-      if (result?.success) setPendingLabelJobs(result.jobs || []);
+      const result = await invoke('getUserJobs');
+      if (result?.success) {
+        const labels = [];
+        if (
+          result.activeJob &&
+          (result.activeJob.jobKind === 'label-import' ||
+            result.activeJob.jobKind === 'label-export')
+        ) {
+          labels.push(result.activeJob);
+        }
+        for (const j of result.queuedJobs || []) {
+          if (j.jobKind === 'label-import' || j.jobKind === 'label-export') {
+            labels.push(j);
+          }
+        }
+        setPendingLabelJobs(labels);
+      }
     } catch (err) {
-      console.error('getUserPendingLabelJobs failed:', err);
+      console.error('getUserJobs failed:', err);
     }
   }, []);
 
@@ -206,6 +221,14 @@ export default function useLabelSyncJobs({ config, importApi, exportApi }) {
         });
         return;
       }
+      if (result.promoted === false) {
+        // Queued behind another job — don't drive the loop here; the
+        // admin queue view + banner pick it up when it promotes.
+        setImportStep('idle');
+        setImportProgress(null);
+        loadPendingLabelJobs();
+        return;
+      }
       setImportProgress((prev) => ({
         ...prev,
         total: result.totalEstimate || 0,
@@ -271,6 +294,12 @@ export default function useLabelSyncJobs({ config, importApi, exportApi }) {
           startedAt,
         });
         setExportLoading(false);
+        return;
+      }
+      if (result.promoted === false) {
+        setExportProgress(null);
+        setExportLoading(false);
+        loadPendingLabelJobs();
         return;
       }
       setExportProgress((prev) => ({

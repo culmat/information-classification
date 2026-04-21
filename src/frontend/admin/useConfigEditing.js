@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { invoke, showFlag } from '@forge/bridge';
+import { invoke } from '@forge/bridge';
 import { localize } from '../../shared/i18n';
 
 function generateId() {
@@ -10,12 +10,21 @@ function generateId() {
  * Level/Contact/Link editing state + CRUD handlers. Owns the modal
  * visibility flags, the edit targets, and the delete-confirmation state.
  * Config mutations flow through the caller's `setConfig`.
+ *
+ * `openBulkClassify(levelId)` (optional) is a callback that jumps to the
+ * Bulk Classify admin tab with `sourceLevelFilter` pre-selected. Used by
+ * the delete-level modal to direct admins to the replacement flow for the
+ * former "Delete & Reclassify" button.
  */
-export default function useConfigEditing({ config, setConfig, t }) {
+export default function useConfigEditing({
+  config,
+  setConfig,
+  openBulkClassify,
+}) {
   const [editingLevel, setEditingLevel] = useState(null);
   const [showLevelModal, setShowLevelModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteLoading] = useState(false);
   const [editingContact, setEditingContact] = useState(null);
   const [showContactModal, setShowContactModal] = useState(false);
   const [editingLink, setEditingLink] = useState(null);
@@ -92,26 +101,11 @@ export default function useConfigEditing({ config, setConfig, t }) {
     removeLevelFromConfig(levelId);
   };
 
-  const handleReclassifyAndDelete = async () => {
-    if (!deleteConfirm?.reclassifyTo) return;
-    setDeleteLoading(true);
-    try {
-      await invoke('reclassifyLevel', {
-        fromLevelId: deleteConfirm.levelId,
-        toLevelId: deleteConfirm.reclassifyTo,
-      });
-      removeLevelFromConfig(deleteConfirm.levelId);
-      showFlag({
-        id: 'reclassify-started',
-        title: t('admin.levels.delete_reclassifying'),
-        type: 'info',
-        isAutoDismiss: true,
-      });
-    } catch (error) {
-      console.error('Failed to reclassify:', error);
-    } finally {
-      setDeleteLoading(false);
-    }
+  const openBulkClassifyFromDelete = () => {
+    if (!deleteConfirm?.levelId) return;
+    const levelId = deleteConfirm.levelId;
+    setDeleteConfirm(null);
+    if (openBulkClassify) openBulkClassify(levelId);
   };
 
   const moveLevel = (levelId, direction) => {
@@ -211,7 +205,7 @@ export default function useConfigEditing({ config, setConfig, t }) {
     deleteLevel,
     moveLevel,
     removeLevelFromConfig,
-    handleReclassifyAndDelete,
+    openBulkClassifyFromDelete,
     addContact,
     editContact,
     saveContact,

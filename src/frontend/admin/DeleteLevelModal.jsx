@@ -4,8 +4,6 @@ import {
   Button,
   ButtonGroup,
   Text,
-  Label,
-  Select,
   Modal,
   ModalHeader,
   ModalTitle,
@@ -13,16 +11,15 @@ import {
   ModalFooter,
   SectionMessage,
 } from '@forge/react';
-import { localize, interpolate } from '../../shared/i18n';
+import { interpolate } from '../../shared/i18n';
 
 const DeleteLevelModal = ({
   t,
-  config,
   deleteConfirm,
   setDeleteConfirm,
   deleteLoading,
   removeLevelFromConfig,
-  handleReclassifyAndDelete,
+  openBulkClassifyFromDelete,
 }) => (
   <Modal onClose={() => setDeleteConfirm(null)}>
     <ModalHeader>
@@ -41,26 +38,7 @@ const DeleteLevelModal = ({
             })}
           </Text>
         </SectionMessage>
-        <Stack space="space.050">
-          <Label labelFor="reclassify-select">
-            {t('admin.levels.delete_reclassify_label')}
-          </Label>
-          <Select
-            inputId="reclassify-select"
-            options={(config?.levels || [])
-              .filter((l) => l.id !== deleteConfirm.levelId)
-              .map((l) => ({
-                label: localize(l.name, 'en'),
-                value: l.id,
-              }))}
-            onChange={(option) =>
-              setDeleteConfirm((prev) => ({
-                ...prev,
-                reclassifyTo: option?.value || null,
-              }))
-            }
-          />
-        </Stack>
+        <Text>{t('admin.levels.delete_bulk_classify_hint')}</Text>
       </Stack>
     </ModalBody>
     <ModalFooter>
@@ -77,11 +55,10 @@ const DeleteLevelModal = ({
         </Button>
         <Button
           appearance="primary"
-          onClick={handleReclassifyAndDelete}
-          isDisabled={!deleteConfirm.reclassifyTo || deleteLoading}
-          isLoading={deleteLoading}
+          onClick={openBulkClassifyFromDelete}
+          isDisabled={deleteLoading}
         >
-          {t('admin.levels.delete_reclassify_button')}
+          {t('admin.levels.delete_open_bulk_classify')}
         </Button>
       </ButtonGroup>
     </ModalFooter>

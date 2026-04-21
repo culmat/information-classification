@@ -10,7 +10,7 @@
  * `asApp` and silently dropped those). Discovery is interleaved with
  * processing and cursor-based so the 5 000-page CQL cap goes away too.
  *
- * Header shape on top of the shared classifyJobStore record:
+ * Header shape on top of the shared jobStore record:
  *   jobKind       'label-import' | 'label-export'
  *   mappings      per-flow: [{ levelId, labels:[...] }] (import)
  *                            [{ levelId, labelName }]   (export)
@@ -38,7 +38,6 @@ import { getGlobalConfig, getEffectiveConfig } from '../storage/configStore';
 import { getSpaceConfig } from '../storage/spaceConfigStore';
 import {
   CLASSIFY_CONCURRENCY,
-  STALE_JOB_MS,
   buildSpaceFilter,
   computeClassifyChunkSize,
   isValidLabel,
@@ -47,11 +46,13 @@ import {
 import { runWithConcurrency } from '../utils/concurrency';
 import {
   consumeChunk,
-  deleteJob,
-  getUserJobRoots,
+  createJob,
+  getUserJobs,
+  onJobComplete,
+  promoteNextIfIdle,
   readJobHeader,
   writeJobHeader,
-} from '../services/classifyJobStore';
+} from '../services/jobStore';
 import {
   successResponse,
   errorResponse,
@@ -140,14 +141,46 @@ async function readLabelChunk(accountId, jobId, idx) {
   return await kvs.get(jobChunkKey(accountId, jobId, idx));
 }
 
-async function addToUserJobs(accountId, jobId) {
-  const key = `user-jobs:${accountId}`;
-  const entry = await kvs.get(key);
-  const roots = entry?.rootPageIds || [];
-  if (!roots.includes(jobId)) {
-    roots.push(jobId);
-    await kvs.set(key, { rootPageIds: roots });
-  }
+/**
+ * Builds an opaque label-job id. Uses crypto.randomUUID when available,
+ * falling back to a timestamp/random blend on older runtimes.
+ */
+function newLabelJobId(kind) {
+  const rand =
+    (typeof crypto !== 'undefined' && crypto.randomUUID?.()) ||
+    `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${kind}-${rand}`;
+}
+
+/**
+ * Canonicalises a label job's mapping set to a stable fingerprint so the
+ * same user can't queue the exact same import/export twice.
+ */
+function labelJobFingerprint(kind, mappings, spaceKey) {
+  const normalised = mappings
+    .map((m) => {
+      if (kind === 'label-import') {
+        return { levelId: m.levelId, labels: [...(m.labels || [])].sort() };
+      }
+      return { levelId: m.levelId, labelName: m.labelName };
+    })
+    .sort((a, b) => a.levelId.localeCompare(b.levelId));
+  return `${kind}:${spaceKey || ''}:${JSON.stringify(normalised)}`;
+}
+
+/**
+ * Checks whether the current user already has a label job queued or
+ * active with the same fingerprint. Used to block duplicates per user.
+ */
+async function findDuplicateLabelJob(accountId, kind, mappings, spaceKey) {
+  const fingerprint = labelJobFingerprint(kind, mappings, spaceKey);
+  const { activeJob, queuedJobs } = await getUserJobs(accountId);
+  const all = [...(activeJob ? [activeJob] : []), ...queuedJobs];
+  return all.find(
+    (j) =>
+      j.jobKind === kind &&
+      labelJobFingerprint(kind, j.mappings || [], j.spaceKey) === fingerprint,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -236,13 +269,25 @@ export async function startLabelImportResolver(req) {
       return successResponse({ count: 0 });
     }
 
-    const jobId = `label-import-${Date.now()}`;
+    const dup = await findDuplicateLabelJob(
+      accountId,
+      'label-import',
+      sortedMappings,
+      spaceKey || null,
+    );
+    if (dup) {
+      return {
+        success: false,
+        error: 'duplicate_job',
+        existingJobId: dup.jobId,
+        status: 409,
+      };
+    }
+
+    const jobId = newLabelJobId('label-import');
     const chunkSize = computeClassifyChunkSize(totalEstimate);
 
     // First discovery step inline: all pages carrying the first label.
-    // The worker's classifySinglePage returns `null` for same-level pages
-    // and a full `true/false` for level changes; progress only advances
-    // on `true`, so already-classified pages don't inflate the bar.
     const firstWi = workItems[0];
     const firstCql = importDiscoveryCql(firstWi.labelName, spaceKey || null);
     const first = await cqlSearch(firstCql, DISCOVERY_LIMIT, 0);
@@ -252,23 +297,7 @@ export async function startLabelImportResolver(req) {
     const firstTotal = first.totalSize || 0;
 
     let workIdx = 0;
-    let workCursor = 0;
-    let totalChunks = 0;
-
-    if (firstIds.length > 0) {
-      for (let i = 0; i < firstIds.length; i += chunkSize) {
-        const slice = firstIds.slice(i, i + chunkSize);
-        await writeLabelChunk(
-          accountId,
-          jobId,
-          totalChunks,
-          slice,
-          workItems[0].mappingIdx,
-        );
-        totalChunks++;
-      }
-    }
-    workCursor = firstIds.length;
+    let workCursor = firstIds.length;
     if (workCursor >= firstTotal) {
       workIdx = 1;
       workCursor = 0;
@@ -277,7 +306,7 @@ export async function startLabelImportResolver(req) {
 
     const now = Date.now();
     const header = {
-      rootPageId: jobId,
+      jobId,
       jobKind: 'label-import',
       accountId,
       locale,
@@ -293,24 +322,37 @@ export async function startLabelImportResolver(req) {
       classified: 0,
       failed: 0,
       skipped: 0,
-      startedAt: now,
+      status: 'queued',
+      queuedAt: now,
+      startedAt: null,
       lastProgressAt: now,
-      status: 'active',
       nextChunkIdx: 0,
-      totalChunks,
+      totalChunks: 0, // set by createJob
       chunkSize,
     };
-    await writeJobHeader(accountId, jobId, header);
-    await addToUserJobs(accountId, jobId);
+    await createJob(accountId, jobId, header, firstIds, chunkSize, {
+      mappingIdx: workItems[0].mappingIdx,
+    });
+    const promotedJobId = await promoteNextIfIdle(accountId);
+    const promoted = promotedJobId === jobId;
+
+    let queuePosition = 0;
+    if (!promoted) {
+      const { queuedJobs } = await getUserJobs(accountId);
+      queuePosition = queuedJobs.findIndex((j) => j.jobId === jobId) + 1;
+      if (queuePosition <= 0) queuePosition = queuedJobs.length + 1;
+    }
 
     return successResponse({
       jobId,
+      promoted,
+      queuePosition: promoted ? 0 : queuePosition,
       classified: 0,
       failed: 0,
       skipped: 0,
       totalEstimate,
       discoveryDone,
-      done: discoveryDone && totalChunks === 0,
+      done: promoted && discoveryDone && firstIds.length === 0,
     });
   } catch (error) {
     console.error('startLabelImport failed:', error);
@@ -367,7 +409,22 @@ export async function startLabelExportResolver(req) {
       return successResponse({ count: 0 });
     }
 
-    const jobId = `label-export-${Date.now()}`;
+    const dup = await findDuplicateLabelJob(
+      accountId,
+      'label-export',
+      mappings,
+      spaceKey || null,
+    );
+    if (dup) {
+      return {
+        success: false,
+        error: 'duplicate_job',
+        existingJobId: dup.jobId,
+        status: 409,
+      };
+    }
+
+    const jobId = newLabelJobId('label-export');
     const chunkSize = computeClassifyChunkSize(totalEstimate);
 
     const firstMapping = mappings[workItems[0].mappingIdx];
@@ -379,8 +436,6 @@ export async function startLabelExportResolver(req) {
       'content.metadata.labels',
     );
     const rawResults = first.results || [];
-    // Filter: drop pages that already carry the target label. `label != "X"`
-    // in CQL would miss pages with no labels at all, so we do it here.
     const firstIds = rawResults
       .filter((r) => !(r.labels || []).includes(firstMapping.labelName))
       .map((r) => r.id)
@@ -388,25 +443,7 @@ export async function startLabelExportResolver(req) {
     const firstTotal = first.totalSize || 0;
 
     let workIdx = 0;
-    let workCursor = 0;
-    let totalChunks = 0;
-
-    if (firstIds.length > 0) {
-      for (let i = 0; i < firstIds.length; i += chunkSize) {
-        const slice = firstIds.slice(i, i + chunkSize);
-        await writeLabelChunk(
-          accountId,
-          jobId,
-          totalChunks,
-          slice,
-          workItems[0].mappingIdx,
-        );
-        totalChunks++;
-      }
-    }
-    // Cursor advances by raw-result count so pages filtered by label-check
-    // aren't revisited on the next discovery pass.
-    workCursor = rawResults.length;
+    let workCursor = rawResults.length;
     if (workCursor >= firstTotal) {
       workIdx = 1;
       workCursor = 0;
@@ -415,7 +452,7 @@ export async function startLabelExportResolver(req) {
 
     const now = Date.now();
     const header = {
-      rootPageId: jobId,
+      jobId,
       jobKind: 'label-export',
       accountId,
       locale,
@@ -429,24 +466,37 @@ export async function startLabelExportResolver(req) {
       classified: 0,
       failed: 0,
       skipped: 0,
-      startedAt: now,
+      status: 'queued',
+      queuedAt: now,
+      startedAt: null,
       lastProgressAt: now,
-      status: 'active',
       nextChunkIdx: 0,
-      totalChunks,
+      totalChunks: 0,
       chunkSize,
     };
-    await writeJobHeader(accountId, jobId, header);
-    await addToUserJobs(accountId, jobId);
+    await createJob(accountId, jobId, header, firstIds, chunkSize, {
+      mappingIdx: workItems[0].mappingIdx,
+    });
+    const promotedJobId = await promoteNextIfIdle(accountId);
+    const promoted = promotedJobId === jobId;
+
+    let queuePosition = 0;
+    if (!promoted) {
+      const { queuedJobs } = await getUserJobs(accountId);
+      queuePosition = queuedJobs.findIndex((j) => j.jobId === jobId) + 1;
+      if (queuePosition <= 0) queuePosition = queuedJobs.length + 1;
+    }
 
     return successResponse({
       jobId,
+      promoted,
+      queuePosition: promoted ? 0 : queuePosition,
       classified: 0,
       failed: 0,
       skipped: 0,
       totalEstimate,
       discoveryDone,
-      done: discoveryDone && totalChunks === 0,
+      done: promoted && discoveryDone && firstIds.length === 0,
     });
   } catch (error) {
     console.error('startLabelExport failed:', error);
@@ -598,7 +648,7 @@ export async function processLabelBatchResolver(req) {
     if (!header) return successResponse({ done: true, missing: true });
 
     if (header.status === 'cancelled') {
-      await deleteJob(accountId, String(jobId));
+      const promotedNextJobId = await onJobComplete(accountId, String(jobId));
       return successResponse({
         done: true,
         cancelled: true,
@@ -606,7 +656,22 @@ export async function processLabelBatchResolver(req) {
         failed: header.failed,
         skipped: header.skipped,
         totalEstimate: header.totalEstimate,
+        promotedNextJobId,
       });
+    }
+    if (header.status === 'queued') {
+      const promoted = await promoteNextIfIdle(accountId);
+      if (promoted !== String(jobId)) {
+        return successResponse({
+          classified: header.classified,
+          failed: header.failed,
+          skipped: header.skipped,
+          totalEstimate: header.totalEstimate,
+          discoveryDone: !!header.discoveryDone,
+          done: false,
+          queued: true,
+        });
+      }
     }
 
     // Discovery step
@@ -639,7 +704,10 @@ export async function processLabelBatchResolver(req) {
             (l) => l.id === mapping.levelId,
           );
           if (!level || !level.allowed) {
-            await deleteJob(accountId, String(jobId));
+            const promotedNextJobId = await onJobComplete(
+              accountId,
+              String(jobId),
+            );
             return successResponse({
               done: true,
               aborted: level ? 'level_disallowed' : 'level_deleted',
@@ -647,6 +715,7 @@ export async function processLabelBatchResolver(req) {
               failed: header.failed,
               skipped: header.skipped,
               totalEstimate: header.totalEstimate,
+              promotedNextJobId,
             });
           }
           const levelIndex = new Map(
@@ -702,12 +771,13 @@ export async function processLabelBatchResolver(req) {
     const done =
       header.discoveryDone && header.nextChunkIdx >= header.totalChunks;
 
+    let promotedNextJobId = null;
     if (done) {
       const durationMs = Date.now() - (header.startedAt || Date.now());
       console.log(
         `[label-job] done jobId=${jobId} kind=${header.jobKind} classified=${header.classified} failed=${header.failed} skipped=${header.skipped} durationMs=${durationMs}`,
       );
-      await deleteJob(accountId, String(jobId));
+      promotedNextJobId = await onJobComplete(accountId, String(jobId));
     } else {
       await writeJobHeader(accountId, String(jobId), header);
     }
@@ -735,6 +805,7 @@ export async function processLabelBatchResolver(req) {
       totalEstimate: header.totalEstimate,
       discoveryDone: header.discoveryDone,
       done,
+      promotedNextJobId,
     });
   } catch (error) {
     console.error('processLabelBatch failed:', error);
@@ -754,70 +825,18 @@ export async function cancelLabelJobResolver(req) {
 
   try {
     const header = await readJobHeader(accountId, String(jobId));
-    await deleteJob(accountId, String(jobId));
+    const promotedNextJobId = await onJobComplete(accountId, String(jobId));
     return successResponse({
       cancelled: true,
       classified: header?.classified || 0,
       failed: header?.failed || 0,
       skipped: header?.skipped || 0,
       jobKind: header?.jobKind || null,
+      promotedNextJobId,
     });
   } catch (error) {
     console.error('cancelLabelJob failed:', error);
     return errorResponse('Failed to cancel label job', 500);
-  }
-}
-
-/**
- * Returns the user's paused label jobs (both import and export). Called when
- * the admin Import/Export tabs open so a resume banner can be shown.
- * Stale-clearance mirrors getUserPendingJobsResolver.
- */
-export async function getUserPendingLabelJobsResolver(req) {
-  const accountId = req.context?.accountId;
-  if (!accountId) return errorResponse('Authentication required', 401);
-
-  try {
-    const roots = await getUserJobRoots(accountId);
-    const now = Date.now();
-    const jobs = [];
-    for (const rootId of roots) {
-      const header = await readJobHeader(accountId, rootId);
-      if (!header) {
-        await deleteJob(accountId, rootId);
-        continue;
-      }
-      if (
-        header.jobKind !== 'label-import' &&
-        header.jobKind !== 'label-export'
-      ) {
-        continue;
-      }
-      const stale =
-        now - (header.lastProgressAt || header.startedAt || 0) > STALE_JOB_MS;
-      if (stale || header.status === 'cancelled') {
-        await deleteJob(accountId, rootId);
-        continue;
-      }
-      jobs.push({
-        jobId: rootId,
-        jobKind: header.jobKind,
-        spaceKey: header.spaceKey,
-        mappings: header.mappings,
-        removeLabels: !!header.removeLabels,
-        classified: header.classified,
-        failed: header.failed,
-        skipped: header.skipped,
-        totalEstimate: header.totalEstimate,
-        discoveryDone: !!header.discoveryDone,
-        startedAt: header.startedAt,
-        lastProgressAt: header.lastProgressAt,
-      });
-    }
-    return successResponse({ jobs });
-  } catch (error) {
-    console.error('getUserPendingLabelJobs failed:', error);
-    return errorResponse('Failed to list pending label jobs', 500);
   }
 }
 

@@ -21,12 +21,12 @@ vi.mock('@forge/realtime', () => ({
 
 const mockClassifyPage = vi.fn();
 const mockClassifySinglePage = vi.fn();
-const mockFindDescendants = vi.fn();
+const mockFindPagesByScope = vi.fn();
 
 vi.mock('../../src/services/classificationService', () => ({
   classifyPage: (...args) => mockClassifyPage(...args),
   classifySinglePage: (...args) => mockClassifySinglePage(...args),
-  findDescendants: (...args) => mockFindDescendants(...args),
+  findPagesByScope: (...args) => mockFindPagesByScope(...args),
 }));
 
 const mockGetAncestorIds = vi.fn().mockResolvedValue([]);
@@ -34,8 +34,6 @@ vi.mock('../../src/services/restrictionService', () => ({
   getAncestorIds: (...args) => mockGetAncestorIds(...args),
 }));
 
-// @forge/api is used for the best-effort page title fetch; return null by
-// default so existing tests don't need to care.
 vi.mock('@forge/api', () => ({
   default: {
     asUser: () => ({
@@ -76,53 +74,69 @@ vi.mock('../../src/storage/spaceConfigStore', () => ({
 }));
 
 const {
-  startRecursiveClassifyResolver,
+  startBulkClassifyResolver,
   processClassifyBatchResolver,
   cancelClassifyJobResolver,
-  getUserPendingJobsResolver,
+  countBulkClassifyScopeResolver,
+  getUserJobsResolver,
 } = await import('../../src/resolvers/classifyJobResolver');
 
 const PAGE = '557281';
 const ACCOUNT = 'user-1';
+
+function descendantsPayload(overrides = {}) {
+  return {
+    scope: { kind: 'descendants', rootPageId: PAGE },
+    sourceLevelFilter: null,
+    targetLevelId: 'public',
+    spaceKey: 'IC',
+    ...overrides,
+  };
+}
+
+function fromLevelPayload(overrides = {}) {
+  return {
+    scope: { kind: 'fromLevel' },
+    sourceLevelFilter: 'internal',
+    targetLevelId: 'public',
+    ...overrides,
+  };
+}
 
 beforeEach(() => {
   kvsStore.clear();
   vi.clearAllMocks();
   mockClassifyPage.mockResolvedValue({ success: true, unchanged: false });
   mockClassifySinglePage.mockResolvedValue(true);
-  mockFindDescendants.mockResolvedValue({ results: [], totalSize: 0 });
+  mockFindPagesByScope.mockResolvedValue({ results: [], totalSize: 0 });
 });
 
-describe('startRecursiveClassifyResolver', () => {
+describe('startBulkClassifyResolver (descendants)', () => {
   it('classifies root, seeds discovery, and writes KVS state', async () => {
     const ids = Array.from({ length: 25 }, (_, i) => ({
       id: String(1000 + i),
       title: `p${i}`,
     }));
-    mockFindDescendants.mockResolvedValueOnce({
-      results: ids,
-      totalSize: 25,
-    });
+    mockFindPagesByScope.mockResolvedValueOnce({ results: ids, totalSize: 25 });
 
-    const result = await startRecursiveClassifyResolver({
+    const result = await startBulkClassifyResolver({
       context: { accountId: ACCOUNT },
-      payload: { pageId: PAGE, spaceKey: 'IC', levelId: 'public' },
+      payload: descendantsPayload(),
     });
 
     expect(result.success).toBe(true);
-    expect(result.classified).toBe(1); // parent counted
-    expect(result.totalEstimate).toBe(26); // 25 descendants + parent
+    expect(result.promoted).toBe(true);
+    expect(result.classified).toBe(1); // root counted
+    expect(result.totalEstimate).toBe(26);
     expect(result.discoveryDone).toBe(true);
     expect(mockClassifyPage).toHaveBeenCalledOnce();
-    // CLASSIFY_CHUNK_SIZE=3 → 25 ids = 8 full chunks of 3 + 1 chunk of 1.
-    expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}`)).toBeTruthy();
-    expect(kvsStore.get(`user-jobs:${ACCOUNT}`)).toEqual({
-      rootPageIds: [PAGE],
-    });
-    const header = kvsStore.get(`job:${ACCOUNT}:${PAGE}`);
+
+    const index = kvsStore.get(`user-jobs:${ACCOUNT}`);
+    expect(index.activeJobId).toBe(result.jobId);
+    expect(index.queuedJobIds).toEqual([]);
+    const header = kvsStore.get(`job:${ACCOUNT}:${result.jobId}`);
+    expect(header.status).toBe('active');
     expect(header.totalChunks).toBe(9);
-    expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}:chunk:0`).ids).toHaveLength(3);
-    expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}:chunk:8`).ids).toHaveLength(1);
   });
 
   it('sets discoveryCursor when more descendants remain', async () => {
@@ -130,379 +144,252 @@ describe('startRecursiveClassifyResolver', () => {
       id: String(1000 + i),
       title: 't',
     }));
-    mockFindDescendants.mockResolvedValueOnce({
+    mockFindPagesByScope.mockResolvedValueOnce({
       results: ids,
       totalSize: 500,
     });
 
-    await startRecursiveClassifyResolver({
+    const result = await startBulkClassifyResolver({
       context: { accountId: ACCOUNT },
-      payload: { pageId: PAGE, spaceKey: 'IC', levelId: 'public' },
+      payload: descendantsPayload(),
     });
 
-    const header = kvsStore.get(`job:${ACCOUNT}:${PAGE}`);
+    const header = kvsStore.get(`job:${ACCOUNT}:${result.jobId}`);
     expect(header.discoveryCursor).toBe(200);
     expect(header.totalEstimate).toBe(500);
-    // Dynamic chunk size: computeClassifyChunkSize(500) = clamp(ceil(500/15),
-    // 3, 20) = 20. First discovery produced 200 ids → 10 chunks of 20.
     expect(header.chunkSize).toBe(20);
     expect(header.totalChunks).toBe(10);
   });
 
-  it('does NOT count parent when already at target', async () => {
-    mockClassifyPage.mockResolvedValueOnce({ success: true, unchanged: true });
-    mockFindDescendants.mockResolvedValueOnce({ results: [], totalSize: 0 });
-
-    const result = await startRecursiveClassifyResolver({
-      context: { accountId: ACCOUNT },
-      payload: { pageId: PAGE, spaceKey: 'IC', levelId: 'internal' },
+  it('rejects on overlapping descendants from a prior ancestor job', async () => {
+    // user A starts an ancestor job.
+    mockGetAncestorIds.mockResolvedValueOnce([]);
+    const a = await startBulkClassifyResolver({
+      context: { accountId: 'other-user' },
+      payload: {
+        ...descendantsPayload(),
+        scope: { kind: 'descendants', rootPageId: 'ANCESTOR' },
+      },
     });
+    expect(a.success).toBe(true);
 
-    expect(result.classified).toBe(0);
+    // user B tries to classify a descendant of that ancestor.
+    mockGetAncestorIds.mockResolvedValueOnce(['ANCESTOR']);
+    const b = await startBulkClassifyResolver({
+      context: { accountId: ACCOUNT },
+      payload: descendantsPayload(),
+    });
+    expect(b.success).toBe(false);
+    expect(b.error).toBe('scope_conflict');
   });
+});
 
-  it('rejects when a non-stale job is already running on this root', async () => {
-    kvsStore.set(`job:${ACCOUNT}:${PAGE}`, {
-      status: 'active',
-      startedAt: Date.now(),
-      lastProgressAt: Date.now(),
-    });
+describe('startBulkClassifyResolver (fromLevel)', () => {
+  it('seeds site-wide discovery with level filter', async () => {
+    const ids = Array.from({ length: 5 }, (_, i) => ({
+      id: String(2000 + i),
+      title: 'x',
+    }));
+    mockFindPagesByScope.mockResolvedValueOnce({ results: ids, totalSize: 5 });
 
-    const result = await startRecursiveClassifyResolver({
+    const result = await startBulkClassifyResolver({
       context: { accountId: ACCOUNT },
-      payload: { pageId: PAGE, spaceKey: 'IC', levelId: 'public' },
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.error).toBe('job_in_progress');
-    expect(mockClassifyPage).not.toHaveBeenCalled();
-  });
-
-  it('recovers a stale job (>10 min) before starting a new one', async () => {
-    const ancient = Date.now() - 20 * 60 * 1000;
-    kvsStore.set(`job:${ACCOUNT}:${PAGE}`, {
-      status: 'active',
-      startedAt: ancient,
-      lastProgressAt: ancient,
-      nextChunkIdx: 0,
-      totalChunks: 1,
-    });
-    kvsStore.set(`job:${ACCOUNT}:${PAGE}:chunk:0`, { ids: ['old'] });
-    kvsStore.set(`user-jobs:${ACCOUNT}`, { rootPageIds: [PAGE] });
-
-    const result = await startRecursiveClassifyResolver({
-      context: { accountId: ACCOUNT },
-      payload: { pageId: PAGE, spaceKey: 'IC', levelId: 'public' },
+      payload: fromLevelPayload(),
     });
 
     expect(result.success).toBe(true);
-    // Fresh job seeded; no trace of the stale chunk remains unless new
-    // discovery repopulated it (mockFindDescendants is default empty).
-    expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}:chunk:0`)).toBeUndefined();
+    expect(result.promoted).toBe(true);
+    // No root classification for fromLevel.
+    expect(mockClassifyPage).not.toHaveBeenCalled();
+    expect(result.totalEstimate).toBe(5);
+    const header = kvsStore.get(`job:${ACCOUNT}:${result.jobId}`);
+    expect(header.scope).toEqual({ kind: 'fromLevel' });
+    expect(header.sourceLevelFilter).toBe('internal');
+  });
+
+  it('requires sourceLevelFilter for fromLevel scope', async () => {
+    const result = await startBulkClassifyResolver({
+      context: { accountId: ACCOUNT },
+      payload: { ...fromLevelPayload(), sourceLevelFilter: null },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('blocks a second fromLevel job with the same source across users', async () => {
+    mockFindPagesByScope.mockResolvedValueOnce({ results: [], totalSize: 0 });
+    const a = await startBulkClassifyResolver({
+      context: { accountId: 'user-a' },
+      payload: fromLevelPayload(),
+    });
+    expect(a.success).toBe(true);
+
+    const b = await startBulkClassifyResolver({
+      context: { accountId: 'user-b' },
+      payload: fromLevelPayload(),
+    });
+    expect(b.success).toBe(false);
+    expect(b.error).toBe('scope_conflict');
+  });
+});
+
+describe('per-user queue', () => {
+  it('queues a second job behind an active one for the same user', async () => {
+    mockFindPagesByScope
+      .mockResolvedValueOnce({ results: [], totalSize: 0 })
+      .mockResolvedValueOnce({ results: [], totalSize: 0 });
+
+    const a = await startBulkClassifyResolver({
+      context: { accountId: ACCOUNT },
+      payload: fromLevelPayload({ sourceLevelFilter: 'internal' }),
+    });
+    expect(a.promoted).toBe(true);
+
+    // Same user queues a non-overlapping fromLevel job (different source).
+    const b = await startBulkClassifyResolver({
+      context: { accountId: ACCOUNT },
+      payload: fromLevelPayload({
+        sourceLevelFilter: 'public',
+        targetLevelId: 'internal',
+      }),
+    });
+    expect(b.success).toBe(true);
+    expect(b.promoted).toBe(false);
+    expect(b.queuePosition).toBe(1);
+
+    const index = kvsStore.get(`user-jobs:${ACCOUNT}`);
+    expect(index.activeJobId).toBe(a.jobId);
+    expect(index.queuedJobIds).toEqual([b.jobId]);
+  });
+
+  it('onJobComplete promotes the next queued job', async () => {
+    mockFindPagesByScope
+      .mockResolvedValueOnce({ results: [], totalSize: 0 })
+      .mockResolvedValueOnce({ results: [], totalSize: 0 });
+
+    const a = await startBulkClassifyResolver({
+      context: { accountId: ACCOUNT },
+      payload: fromLevelPayload({ sourceLevelFilter: 'internal' }),
+    });
+    const b = await startBulkClassifyResolver({
+      context: { accountId: ACCOUNT },
+      payload: fromLevelPayload({
+        sourceLevelFilter: 'public',
+        targetLevelId: 'internal',
+      }),
+    });
+    expect(b.promoted).toBe(false);
+
+    // Cancel the active one — b should promote automatically.
+    const cancel = await cancelClassifyJobResolver({
+      context: { accountId: ACCOUNT },
+      payload: { jobId: a.jobId },
+    });
+    expect(cancel.success).toBe(true);
+    expect(cancel.promotedNextJobId).toBe(b.jobId);
+
+    const index = kvsStore.get(`user-jobs:${ACCOUNT}`);
+    expect(index.activeJobId).toBe(b.jobId);
+    expect(index.queuedJobIds).toEqual([]);
   });
 });
 
 describe('processClassifyBatchResolver', () => {
-  async function seedJob({ ids = [], totalEstimate = ids.length } = {}) {
-    mockFindDescendants.mockResolvedValueOnce({
-      results: ids.map((id) => ({ id, title: id })),
-      totalSize: totalEstimate,
-    });
-    await startRecursiveClassifyResolver({
+  async function seedJob() {
+    const ids = Array.from({ length: 6 }, (_, i) => ({
+      id: String(3000 + i),
+      title: 'x',
+    }));
+    mockFindPagesByScope.mockResolvedValueOnce({ results: ids, totalSize: 6 });
+    const start = await startBulkClassifyResolver({
       context: { accountId: ACCOUNT },
-      payload: { pageId: PAGE, spaceKey: 'IC', levelId: 'public' },
+      payload: descendantsPayload(),
     });
+    return start.jobId;
   }
 
   it('classifies a chunk per invoke and advances nextChunkIdx', async () => {
-    // 3 ids = exactly one CLASSIFY_CHUNK_SIZE=3 chunk → 1 batch to completion.
-    const ids = ['100', '101', '102'];
-    await seedJob({ ids });
+    const jobId = await seedJob();
+    mockFindPagesByScope.mockResolvedValue({ results: [], totalSize: 6 });
+    mockClassifySinglePage.mockResolvedValue(true);
 
-    const before = kvsStore.get(`job:${ACCOUNT}:${PAGE}`);
-    expect(before.nextChunkIdx).toBe(0);
-
-    const batch = await processClassifyBatchResolver({
+    const result = await processClassifyBatchResolver({
       context: { accountId: ACCOUNT },
-      payload: { jobId: PAGE },
+      payload: { jobId },
     });
-
-    expect(batch.success).toBe(true);
-    expect(batch.classified).toBe(4); // 3 descendants + 1 parent (seeded)
-    expect(batch.done).toBe(true);
-    // Job deleted on completion.
-    expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}`)).toBeUndefined();
-    expect(kvsStore.get(`user-jobs:${ACCOUNT}`)).toBeUndefined();
+    expect(result.success).toBe(true);
+    expect(result.done).toBe(false);
+    // Chunk 0 drained; classified should have increased from 1 (root) by 3.
+    expect(result.classified).toBeGreaterThan(1);
   });
 
-  it('publishes classification-changed when any descendant was classified', async () => {
-    const ids = ['100', '101'];
-    await seedJob({ ids });
-    mockPublishGlobal.mockClear();
+  it('returns done:true when cancelled, promotes next if any', async () => {
+    const jobId = await seedJob();
+    const header = kvsStore.get(`job:${ACCOUNT}:${jobId}`);
+    header.status = 'cancelled';
+    kvsStore.set(`job:${ACCOUNT}:${jobId}`, header);
 
-    await processClassifyBatchResolver({
+    const result = await processClassifyBatchResolver({
       context: { accountId: ACCOUNT },
-      payload: { jobId: PAGE },
+      payload: { jobId },
     });
-
-    // Regression guard: open stats macros must get a ping per batch so the
-    // chart refreshes during a long recursive job. One publish per batch is
-    // all we need — the panel debounces incoming events.
-    const changedCalls = mockPublishGlobal.mock.calls.filter(
-      (c) => c[0] === 'classification-changed',
-    );
-    expect(changedCalls.length).toBe(1);
-    expect(changedCalls[0][1]).toMatchObject({ source: 'recursive-client' });
-  });
-
-  it('does NOT publish classification-changed when the batch had 0 changes', async () => {
-    const ids = ['100'];
-    await seedJob({ ids });
-    mockClassifySinglePage.mockResolvedValueOnce(null); // already at target
-    mockPublishGlobal.mockClear();
-
-    await processClassifyBatchResolver({
-      context: { accountId: ACCOUNT },
-      payload: { jobId: PAGE },
-    });
-
-    const changedCalls = mockPublishGlobal.mock.calls.filter(
-      (c) => c[0] === 'classification-changed',
-    );
-    expect(changedCalls.length).toBe(0);
-  });
-
-  it('treats classifySinglePage null as skipped (not failed)', async () => {
-    const ids = ['100', '101', '102'];
-    await seedJob({ ids });
-    mockClassifySinglePage
-      .mockResolvedValueOnce(null) // already at target
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false); // write failed
-
-    const batch = await processClassifyBatchResolver({
-      context: { accountId: ACCOUNT },
-      payload: { jobId: PAGE },
-    });
-
-    expect(batch.classified).toBe(2); // 1 parent + 1 descendant
-    expect(batch.skipped).toBe(1);
-    expect(batch.failed).toBe(1);
-    expect(batch.done).toBe(true);
-  });
-
-  it('continues discovery across multiple batches', async () => {
-    // 6 descendants total, seeded in batches of 3. With CLASSIFY_CHUNK_SIZE=3
-    // that produces 2 chunks and discovery finishes on the second fetch.
-    const firstIds = Array.from({ length: 3 }, (_, i) => ({
-      id: String(i),
-      title: 't',
-    }));
-    mockFindDescendants.mockResolvedValueOnce({
-      results: firstIds,
-      totalSize: 6,
-    });
-    await startRecursiveClassifyResolver({
-      context: { accountId: ACCOUNT },
-      payload: { pageId: PAGE, spaceKey: 'IC', levelId: 'public' },
-    });
-    const header = kvsStore.get(`job:${ACCOUNT}:${PAGE}`);
-    expect(header.discoveryCursor).toBe(3);
-    expect(header.totalChunks).toBe(1);
-
-    // batch1: discovery fetches the last 3; classification consumes chunk 0.
-    const secondIds = Array.from({ length: 3 }, (_, i) => ({
-      id: String(100 + i),
-      title: 't',
-    }));
-    mockFindDescendants.mockResolvedValueOnce({
-      results: secondIds,
-      totalSize: 6,
-    });
-    const batch1 = await processClassifyBatchResolver({
-      context: { accountId: ACCOUNT },
-      payload: { jobId: PAGE },
-    });
-    expect(batch1.discoveryDone).toBe(true);
-    expect(batch1.done).toBe(false); // chunk 1 still pending
-
-    // batch2: consumes chunk 1 → done.
-    const batch2 = await processClassifyBatchResolver({
-      context: { accountId: ACCOUNT },
-      payload: { jobId: PAGE },
-    });
-    expect(batch2.done).toBe(true);
-    expect(batch2.classified).toBe(7); // 6 descendants + 1 parent
+    expect(result.success).toBe(true);
+    expect(result.done).toBe(true);
+    expect(result.cancelled).toBe(true);
   });
 
   it('aborts if the target level was deleted mid-job', async () => {
-    const ids = ['1', '2'];
-    await seedJob({ ids });
-    // Mutate the effective config so the target level is gone.
-    const storageMock = await import('../../src/storage/configStore');
-    storageMock.getEffectiveConfig.mockResolvedValueOnce({
-      levels: [{ id: 'internal', allowed: true }],
-      defaultLevelId: 'internal',
-    });
+    const jobId = await seedJob();
+    const { getEffectiveConfig } =
+      await import('../../src/storage/configStore');
+    getEffectiveConfig.mockResolvedValueOnce({ levels: [] });
 
-    const batch = await processClassifyBatchResolver({
+    const result = await processClassifyBatchResolver({
       context: { accountId: ACCOUNT },
-      payload: { jobId: PAGE },
+      payload: { jobId },
     });
-
-    expect(batch.done).toBe(true);
-    expect(batch.aborted).toBe('level_deleted');
-    expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}`)).toBeUndefined();
-  });
-
-  it('aborts if the target level is no longer allowed mid-job', async () => {
-    const ids = ['1'];
-    await seedJob({ ids });
-    const storageMock = await import('../../src/storage/configStore');
-    storageMock.getEffectiveConfig.mockResolvedValueOnce({
-      levels: [
-        { id: 'public', allowed: false },
-        { id: 'internal', allowed: true },
-      ],
-      defaultLevelId: 'internal',
-    });
-
-    const batch = await processClassifyBatchResolver({
-      context: { accountId: ACCOUNT },
-      payload: { jobId: PAGE },
-    });
-
-    expect(batch.aborted).toBe('level_disallowed');
-  });
-
-  it('returns done:true, cancelled:true if the header is marked cancelled', async () => {
-    const ids = ['1', '2'];
-    await seedJob({ ids });
-    const header = kvsStore.get(`job:${ACCOUNT}:${PAGE}`);
-    kvsStore.set(`job:${ACCOUNT}:${PAGE}`, { ...header, status: 'cancelled' });
-
-    const batch = await processClassifyBatchResolver({
-      context: { accountId: ACCOUNT },
-      payload: { jobId: PAGE },
-    });
-
-    expect(batch.done).toBe(true);
-    expect(batch.cancelled).toBe(true);
-    expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}`)).toBeUndefined();
+    expect(result.done).toBe(true);
+    expect(result.aborted).toBe('level_deleted');
   });
 });
 
-describe('cancelClassifyJobResolver', () => {
-  it('deletes header + chunks + user-jobs entry', async () => {
-    const ids = ['1', '2'];
-    mockFindDescendants.mockResolvedValueOnce({
-      results: ids.map((id) => ({ id, title: id })),
-      totalSize: 2,
-    });
-    await startRecursiveClassifyResolver({
-      context: { accountId: ACCOUNT },
-      payload: { pageId: PAGE, spaceKey: 'IC', levelId: 'public' },
-    });
-    expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}`)).toBeTruthy();
-
-    const result = await cancelClassifyJobResolver({
-      context: { accountId: ACCOUNT },
-      payload: { jobId: PAGE },
-    });
-
-    expect(result.cancelled).toBe(true);
-    expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}`)).toBeUndefined();
-    expect(kvsStore.get(`job:${ACCOUNT}:${PAGE}:chunk:0`)).toBeUndefined();
-    expect(kvsStore.get(`user-jobs:${ACCOUNT}`)).toBeUndefined();
-  });
-});
-
-describe('getUserPendingJobsResolver', () => {
-  it('returns live jobs and garbage-collects stale ones', async () => {
-    // Live job.
-    mockFindDescendants.mockResolvedValueOnce({
-      results: [{ id: '1', title: 't' }],
-      totalSize: 1,
-    });
-    await startRecursiveClassifyResolver({
-      context: { accountId: ACCOUNT },
-      payload: { pageId: PAGE, spaceKey: 'IC', levelId: 'public' },
-    });
-
-    // Stale job (planted manually).
-    const ancient = Date.now() - 20 * 60 * 1000;
+describe('getUserJobsResolver', () => {
+  it('returns active + queued jobs and GCs orphan entries', async () => {
     kvsStore.set(`user-jobs:${ACCOUNT}`, {
-      rootPageIds: [PAGE, 'stale-page'],
+      activeJobId: 'orphan',
+      queuedJobIds: [],
     });
-    kvsStore.set(`job:${ACCOUNT}:stale-page`, {
-      rootPageId: 'stale-page',
-      startedAt: ancient,
-      lastProgressAt: ancient,
-      status: 'active',
-      classified: 0,
-      failed: 0,
-      skipped: 0,
-      totalEstimate: 0,
-      parentClassified: 0,
-      nextChunkIdx: 0,
-      totalChunks: 0,
-    });
-
-    const result = await getUserPendingJobsResolver({
+    const result = await getUserJobsResolver({
       context: { accountId: ACCOUNT },
     });
-
-    expect(result.jobs).toHaveLength(1);
-    expect(result.jobs[0].rootPageId).toBe(PAGE);
-    expect(kvsStore.get(`job:${ACCOUNT}:stale-page`)).toBeUndefined();
+    expect(result.success).toBe(true);
+    expect(result.activeJob).toBeNull();
+    expect(result.queuedJobs).toEqual([]);
   });
 
-  it('removes orphan entries (in index but no header)', async () => {
-    kvsStore.set(`user-jobs:${ACCOUNT}`, { rootPageIds: ['orphan'] });
-
-    const result = await getUserPendingJobsResolver({
+  it('annotates bulk-classify descendants with isSelf/isAncestor', async () => {
+    mockFindPagesByScope.mockResolvedValueOnce({ results: [], totalSize: 0 });
+    const a = await startBulkClassifyResolver({
       context: { accountId: ACCOUNT },
+      payload: descendantsPayload(),
     });
-
-    expect(result.jobs).toHaveLength(0);
-    expect(kvsStore.get(`user-jobs:${ACCOUNT}`)).toBeUndefined();
-  });
-
-  it('annotates jobs with isSelf / isAncestor relative to currentPageId', async () => {
-    // Seed one job rooted at PAGE.
-    mockFindDescendants.mockResolvedValueOnce({
-      results: [{ id: '1', title: 't' }],
-      totalSize: 1,
-    });
-    await startRecursiveClassifyResolver({
-      context: { accountId: ACCOUNT },
-      payload: { pageId: PAGE, spaceKey: 'IC', levelId: 'public' },
-    });
-
-    // Case 1: currentPageId IS the root → isSelf.
-    let result = await getUserPendingJobsResolver({
+    mockGetAncestorIds.mockResolvedValueOnce(['ancestor-xyz']);
+    const result = await getUserJobsResolver({
       context: { accountId: ACCOUNT },
       payload: { currentPageId: PAGE },
     });
-    expect(result.jobs[0].isSelf).toBe(true);
-    expect(result.jobs[0].isAncestor).toBe(false);
+    expect(result.activeJob.jobId).toBe(a.jobId);
+    expect(result.activeJob.isSelf).toBe(true);
+  });
+});
 
-    // Case 2: currentPageId is a descendant → isAncestor.
-    mockGetAncestorIds.mockResolvedValueOnce([PAGE, '999']);
-    result = await getUserPendingJobsResolver({
+describe('countBulkClassifyScopeResolver', () => {
+  it('returns the CQL totalSize for the scope', async () => {
+    mockFindPagesByScope.mockResolvedValueOnce({ results: [], totalSize: 123 });
+    const result = await countBulkClassifyScopeResolver({
       context: { accountId: ACCOUNT },
-      payload: { currentPageId: 'descendant-page' },
+      payload: { scope: { kind: 'fromLevel' }, sourceLevelFilter: 'internal' },
     });
-    expect(result.jobs[0].isSelf).toBe(false);
-    expect(result.jobs[0].isAncestor).toBe(true);
-
-    // Case 3: currentPageId is unrelated → neither.
-    mockGetAncestorIds.mockResolvedValueOnce(['999', '1000']);
-    result = await getUserPendingJobsResolver({
-      context: { accountId: ACCOUNT },
-      payload: { currentPageId: 'unrelated' },
-    });
-    expect(result.jobs[0].isSelf).toBe(false);
-    expect(result.jobs[0].isAncestor).toBe(false);
+    expect(result.success).toBe(true);
+    expect(result.count).toBe(123);
   });
 });

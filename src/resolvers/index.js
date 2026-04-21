@@ -10,17 +10,17 @@ import {
   getClassificationProgressResolver,
 } from './classifyResolver';
 import {
-  startRecursiveClassifyResolver,
+  startBulkClassifyResolver,
   processClassifyBatchResolver,
   cancelClassifyJobResolver,
-  getUserPendingJobsResolver,
+  countBulkClassifyScopeResolver,
+  getUserJobsResolver,
 } from './classifyJobResolver';
 import {
   getConfigResolver,
   setConfigResolver,
   getAuditDataResolver,
   countLevelUsageResolver,
-  reclassifyLevelResolver,
 } from './configResolver';
 import {
   getSpaceConfigResolver,
@@ -38,7 +38,6 @@ import {
   startLabelExportResolver,
   processLabelBatchResolver,
   cancelLabelJobResolver,
-  getUserPendingLabelJobsResolver,
 } from './labelJobResolver';
 import { getVersionInfoResolver } from './versionInfoResolver';
 
@@ -50,18 +49,21 @@ resolver.define('setClassification', setClassificationResolver);
 resolver.define('countDescendants', countDescendantsResolver);
 resolver.define('getClassificationProgress', getClassificationProgressResolver);
 
-// Client-driven recursive classification (runs asUser, respects restrictions)
-resolver.define('startRecursiveClassify', startRecursiveClassifyResolver);
+// Client-driven bulk classify (runs asUser, respects restrictions).
+// Unified across byline "apply to sub-pages" (scope=descendants) and admin
+// Bulk Classify tab (scope=fromLevel). `getUserJobs` returns both classify
+// and label jobs so every surface shows one coherent queue.
+resolver.define('startBulkClassify', startBulkClassifyResolver);
 resolver.define('processClassifyBatch', processClassifyBatchResolver);
 resolver.define('cancelClassifyJob', cancelClassifyJobResolver);
-resolver.define('getUserPendingJobs', getUserPendingJobsResolver);
+resolver.define('countBulkClassifyScope', countBulkClassifyScopeResolver);
+resolver.define('getUserJobs', getUserJobsResolver);
 
 // Global admin config operations (used by admin frontend)
 resolver.define('getConfig', getConfigResolver);
 resolver.define('setConfig', setConfigResolver);
 resolver.define('getAuditData', getAuditDataResolver);
 resolver.define('countLevelUsage', countLevelUsageResolver);
-resolver.define('reclassifyLevel', reclassifyLevelResolver);
 
 // Space config operations (used by space settings frontend)
 resolver.define('getSpaceConfig', getSpaceConfigResolver);
@@ -74,12 +76,13 @@ resolver.define('listLabels', listLabelsResolver);
 resolver.define('countLabelPages', countLabelPagesResolver);
 resolver.define('countLevelGap', countLevelGapResolver);
 
-// Client-driven label import/export (runs asUser, respects restrictions)
+// Client-driven label import/export (runs asUser, respects restrictions).
+// Label jobs share the unified user queue with bulk-classify; list them
+// via `getUserJobs` above.
 resolver.define('startLabelImport', startLabelImportResolver);
 resolver.define('startLabelExport', startLabelExportResolver);
 resolver.define('processLabelBatch', processLabelBatchResolver);
 resolver.define('cancelLabelJob', cancelLabelJobResolver);
-resolver.define('getUserPendingLabelJobs', getUserPendingLabelJobsResolver);
 
 // About panel — returns Forge version + upgrade status for the admin UI
 resolver.define('getVersionInfo', getVersionInfoResolver);

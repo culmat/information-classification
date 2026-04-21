@@ -87,7 +87,6 @@ const {
   startLabelExportResolver,
   processLabelBatchResolver,
   cancelLabelJobResolver,
-  getUserPendingLabelJobsResolver,
 } = await import('../../src/resolvers/labelJobResolver');
 
 const ACCOUNT = 'admin-1';
@@ -155,20 +154,20 @@ describe('startLabelImportResolver', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(result.jobId).toMatch(/^label-import-\d+$/);
+    expect(result.jobId).toMatch(/^label-import-/);
+    expect(result.promoted).toBe(true);
     expect(result.totalEstimate).toBe(5);
     expect(result.discoveryDone).toBe(true);
 
-    // Header written to KVS.
     const header = kvsStore.get(`job:${ACCOUNT}:${result.jobId}`);
     expect(header).toBeTruthy();
     expect(header.jobKind).toBe('label-import');
     expect(header.removeLabels).toBe(true);
     expect(header.totalChunks).toBeGreaterThan(0);
-    // user-jobs index updated.
-    expect(kvsStore.get(`user-jobs:${ACCOUNT}`)).toEqual({
-      rootPageIds: [result.jobId],
-    });
+    expect(header.status).toBe('active');
+    const index = kvsStore.get(`user-jobs:${ACCOUNT}`);
+    expect(index.activeJobId).toBe(result.jobId);
+    expect(index.queuedJobIds).toEqual([]);
   });
 });
 
@@ -202,7 +201,8 @@ describe('startLabelExportResolver', () => {
       },
     });
     expect(result.success).toBe(true);
-    expect(result.jobId).toMatch(/^label-export-\d+$/);
+    expect(result.jobId).toMatch(/^label-export-/);
+    expect(result.promoted).toBe(true);
     expect(result.totalEstimate).toBe(3);
 
     const header = kvsStore.get(`job:${ACCOUNT}:${result.jobId}`);
@@ -309,46 +309,5 @@ describe('cancelLabelJobResolver', () => {
     expect(result.cancelled).toBe(true);
     expect(result.jobKind).toBe('label-export');
     expect(kvsStore.get(`job:${ACCOUNT}:${start.jobId}`)).toBeUndefined();
-  });
-});
-
-describe('getUserPendingLabelJobsResolver', () => {
-  it('lists active label jobs and filters out recursive ones', async () => {
-    // Fake recursive job — should be filtered out.
-    kvsStore.set(`job:${ACCOUNT}:recursive-99`, {
-      jobKind: 'recursive',
-      status: 'active',
-      startedAt: Date.now(),
-      lastProgressAt: Date.now(),
-      classified: 0,
-      failed: 0,
-      skipped: 0,
-      totalEstimate: 10,
-    });
-    // Real label job.
-    const ids = [{ id: '6000', title: 'p' }];
-    queueCql([
-      { results: [], totalSize: 1 },
-      { results: [], totalSize: 0 },
-      { results: ids, totalSize: 1 },
-    ]);
-    const start = await startLabelExportResolver({
-      context: { accountId: ACCOUNT },
-      payload: {
-        mappings: [{ levelId: 'public', labelName: 'public' }],
-      },
-    });
-    // Add the recursive job to the index too (simulating both being listed).
-    kvsStore.set(`user-jobs:${ACCOUNT}`, {
-      rootPageIds: [start.jobId, 'recursive-99'],
-    });
-
-    const result = await getUserPendingLabelJobsResolver({
-      context: { accountId: ACCOUNT },
-    });
-    expect(result.success).toBe(true);
-    expect(result.jobs).toHaveLength(1);
-    expect(result.jobs[0].jobId).toBe(start.jobId);
-    expect(result.jobs[0].jobKind).toBe('label-export');
   });
 });

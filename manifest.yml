@@ -62,18 +62,11 @@ modules:
         - path: classifiedBy
           type: string
           searchAlias: culmat_classified_by
-  consumer:
-    - key: recursive-classification-consumer
-      queue: classification-queue
-      function: recursive-consumer
   function:
     - key: resolver
       handler: index.handler
     - key: dynamic-props
       handler: dynamicProperties.handler
-    - key: recursive-consumer
-      handler: recursiveConsumer.handler
-      timeoutSeconds: 600
 resources:
   - key: byline-ui
     path: src/frontend/byline.jsx

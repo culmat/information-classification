@@ -83,11 +83,7 @@ export function buildSpaceFilter(spaceKey) {
   return ` AND space in (${keys.map((k) => `"${k}"`).join(',')})`;
 }
 
-// KVS key prefix for tracking active async classification jobs
-export const ASYNC_JOB_KEY_PREFIX = 'async-job:';
-export const asyncJobKey = (pageId) => `${ASYNC_JOB_KEY_PREFIX}${pageId}`;
-
-// Client-driven recursive classification tuning.
+// Client-driven bulk classification tuning.
 //
 // Chunk size is DYNAMIC: computed per job from the total page estimate so
 // small trees get tiny chunks (smooth progress, fast first update) and big
@@ -109,12 +105,17 @@ export function computeClassifyChunkSize(totalPages) {
   return Math.min(CLASSIFY_MAX_CHUNK, Math.max(CLASSIFY_MIN_CHUNK, size));
 }
 
-// KVS keys for the client-driven job state.
+// KVS keys for the client-driven job state. `jobId` is an opaque string
+// generated server-side at job creation (was rootPageId pre-queue-model —
+// legacy jobIds of the form `${rootPageId}` remain valid).
 export const userJobsKey = (accountId) => `user-jobs:${accountId}`;
-export const jobHeaderKey = (accountId, rootPageId) =>
-  `job:${accountId}:${rootPageId}`;
-export const jobChunkKey = (accountId, rootPageId, idx) =>
-  `job:${accountId}:${rootPageId}:chunk:${idx}`;
+export const jobHeaderKey = (accountId, jobId) => `job:${accountId}:${jobId}`;
+export const jobChunkKey = (accountId, jobId, idx) =>
+  `job:${accountId}:${jobId}:chunk:${idx}`;
+
+// Global cross-user registry of live bulk-classify jobs (active + queued).
+// Used to reject new jobs whose page scope overlaps another user's job.
+export const BULK_SCOPE_LOCKS_KEY = 'scope-locks:bulk';
 
 // Stale-job clearance window — shared by the old async-queue jobs and the
 // new client-driven jobs. If `lastProgressAt` is older than this, consider

@@ -230,6 +230,43 @@ export async function findPagesByLevel(
 }
 
 /**
+ * Unified bulk-classify page discovery.
+ *   scope.kind === 'descendants' — pages under scope.rootPageId
+ *   scope.kind === 'fromLevel'   — site-wide, `sourceLevelFilter` required
+ * `sourceLevelFilter` (optional for descendants, required for fromLevel)
+ * restricts discovery to pages currently at that level.
+ */
+export async function findPagesByScope(
+  scope,
+  sourceLevelFilter,
+  limit = 0,
+  startIndex = 0,
+  { asApp: useApp = false } = {},
+) {
+  let cql = `type=page`;
+  if (scope?.kind === 'descendants') {
+    if (!scope.rootPageId) {
+      throw new Error(
+        'findPagesByScope: descendants scope requires rootPageId',
+      );
+    }
+    cql += ` AND ancestor=${scope.rootPageId}`;
+  } else if (scope?.kind === 'fromLevel') {
+    if (!sourceLevelFilter) {
+      throw new Error(
+        'findPagesByScope: fromLevel scope requires sourceLevelFilter',
+      );
+    }
+  } else {
+    throw new Error(`findPagesByScope: unknown scope kind "${scope?.kind}"`);
+  }
+  if (sourceLevelFilter) {
+    cql += ` AND culmat_classification_level = "${sourceLevelFilter}"`;
+  }
+  return await cqlPageSearch(cql, limit, startIndex, useApp);
+}
+
+/**
  * Shared CQL page search helper. Returns `{ results, totalSize }`.
  */
 async function cqlPageSearch(cql, limit, startIndex, useApp) {

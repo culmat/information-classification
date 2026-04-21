@@ -90,10 +90,18 @@ export default function useClassifyActions({
     setShowModal(true);
 
     try {
-      const result = await invoke('getUserPendingJobs', {
-        currentPageId: pageId,
-      });
-      setPendingJobs(result?.jobs || []);
+      const result = await invoke('getUserJobs', { currentPageId: pageId });
+      // Byline only surfaces bulk-classify jobs (label jobs are admin-only).
+      // Active + queued get merged into a single list; the existing UI
+      // treats them uniformly — queued jobs simply can't be "running" here.
+      const merged = [];
+      if (result?.activeJob && result.activeJob.jobKind === 'bulk-classify') {
+        merged.push(result.activeJob);
+      }
+      for (const j of result?.queuedJobs || []) {
+        if (j.jobKind === 'bulk-classify') merged.push(j);
+      }
+      setPendingJobs(merged);
     } catch (_) {
       setPendingJobs([]);
     }
@@ -214,10 +222,11 @@ export default function useClassifyActions({
   ]);
 
   const handleClassifyRecursive = useCallback(async () => {
-    const start = await invoke('startRecursiveClassify', {
-      pageId,
+    const start = await invoke('startBulkClassify', {
+      scope: { kind: 'descendants', rootPageId: pageId },
+      sourceLevelFilter: null,
+      targetLevelId: selectedLevel,
       spaceKey,
-      levelId: selectedLevel,
       locale,
     });
     if (!start.success) {
@@ -225,6 +234,23 @@ export default function useClassifyActions({
         type: 'error',
         text: start.message || start.error || t('classify.error'),
       });
+      setSaving(false);
+      return;
+    }
+    // If the user had another job active, this one is queued. Surface
+    // the state but don't drive the loop — the admin/byline will pick
+    // it up when it gets promoted.
+    if (start.promoted === false) {
+      showFlag({
+        id: 'classify-queued',
+        title: interpolate(t('classify.queued'), {
+          position: start.queuePosition || 1,
+        }),
+        type: 'info',
+        isAutoDismiss: true,
+      });
+      setShowModal(false);
+      setSaving(false);
       return;
     }
     startedAtRef.current = Date.now();

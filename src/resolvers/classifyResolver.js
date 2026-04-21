@@ -51,8 +51,8 @@ export async function getClassificationResolver(req) {
     const history = await getHistory(String(pageId));
 
     // Client-driven classify-job state lives in its own KVS namespace and is
-    // retrieved via getUserPendingJobs when the modal opens. This resolver
-    // no longer reports an `activeJob` field.
+    // retrieved via getUserJobs when the modal opens. This resolver no
+    // longer reports an `activeJob` field.
     return successResponse({
       ...result,
       config,
@@ -81,10 +81,9 @@ export async function setClassificationResolver(req) {
     return errorResponse('Authentication required', 401);
   }
 
-  // Recursive classification is now driven from the browser via
-  // startRecursiveClassify + processClassifyBatch (so it runs asUser and
-  // respects page restrictions). This resolver only handles single-page
-  // classification.
+  // Bulk classification is driven from the browser via startBulkClassify
+  // + processClassifyBatch (so it runs asUser and respects page
+  // restrictions). This resolver only handles single-page classification.
   try {
     const result = await classifyPage({
       pageId: String(pageId),

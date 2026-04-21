@@ -43,6 +43,7 @@ const BylineView = ({
   etaText,
   ownerJob,
   otherJobs,
+  activeJobId,
   actions,
 }) => (
   <Box xcss={popupContentStyle}>
@@ -92,6 +93,7 @@ const BylineView = ({
           locale={locale}
           ownerJob={ownerJob}
           otherJobs={otherJobs}
+          activeJobId={activeJobId}
           asyncJob={actions.asyncJob}
           asyncProgress={actions.asyncProgress}
           stopConfirmVisible={actions.stopConfirmVisible}

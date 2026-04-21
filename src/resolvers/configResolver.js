@@ -14,7 +14,6 @@ import {
   validationError,
 } from '../utils/responseHelper';
 import { LEVEL_COLORS, isValidSpaceKey } from '../shared/constants';
-import { enqueueJob } from '../utils/jobQueue';
 
 /**
  * Resolver: getConfig
@@ -301,43 +300,5 @@ export async function countLevelUsageResolver(req) {
   } catch (error) {
     console.error('Error counting level usage:', error);
     return errorResponse('Failed to count pages', 500);
-  }
-}
-
-/**
- * Resolver: reclassifyLevel
- * Reclassifies all pages from one level to another via the async queue.
- */
-export async function reclassifyLevelResolver(req) {
-  const accountId = req.context.accountId;
-  const { fromLevelId, toLevelId } = req.payload || {};
-  const locale = req.context.locale || 'en';
-
-  if (!fromLevelId || !toLevelId)
-    return validationError('fromLevelId and toLevelId are required');
-  if (fromLevelId === toLevelId)
-    return validationError('fromLevelId and toLevelId must differ');
-
-  try {
-    const { totalSize } = await findPagesByLevel(fromLevelId, 0);
-    if (totalSize === 0) return successResponse({ count: 0 });
-
-    const { jobId } = await enqueueJob(
-      `reclassify-${fromLevelId}`,
-      {
-        fromLevelId,
-        toLevelId,
-        accountId,
-        locale,
-        totalToClassify: totalSize,
-      },
-      `reclassify-${fromLevelId}`,
-      totalSize,
-    );
-
-    return successResponse({ count: totalSize, asyncJobId: jobId });
-  } catch (error) {
-    console.error('Error reclassifying level:', error);
-    return errorResponse('Failed to start reclassification', 500);
   }
 }

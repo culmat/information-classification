@@ -23,6 +23,7 @@ const ClassifyModal = ({
   locale,
   ownerJob,
   otherJobs,
+  activeJobId,
   asyncJob,
   asyncProgress,
   stopConfirmVisible,
@@ -72,6 +73,7 @@ const ClassifyModal = ({
           {ownerJob && (
             <OwnerJobBanner
               ownerJob={ownerJob}
+              isRunning={ownerJob.jobId === activeJobId}
               t={t}
               resumePendingJob={resumePendingJob}
               stopPendingJob={stopPendingJob}
@@ -83,6 +85,7 @@ const ClassifyModal = ({
           {otherJobs.length > 0 && (
             <PendingJobsList
               otherJobs={otherJobs}
+              activeJobId={activeJobId}
               t={t}
               resumePendingJob={resumePendingJob}
               stopPendingJob={stopPendingJob}

@@ -5,7 +5,6 @@ const mockGetPageClassification = vi.fn();
 const mockClassifyPage = vi.fn();
 const mockKvsGet = vi.fn().mockResolvedValue(null);
 const mockKvsDelete = vi.fn().mockResolvedValue(undefined);
-const mockEnqueueJob = vi.fn().mockResolvedValue({ jobId: 'job-abc' });
 const mockGetHistory = vi
   .fn()
   .mockResolvedValue({ truncated: false, entries: [] });
@@ -44,10 +43,6 @@ vi.mock('../../src/services/contentPropertyService', () => ({
   getHistory: (...args) => mockGetHistory(...args),
 }));
 
-vi.mock('../../src/utils/jobQueue', () => ({
-  enqueueJob: (...args) => mockEnqueueJob(...args),
-}));
-
 vi.mock('../../src/storage/configStore', () => ({
   getEffectiveConfig: vi.fn().mockResolvedValue({ levels: [] }),
 }));
@@ -66,7 +61,6 @@ beforeEach(() => {
     totalSize: 0,
   });
   mockFindDescendants.mockResolvedValue({ results: [], totalSize: 0 });
-  mockEnqueueJob.mockResolvedValue({ jobId: 'job-abc' });
   // Default: no active job — individual tests override with kvs.get mock.
   mockKvsGet.mockResolvedValue(null);
   mockGetPageClassification.mockResolvedValue({
@@ -252,6 +246,5 @@ describe('setClassificationResolver', () => {
     // dropped it when the dead recursive branch was removed).
     const call = mockClassifyPage.mock.calls[0][0];
     expect(call).not.toHaveProperty('recursive');
-    expect(mockEnqueueJob).not.toHaveBeenCalled();
   });
 });

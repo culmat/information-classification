@@ -26,6 +26,8 @@ import EmptyStatePopup from './byline/EmptyStatePopup';
 import useClassifyActions from './byline/useClassifyActions';
 import useClassificationData from './byline/useClassificationData';
 import useDescendantCount from './byline/useDescendantCount';
+import useJobQueue from './shared/useJobQueue';
+import useBulkClassifyDriver from './shared/useBulkClassifyDriver';
 import {
   formatDate,
   makeLevelAppearance,
@@ -108,6 +110,21 @@ const App = () => {
     loadClassification,
   });
 
+  // Auto-drive any active bulk-classify job while the classify modal is
+  // open — mirrors the admin page. Polling stays off for plain page views
+  // so the byline doesn't pay a cost on every Confluence page load. The
+  // driver bails out when `useClassifyActions` has its own loop running
+  // (`asyncJob` set after Apply/Resume), so only one driver per job.
+  const bylineJobQueue = useJobQueue({
+    poll: actions.showModal,
+    currentPageId: pageId,
+  });
+  useBulkClassifyDriver({
+    activeJob:
+      actions.showModal && !actions.asyncJob ? bylineJobQueue.activeJob : null,
+    onTick: bylineJobQueue.refresh,
+  });
+
   const etaText = useMemo(() => {
     if (!actions.asyncJob?.sessionStartedAt) return '';
     const classified = actions.asyncProgress?.classified || 0;
@@ -151,8 +168,23 @@ const App = () => {
     );
   }
 
+  // While the modal is open, prefer the live queue snapshot so progress
+  // counters update as the driver advances. Falls back to the (stale but
+  // harmless) list captured at openModal when the modal is closed.
+  const modalJobs = actions.showModal
+    ? [
+        ...(bylineJobQueue.activeJob &&
+        bylineJobQueue.activeJob.jobKind === 'bulk-classify'
+          ? [bylineJobQueue.activeJob]
+          : []),
+        ...bylineJobQueue.queuedJobs.filter(
+          (j) => j.jobKind === 'bulk-classify',
+        ),
+      ]
+    : actions.pendingJobs;
+  const activeJobId = bylineJobQueue.activeJob?.jobId || null;
   const { ownerJob, otherJobs } = partitionPendingJobs(
-    actions.pendingJobs,
+    modalJobs,
     actions.asyncJob,
   );
 
@@ -182,6 +214,7 @@ const App = () => {
       etaText={etaText}
       ownerJob={ownerJob}
       otherJobs={otherJobs}
+      activeJobId={activeJobId}
       actions={actions}
     />
   );
