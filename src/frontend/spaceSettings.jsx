@@ -228,6 +228,19 @@ const App = () => {
     );
   }
 
+  if (!globalConfig?.levels?.length) {
+    return (
+      <Box xcss={containerStyle}>
+        <SectionMessage
+          appearance="information"
+          title={t('space_settings.not_configured_title')}
+        >
+          <Text>{t('space_settings.not_configured_message')}</Text>
+        </SectionMessage>
+      </Box>
+    );
+  }
+
   // Only show globally-allowed levels as toggleable options
   const globalAllowedLevels = (globalConfig?.levels || []).filter(
     (l) => l.allowed,

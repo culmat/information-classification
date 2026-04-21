@@ -17,7 +17,12 @@
     "no_links": "Aucun lien configuré.",
     "no_resources": "Aucun contact ou lien configuré.",
     "no_history": "Aucune modification de classification enregistrée.",
-    "history_truncated": "Seules les modifications les plus récentes sont affichées."
+    "history_truncated": "Seules les modifications les plus récentes sont affichées.",
+    "empty_state": {
+      "heading": "Pas encore configuré",
+      "body": "La classification de l'information n'est pas configurée sur ce site Confluence. Un administrateur Confluence doit choisir des niveaux de classification avant que cette application puisse être utilisée.",
+      "docs_link": "Voir la documentation"
+    }
   },
   "classify": {
     "title": "Modifier la classification",
@@ -258,7 +263,21 @@
     },
     "save_button": "Enregistrer la configuration",
     "save_success": "Configuration enregistrée.",
-    "save_error": "Impossible d'enregistrer la configuration."
+    "save_error": "Impossible d'enregistrer la configuration.",
+    "access_denied_title": "Accès administrateur requis",
+    "access_denied_message": "Seuls les administrateurs du site Confluence peuvent configurer la classification de l'information.",
+    "bootstrap": {
+      "title": "Configurer les niveaux de classification",
+      "subtitle": "Choisissez un modèle de départ pour votre schéma de classification. Vous pourrez ensuite renommer, réorganiser, supprimer ou ajouter des niveaux.",
+      "apply_button": "Utiliser ce modèle",
+      "scratch_prompt": "Ou créer le vôtre :",
+      "scratch_button": "Partir de zéro",
+      "template": {
+        "iso27001": "ISO 27001 (Public / Interne / Confidentiel / Secret)",
+        "nist": "NIST (Public / Interne / Confidentiel / Restricted)",
+        "government": "Gouvernement (Unclassified / Confidential / Secret / Top Secret)"
+      }
+    }
   },
   "space_settings": {
     "title": "Paramètres de classification",
@@ -267,7 +286,9 @@
     "reset_button": "Réinitialiser aux valeurs globales",
     "save_button": "Enregistrer",
     "save_success": "Paramètres d'espace enregistrés.",
-    "reset_success": "Paramètres d'espace réinitialisés aux valeurs globales."
+    "reset_success": "Paramètres d'espace réinitialisés aux valeurs globales.",
+    "not_configured_title": "La classification n'est pas encore configurée",
+    "not_configured_message": "Un administrateur du site Confluence doit d'abord choisir un schéma de classification avant que les paramètres au niveau de l'espace ne soient disponibles."
   },
   "language_names": {
     "en": "Anglais",

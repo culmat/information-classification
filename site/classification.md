@@ -9,7 +9,7 @@ order: 30
 
 ## The byline badge
 
-Every Confluence page shows a classification badge in the page byline.
+Every Confluence page shows a classification badge in the page byline - once a site administrator has configured at least one classification level (see [Installation](Installation#first-time-setup)). Until that happens, no badge is shown on any page.
 
 - **Unclassified pages** show the default level (e.g. "Internal").
 - **Classified pages** show the explicitly assigned level.

@@ -4,6 +4,10 @@
  * and make it easy to find where data lives.
  */
 
+// User-facing documentation URL.
+export const DOCS_URL =
+  'https://culm.at/information-classification/configuration/';
+
 // Content property keys — stored on each Confluence page
 export const CONTENT_PROPERTY_KEY = 'culmat_page_classification';
 export const BYLINE_PROPERTY_KEY = 'culmat_page_classification_byline';

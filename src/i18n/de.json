@@ -17,7 +17,12 @@
     "no_links": "Keine Links konfiguriert.",
     "no_resources": "Keine Kontakte oder Links konfiguriert.",
     "no_history": "Keine Klassifizierungsänderungen erfasst.",
-    "history_truncated": "Nur die neuesten Änderungen werden angezeigt."
+    "history_truncated": "Nur die neuesten Änderungen werden angezeigt.",
+    "empty_state": {
+      "heading": "Noch nicht eingerichtet",
+      "body": "Die Informationsklassifizierung ist auf dieser Confluence-Site nicht eingerichtet. Eine Confluence-Administratorin oder ein Confluence-Administrator muss zunächst Klassifizierungsstufen wählen, bevor die App genutzt werden kann.",
+      "docs_link": "Dokumentation anzeigen"
+    }
   },
   "classify": {
     "title": "Klassifizierung ändern",
@@ -258,7 +263,21 @@
     },
     "save_button": "Konfiguration speichern",
     "save_success": "Konfiguration gespeichert.",
-    "save_error": "Konfiguration konnte nicht gespeichert werden."
+    "save_error": "Konfiguration konnte nicht gespeichert werden.",
+    "access_denied_title": "Administratorzugriff erforderlich",
+    "access_denied_message": "Nur Confluence-Site-Administratoren können die Informationsklassifizierung konfigurieren.",
+    "bootstrap": {
+      "title": "Klassifizierungsstufen einrichten",
+      "subtitle": "Wählen Sie eine Vorlage als Ausgangspunkt für Ihr Klassifizierungsschema. Sie können Stufen anschließend umbenennen, neu ordnen, entfernen oder hinzufügen.",
+      "apply_button": "Diese Vorlage verwenden",
+      "scratch_prompt": "Oder selbst aufbauen:",
+      "scratch_button": "Von Grund auf beginnen",
+      "template": {
+        "iso27001": "ISO 27001 (Öffentlich / Intern / Vertraulich / Geheim)",
+        "nist": "NIST (Öffentlich / Intern / Vertraulich / Restricted)",
+        "government": "Behörde (Unclassified / Confidential / Secret / Top Secret)"
+      }
+    }
   },
   "space_settings": {
     "title": "Einstellungen Informationsklassifizierung",
@@ -267,7 +286,9 @@
     "reset_button": "Auf globale Standardwerte zurücksetzen",
     "save_button": "Speichern",
     "save_success": "Bereichseinstellungen gespeichert.",
-    "reset_success": "Bereichseinstellungen auf globale Standardwerte zurückgesetzt."
+    "reset_success": "Bereichseinstellungen auf globale Standardwerte zurückgesetzt.",
+    "not_configured_title": "Klassifizierung ist noch nicht konfiguriert",
+    "not_configured_message": "Ein Confluence-Site-Administrator muss zunächst ein Klassifizierungsschema wählen, bevor die Einstellungen auf Bereichsebene verfügbar werden."
   },
   "language_names": {
     "en": "Englisch",

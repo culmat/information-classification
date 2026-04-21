@@ -1,7 +1,7 @@
 /**
- * Default classification levels and configuration.
- * Applied on first use when no admin configuration exists yet.
- * These defaults follow the ISO 27001 information classification scheme.
+ * Bootstrap templates for the classification config.
+ * Applied only when an admin explicitly picks one during first-run setup.
+ * The app ships empty — these are opt-in starting points, not silent defaults.
  */
 
 /**
@@ -31,7 +31,7 @@ export const SUPPORTED_LANGUAGES = {
   uk: 'Українська',
 };
 
-export const DEFAULT_LEVELS = [
+const ISO27001_LEVELS = [
   {
     id: 'public',
     name: { en: 'Public' },
@@ -84,15 +84,153 @@ export const DEFAULT_LEVELS = [
   },
 ];
 
+const NIST_LEVELS = [
+  {
+    id: 'public',
+    name: { en: 'Public' },
+    color: 'green',
+    description: {
+      en: 'Public information can be freely disclosed without risk to the organization.',
+    },
+    sortOrder: 0,
+    allowed: true,
+    requiresProtection: false,
+    errorMessage: null,
+  },
+  {
+    id: 'internal',
+    name: { en: 'Internal' },
+    color: 'blue',
+    description: {
+      en: 'Internal information is intended for use within the organization. Unauthorized disclosure would have limited adverse effect.',
+    },
+    sortOrder: 1,
+    allowed: true,
+    requiresProtection: false,
+    errorMessage: null,
+  },
+  {
+    id: 'confidential',
+    name: { en: 'Confidential' },
+    color: 'orange',
+    description: {
+      en: 'Confidential information (including Controlled Unclassified Information) requires safeguards. Unauthorized disclosure would have serious adverse effect.',
+    },
+    sortOrder: 2,
+    allowed: true,
+    requiresProtection: true,
+    errorMessage: null,
+  },
+  {
+    id: 'restricted',
+    name: { en: 'Restricted' },
+    color: 'red',
+    description: {
+      en: 'Restricted information has severe or catastrophic impact if disclosed. Access is granted only on a strict need-to-know basis.',
+    },
+    sortOrder: 3,
+    allowed: true,
+    requiresProtection: true,
+    errorMessage: null,
+  },
+];
+
+const GOVERNMENT_LEVELS = [
+  {
+    id: 'unclassified',
+    name: { en: 'Unclassified' },
+    color: 'green',
+    description: {
+      en: 'Unclassified information is not subject to national-security classification controls.',
+    },
+    sortOrder: 0,
+    allowed: true,
+    requiresProtection: false,
+    errorMessage: null,
+  },
+  {
+    id: 'confidential',
+    name: { en: 'Confidential' },
+    color: 'blue',
+    description: {
+      en: 'Confidential information could reasonably be expected to cause damage to national security if disclosed.',
+    },
+    sortOrder: 1,
+    allowed: true,
+    requiresProtection: true,
+    errorMessage: null,
+  },
+  {
+    id: 'secret',
+    name: { en: 'Secret' },
+    color: 'orange',
+    description: {
+      en: 'Secret information could reasonably be expected to cause serious damage to national security if disclosed.',
+    },
+    sortOrder: 2,
+    allowed: false,
+    requiresProtection: false,
+    errorMessage: {
+      en: 'Secret data must not be stored in Confluence without accredited, encrypted storage.',
+    },
+  },
+  {
+    id: 'top-secret',
+    name: { en: 'Top Secret' },
+    color: 'red',
+    description: {
+      en: 'Top Secret information could reasonably be expected to cause exceptionally grave damage to national security if disclosed.',
+    },
+    sortOrder: 3,
+    allowed: false,
+    requiresProtection: false,
+    errorMessage: {
+      en: 'Top Secret data must not be stored in Confluence — it requires dedicated accredited systems.',
+    },
+  },
+];
+
 /**
- * Returns the full default configuration object.
- * Used to initialize the global config on first app use.
+ * Registry of bootstrap templates. Keys are template ids used over the wire
+ * between the admin UI and the apply-template resolver.
+ *
+ * Each entry provides:
+ * - labelKey: i18n key for the display name in the wizard
+ * - levels: the starting levels array (deep-cloned on use)
+ * - defaultLevelId: which level to pre-select as the default
  */
-export function getDefaultConfig() {
+export const TEMPLATES = {
+  iso27001: {
+    labelKey: 'admin.bootstrap.template.iso27001',
+    levels: ISO27001_LEVELS,
+    defaultLevelId: 'internal',
+  },
+  nist: {
+    labelKey: 'admin.bootstrap.template.nist',
+    levels: NIST_LEVELS,
+    defaultLevelId: 'internal',
+  },
+  government: {
+    labelKey: 'admin.bootstrap.template.government',
+    levels: GOVERNMENT_LEVELS,
+    defaultLevelId: 'unclassified',
+  },
+};
+
+/**
+ * Returns a fresh config object populated from the named template.
+ * Throws if `templateId` is unknown so the caller surfaces a validation error
+ * rather than silently saving a malformed config.
+ */
+export function buildConfigFromTemplate(templateId) {
+  const template = TEMPLATES[templateId];
+  if (!template) {
+    throw new Error(`Unknown template: ${templateId}`);
+  }
   return {
     languages: [{ code: 'en', label: 'English' }],
-    levels: structuredClone(DEFAULT_LEVELS),
-    defaultLevelId: 'internal',
+    levels: structuredClone(template.levels),
+    defaultLevelId: template.defaultLevelId,
     contacts: [],
     links: [],
   };

@@ -25,6 +25,7 @@ import useExportState from './admin/useExportState';
 import useLabelSyncJobs from './admin/useLabelSyncJobs';
 import useConfigEditing from './admin/useConfigEditing';
 import AdminView from './admin/AdminView';
+import BootstrapPanel from './admin/BootstrapPanel';
 
 const containerStyle = xcss({ padding: 'space.400', maxWidth: '960px' });
 
@@ -40,6 +41,9 @@ const App = () => {
   const [showUnclassified, setShowUnclassified] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
   const [message, setMessage] = useState(null);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [bootstrapDismissed, setBootstrapDismissed] = useState(false);
+  const [bootstrapError, setBootstrapError] = useState(null);
   const isDirty =
     config &&
     savedConfig &&
@@ -74,6 +78,13 @@ const App = () => {
         if (configResult.success) {
           setConfig(configResult.config);
           setSavedConfig(configResult.config);
+        } else if (configResult.status === 403) {
+          setAccessDenied(true);
+        } else {
+          setMessage({
+            type: 'error',
+            text: configResult.error || t('admin.save_error'),
+          });
         }
       } catch (error) {
         console.error('Failed to load config:', error);
@@ -83,6 +94,22 @@ const App = () => {
       setLoading(false);
     })();
   }, [t, refreshAuditData]);
+
+  const applyBootstrapTemplate = useCallback(
+    async (templateConfig) => {
+      setBootstrapError(null);
+      const result = await invoke('setConfig', { config: templateConfig });
+      if (result.success) {
+        setConfig(templateConfig);
+        setSavedConfig(templateConfig);
+        setBootstrapDismissed(false);
+        await refreshAuditData();
+      } else {
+        setBootstrapError(result.error || t('admin.save_error'));
+      }
+    },
+    [refreshAuditData, t],
+  );
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -133,6 +160,40 @@ const App = () => {
         >
           <Text>{t('license.inactive_message')}</Text>
         </SectionMessage>
+      </Box>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <Box xcss={containerStyle}>
+        <SectionMessage
+          appearance="warning"
+          title={t('admin.access_denied_title')}
+        >
+          <Text>{t('admin.access_denied_message')}</Text>
+        </SectionMessage>
+      </Box>
+    );
+  }
+
+  // Gate the wizard on the *saved* config, not the in-memory edit state.
+  // Otherwise deleting the last level flips into the wizard before the admin
+  // has had a chance to click Save — swallowing their unsaved edits.
+  const needsBootstrap =
+    savedConfig &&
+    (savedConfig.levels || []).length === 0 &&
+    !bootstrapDismissed;
+
+  if (needsBootstrap) {
+    return (
+      <Box xcss={containerStyle}>
+        <BootstrapPanel
+          t={t}
+          onApplyTemplate={applyBootstrapTemplate}
+          onSkip={() => setBootstrapDismissed(true)}
+          error={bootstrapError}
+        />
       </Box>
     );
   }

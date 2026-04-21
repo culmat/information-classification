@@ -9,7 +9,9 @@ order: 10
 
 The global configuration is accessible to Confluence site administrators under **Confluence Settings -> Information Classification**.
 
-The settings are organized into six tabs: **Levels**, **Contacts**, **Links**, **Languages**, **Labels**, and **Statistics**.
+When the app has no levels configured (fresh install, or after you've deleted every level), a setup wizard takes over the admin page and offers a starting template. See [Installation](Installation#first-time-setup) for the available templates.
+
+Once a template is applied - or you've added at least one level via **Start from scratch** - the settings are organized into six tabs: **Levels**, **Contacts**, **Links**, **Languages**, **Labels**, and **Statistics**.
 
 ## Levels
 
@@ -40,7 +42,11 @@ Toggle the **Allowed** switch off. Pages already classified with this level keep
 
 ## Default level
 
-The default level is shown for pages that have not been explicitly classified. It must be an allowed level. Change it via the dropdown below the levels table.
+The default level is shown for pages that have not been explicitly classified. It must be an allowed level. Change it via the dropdown below the levels table. The dropdown is only visible once at least one level exists.
+
+## Resetting to the wizard
+
+Deleting every level is allowed and returns the admin page to the setup wizard, letting you switch to a different template or start from scratch. Pages that were already classified keep their stored classification; if you re-apply a template that uses the same level IDs, their badges reappear automatically. Switching to a template with different IDs leaves those pages effectively unclassified (the badge hides) until a migration is performed manually.
 
 ## Contacts
 

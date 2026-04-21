@@ -11,23 +11,25 @@
 
 import { kvs } from '@forge/kvs';
 import { GLOBAL_CONFIG_KEY } from '../shared/constants';
-import { getDefaultConfig } from '../shared/defaults';
+
+const EMPTY_CONFIG = Object.freeze({
+  languages: [{ code: 'en', label: 'English' }],
+  levels: [],
+  defaultLevelId: null,
+  contacts: [],
+  links: [],
+});
 
 /**
  * Retrieves the global classification configuration.
- * If no config exists yet (first use), initializes with defaults and saves them.
+ * Returns an explicit empty shape when no config has been saved yet so callers
+ * can render an onboarding state. Does not write to KVS on read.
  *
  * @returns {Promise<Object>} the global config object
  */
 export async function getGlobalConfig() {
-  let config = await kvs.get(GLOBAL_CONFIG_KEY);
-
-  // First-time initialization: save defaults so admin sees them in the UI
-  if (!config) {
-    config = getDefaultConfig();
-    await kvs.set(GLOBAL_CONFIG_KEY, config);
-    console.log('Initialized global config with defaults');
-  }
+  const config = await kvs.get(GLOBAL_CONFIG_KEY);
+  if (!config) return structuredClone(EMPTY_CONFIG);
 
   // Ensure languages field exists (handles configs created before this feature)
   if (!config.languages) {

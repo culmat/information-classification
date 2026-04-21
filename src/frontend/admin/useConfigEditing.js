@@ -26,7 +26,7 @@ export default function useConfigEditing({ config, setConfig, t }) {
     const updated = { ...config, levels };
     if (config.defaultLevelId === levelId) {
       const firstAllowed = levels.find((l) => l.allowed);
-      updated.defaultLevelId = firstAllowed?.id || levels[0]?.id;
+      updated.defaultLevelId = firstAllowed?.id ?? levels[0]?.id ?? null;
     }
     setConfig(updated);
     setDeleteConfirm(null);
@@ -58,7 +58,17 @@ export default function useConfigEditing({ config, setConfig, t }) {
     } else {
       levels.push(level);
     }
-    setConfig({ ...config, levels });
+    // Ensure defaultLevelId always points at an allowed level. Covers the
+    // bootstrap-skipped case where the admin adds their first level into an
+    // empty config with defaultLevelId=null, and the edge where the previous
+    // default was just made disallowed.
+    let { defaultLevelId } = config || {};
+    const defaultLevel = levels.find((l) => l.id === defaultLevelId);
+    if (!defaultLevel || !defaultLevel.allowed) {
+      const firstAllowed = levels.find((l) => l.allowed);
+      defaultLevelId = firstAllowed?.id ?? levels[0]?.id ?? null;
+    }
+    setConfig({ ...config, levels, defaultLevelId });
     setShowLevelModal(false);
   };
 

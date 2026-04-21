@@ -12,15 +12,18 @@ vi.mock('@forge/kvs', () => ({
 // Import after mocking
 const { getGlobalConfig, setGlobalConfig, getEffectiveConfig } =
   await import('../../src/storage/configStore');
-const { getDefaultConfig } = await import('../../src/shared/defaults');
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe('getGlobalConfig', () => {
-  it('should return existing config from storage', async () => {
-    const existing = { levels: [{ id: 'custom' }], defaultLevelId: 'custom' };
+  it('returns existing config from storage as-is', async () => {
+    const existing = {
+      languages: [{ code: 'en', label: 'English' }],
+      levels: [{ id: 'custom' }],
+      defaultLevelId: 'custom',
+    };
     mockStorage.get.mockResolvedValue(existing);
 
     const result = await getGlobalConfig();
@@ -28,28 +31,32 @@ describe('getGlobalConfig', () => {
     expect(mockStorage.set).not.toHaveBeenCalled();
   });
 
-  it('should initialize with defaults when no config exists', async () => {
+  it('returns an empty-shape config when storage is empty, without writing', async () => {
     mockStorage.get.mockResolvedValue(null);
 
     const result = await getGlobalConfig();
-    expect(result.levels).toHaveLength(4);
-    expect(result.defaultLevelId).toBe('internal');
-    expect(mockStorage.set).toHaveBeenCalledOnce();
+    expect(result.levels).toEqual([]);
+    expect(result.defaultLevelId).toBeNull();
+    expect(result.contacts).toEqual([]);
+    expect(result.links).toEqual([]);
+    expect(result.languages).toEqual([{ code: 'en', label: 'English' }]);
+    expect(mockStorage.set).not.toHaveBeenCalled();
   });
 
-  it('should save defaults on first-time initialization', async () => {
-    mockStorage.get.mockResolvedValue(null);
+  it('backfills missing languages field on legacy stored configs', async () => {
+    mockStorage.get.mockResolvedValue({
+      levels: [{ id: 'public' }],
+      defaultLevelId: 'public',
+    });
 
-    await getGlobalConfig();
-    const savedConfig = mockStorage.set.mock.calls[0][1];
-    expect(savedConfig.levels).toHaveLength(4);
-    expect(savedConfig.defaultLevelId).toBe('internal');
+    const result = await getGlobalConfig();
+    expect(result.languages).toEqual([{ code: 'en', label: 'English' }]);
   });
 });
 
 describe('setGlobalConfig', () => {
   it('should save config to storage', async () => {
-    const config = { levels: [], defaultLevelId: 'test' };
+    const config = { levels: [], defaultLevelId: null };
     await setGlobalConfig(config);
     expect(mockStorage.set).toHaveBeenCalledWith('config:global', config);
   });
@@ -57,6 +64,7 @@ describe('setGlobalConfig', () => {
 
 describe('getEffectiveConfig', () => {
   const globalConfig = {
+    languages: [{ code: 'en', label: 'English' }],
     levels: [
       { id: 'public', allowed: true, sortOrder: 0 },
       { id: 'internal', allowed: true, sortOrder: 1 },
@@ -92,14 +100,11 @@ describe('getEffectiveConfig', () => {
 
     const result = await getEffectiveConfig('DEV', spaceConfig);
 
-    // public and internal should be allowed
     expect(result.levels.find((l) => l.id === 'public').allowed).toBe(true);
     expect(result.levels.find((l) => l.id === 'internal').allowed).toBe(true);
-    // confidential should be disallowed (not in space allowedLevelIds)
     expect(result.levels.find((l) => l.id === 'confidential').allowed).toBe(
       false,
     );
-    // secret remains disallowed (globally disallowed AND not in space list)
     expect(result.levels.find((l) => l.id === 'secret').allowed).toBe(false);
   });
 
@@ -120,11 +125,10 @@ describe('getEffectiveConfig', () => {
 
     const spaceConfig = {
       allowedLevelIds: ['public'],
-      defaultLevelId: 'internal', // internal is not in space allowed list
+      defaultLevelId: 'internal',
     };
 
     const result = await getEffectiveConfig('DEV', spaceConfig);
-    // internal is not allowed in space, so fall back to global default
-    expect(result.defaultLevelId).toBe('internal'); // global default
+    expect(result.defaultLevelId).toBe('internal');
   });
 });

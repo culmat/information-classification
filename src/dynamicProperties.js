@@ -13,25 +13,49 @@ import { getClassification } from './services/contentPropertyService';
 import { hasViewRestrictions } from './services/restrictionService';
 import { localize } from './shared/i18n';
 
+// Localized fallback for the byline title when no concrete level can be
+// resolved. Confluence renders the static manifest title ("Information
+// Classification") if we return an empty string, so always emit a
+// classification-shaped label instead. Kept inline because this handler runs
+// outside @forge/react's translation system.
+const UNCLASSIFIED_LABEL = {
+  en: 'Unclassified',
+  de: 'Nicht klassifiziert',
+  fr: 'Non classifié',
+  ja: '未分類',
+};
+
+function unclassified(locale) {
+  return { title: localize(UNCLASSIFIED_LABEL, locale) };
+}
+
 export async function handler(req) {
+  const locale = req?.context?.locale || 'en';
   try {
     const pageId = req?.context?.extension?.content?.id;
     const spaceKey = req?.context?.extension?.space?.key;
-    const locale = req?.context?.locale || 'en';
 
     if (!pageId || !spaceKey) {
-      return { title: 'Classification' };
+      return unclassified(locale);
     }
 
     const spConfig = await getSpaceConfig(spaceKey);
     const effectiveConfig = await getEffectiveConfig(spaceKey, spConfig);
+
+    // No levels configured — stay silent. Skip the classification and
+    // restriction reads so page views cost zero extra round-trips until
+    // an admin actually sets up the app.
+    if (!effectiveConfig.levels?.length) {
+      return unclassified(locale);
+    }
+
     const classification = await getClassification(String(pageId));
 
     const levelId = classification?.level || effectiveConfig.defaultLevelId;
     const level = effectiveConfig.levels.find((l) => l.id === levelId);
 
     if (!level) {
-      return { title: effectiveConfig.defaultLevelId || 'Unclassified' };
+      return unclassified(locale);
     }
 
     const levelName = localize(level.name, locale);
@@ -54,6 +78,6 @@ export async function handler(req) {
     };
   } catch (error) {
     console.error('Error in dynamicProperties:', error);
-    return { title: 'Classification' };
+    return unclassified(locale);
   }
 }

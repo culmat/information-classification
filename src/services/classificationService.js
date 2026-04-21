@@ -34,6 +34,17 @@ import { hasViewRestrictions } from './restrictionService';
 export async function getPageClassification(pageId, spaceKey) {
   const spConfig = await getSpaceConfig(spaceKey);
   const effectiveConfig = await getEffectiveConfig(spaceKey, spConfig);
+
+  // No levels configured — skip the classification and restriction reads.
+  // Saves two REST calls per byline popup on unconfigured instances.
+  if (!effectiveConfig.levels?.length) {
+    return {
+      classification: null,
+      config: effectiveConfig,
+      restrictionWarning: null,
+    };
+  }
+
   const classification = await getClassification(pageId);
 
   // Check restriction mismatch on every load

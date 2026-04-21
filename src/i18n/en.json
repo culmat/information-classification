@@ -17,7 +17,12 @@
     "no_links": "No links configured.",
     "no_resources": "No contacts or links configured.",
     "no_history": "No classification changes recorded.",
-    "history_truncated": "Showing most recent changes only."
+    "history_truncated": "Showing most recent changes only.",
+    "empty_state": {
+      "heading": "Not set up yet",
+      "body": "Information Classification is not set up on this Confluence site. A Confluence administrator needs to pick classification levels before this app can be used.",
+      "docs_link": "View documentation"
+    }
   },
   "classify": {
     "title": "Change Classification",
@@ -256,7 +261,21 @@
     },
     "save_button": "Save Configuration",
     "save_success": "Configuration saved.",
-    "save_error": "Failed to save configuration."
+    "save_error": "Failed to save configuration.",
+    "access_denied_title": "Admin access required",
+    "access_denied_message": "Only Confluence site administrators can configure Information Classification.",
+    "bootstrap": {
+      "title": "Set up classification levels",
+      "subtitle": "Pick a starting template for your classification scheme. You can rename, reorder, remove, or add levels afterwards.",
+      "apply_button": "Use this template",
+      "scratch_prompt": "Or build your own:",
+      "scratch_button": "Start from scratch",
+      "template": {
+        "iso27001": "ISO 27001 (Public / Internal / Confidential / Secret)",
+        "nist": "NIST (Public / Internal / Confidential / Restricted)",
+        "government": "Government (Unclassified / Confidential / Secret / Top Secret)"
+      }
+    }
   },
   "space_settings": {
     "title": "Information Classification Settings",
@@ -265,7 +284,9 @@
     "reset_button": "Reset to Global Defaults",
     "save_button": "Save",
     "save_success": "Space settings saved.",
-    "reset_success": "Space settings reset to global defaults."
+    "reset_success": "Space settings reset to global defaults.",
+    "not_configured_title": "Classification is not configured yet",
+    "not_configured_message": "A Confluence site administrator must pick a classification scheme before space-level settings become available."
   },
   "language_names": {
     "en": "English",

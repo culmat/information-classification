@@ -33,6 +33,7 @@ import {
 } from '@forge/react';
 import { invoke } from '@forge/bridge';
 import buildInfo from '../shared/buildInfo.json';
+import { DOCS_URL } from '../shared/constants';
 import appIcon from './assets/app-icon.png';
 
 const REPO_URL = 'https://github.com/culmat/information-classification';
@@ -43,7 +44,6 @@ const ISSUES_URL = `${REPO_URL}/issues`;
 // picker, which is acceptable until the real slug is known.
 const MARKETPLACE_REVIEWS_URL =
   'https://marketplace.atlassian.com/apps/TBD/information-classification-for-confluence?tab=reviews';
-const DOCS_URL = 'https://culm.at/information-classification/configuration/';
 
 /* Logo-clamp pattern: Image would otherwise expand to its default xlarge
    size inside an Inline flex row. We pin the wrapper to a bigger 96px now

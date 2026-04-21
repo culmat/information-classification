@@ -15,22 +15,23 @@ order: 10
 2. Click **Find new apps** and search for **Information Classification**.
 3. Click **Get app** and follow the prompts.
 
-Once installed, a classification badge appears in the byline of every page. Pages are initially unclassified and show the default level (Internal).
+Once installed, the app ships with no classification scheme preselected. The byline badge stays hidden until a site administrator completes first-time setup.
 
 ## First-time setup
 
-The app ships with four default levels based on ISO 27001:
+1. Open **Confluence Settings -> Apps -> Information Classification**.
+2. A setup wizard offers three starting templates. Pick one, or choose **Start from scratch** to define your own levels.
 
-| Level        | Color  | Description                                                                          |
-| ------------ | ------ | ------------------------------------------------------------------------------------ |
-| Public       | Green  | Intended for general publication, no restrictions                                    |
-| Internal     | Blue   | Available to all employees, normal business sharing                                  |
-| Confidential | Orange | Authorized personnel only, requires page restrictions                                |
-| Secret       | Red    | Disallowed by default - a placeholder for data that must not be stored in Confluence |
+| Template               | Levels                                            |
+| ---------------------- | ------------------------------------------------- |
+| **ISO 27001**          | Public / Internal / Confidential / Secret         |
+| **NIST**               | Public / Internal / Confidential / Restricted     |
+| **Government**         | Unclassified / Confidential / Secret / Top Secret |
+| **Start from scratch** | Empty - add levels yourself                       |
 
-The default classification for unclassified pages is **Internal**.
+After a template is applied, you can rename, recolor, reorder, add, or remove levels in the [global configuration](Configuration). Deleting every level returns you to the setup wizard, so you can switch schemes any time.
 
-These defaults are a starting point. You can rename, recolor, add, or remove levels in the [global configuration](Configuration).
+Classification levels are optional: if the config is empty, the byline badge is hidden and pages remain silently unclassified.
 
 ## Permissions
 

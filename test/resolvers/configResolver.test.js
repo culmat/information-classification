@@ -52,14 +52,29 @@ describe('setConfigResolver — validation', () => {
     expect(result.success).toBe(false);
   });
 
-  it('should reject empty levels array', async () => {
+  it('should accept empty levels array (bootstrap state) when defaultLevelId is null', async () => {
+    const result = await setConfigResolver(
+      adminReq({
+        config: {
+          languages: langs,
+          levels: [],
+          defaultLevelId: null,
+          contacts: [],
+          links: [],
+        },
+      }),
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject empty levels with a non-null defaultLevelId', async () => {
     const result = await setConfigResolver(
       adminReq({
         config: { languages: langs, levels: [], defaultLevelId: 'x' },
       }),
     );
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/at least one/i);
+    expect(result.error).toMatch(/default level/i);
   });
 
   it('should reject config with no allowed levels', async () => {

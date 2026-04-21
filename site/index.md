@@ -21,7 +21,7 @@ slug: index
 ## Features at a glance
 
 - **Byline badge** - instantly see a page's classification
-- **ISO 27001 defaults** - ships with Public, Internal, Confidential, and Secret levels
+- **First-run setup wizard** - pick a starting template (ISO 27001, NIST, or Government) or start from scratch
 - **Fully configurable** - rename, recolor, add, or remove levels; set descriptions, contacts, and links per level
 - **Multilingual** - level names and descriptions support multiple languages
 - **Recursive classification** - classify an entire page tree with progress tracking

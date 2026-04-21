@@ -200,35 +200,45 @@ function validateConfig(config) {
     }
   }
 
-  // Must have levels array
-  if (!Array.isArray(config.levels) || config.levels.length === 0) {
+  // Levels array must be present (empty is allowed — returns admin to bootstrap).
+  if (!Array.isArray(config.levels)) {
     return {
       valid: false,
-      error: 'At least one classification level is required.',
+      error: 'Levels must be an array.',
     };
   }
 
-  // At least one level must be allowed
-  const allowedLevels = config.levels.filter((l) => l.allowed);
-  if (allowedLevels.length === 0) {
-    return {
-      valid: false,
-      error: 'At least one classification level must be allowed.',
-    };
-  }
+  // When levels are configured, require at least one allowed level and a valid
+  // default. An empty-levels config is the "unconfigured" state and skips these.
+  if (config.levels.length > 0) {
+    const allowedLevels = config.levels.filter((l) => l.allowed);
+    if (allowedLevels.length === 0) {
+      return {
+        valid: false,
+        error: 'At least one classification level must be allowed.',
+      };
+    }
 
-  // Default level must exist and be allowed
-  const defaultLevel = config.levels.find(
-    (l) => l.id === config.defaultLevelId,
-  );
-  if (!defaultLevel) {
+    const defaultLevel = config.levels.find(
+      (l) => l.id === config.defaultLevelId,
+    );
+    if (!defaultLevel) {
+      return {
+        valid: false,
+        error: 'Default level must reference an existing level.',
+      };
+    }
+    if (!defaultLevel.allowed) {
+      return { valid: false, error: 'Default level must be an allowed level.' };
+    }
+  } else if (
+    config.defaultLevelId !== null &&
+    config.defaultLevelId !== undefined
+  ) {
     return {
       valid: false,
-      error: 'Default level must reference an existing level.',
+      error: 'Default level must be null when no levels are configured.',
     };
-  }
-  if (!defaultLevel.allowed) {
-    return { valid: false, error: 'Default level must be an allowed level.' };
   }
 
   // Level IDs must be unique

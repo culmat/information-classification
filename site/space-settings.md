@@ -10,6 +10,8 @@ slug: space-settings
 
 Space administrators can override the global classification configuration for their space. Open **Space Settings -> Information Classification** to access space-level settings.
 
+Until a site administrator has configured at least one classification level globally (see [Installation](Installation#first-time-setup)), the space settings page shows an informational message and no overrides can be defined - there is nothing to restrict yet.
+
 Space settings have two tabs: **Configuration** and **Statistics**.
 
 ## Configuration

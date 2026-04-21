@@ -6,7 +6,6 @@ import Resolver from '@forge/resolver';
 import {
   getClassificationResolver,
   setClassificationResolver,
-  getDynamicPropertiesResolver,
   countDescendantsResolver,
   getClassificationProgressResolver,
 } from './classifyResolver';
@@ -56,9 +55,6 @@ resolver.define('startRecursiveClassify', startRecursiveClassifyResolver);
 resolver.define('processClassifyBatch', processClassifyBatchResolver);
 resolver.define('cancelClassifyJob', cancelClassifyJobResolver);
 resolver.define('getUserPendingJobs', getUserPendingJobsResolver);
-
-// Dynamic properties — called by Confluence to set byline title/icon before popup opens
-resolver.define('getDynamicProperties', getDynamicPropertiesResolver);
 
 // Global admin config operations (used by admin frontend)
 resolver.define('getConfig', getConfigResolver);

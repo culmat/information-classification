@@ -17,12 +17,12 @@ import ForgeReconciler, {
   I18nProvider,
   Box,
   Text,
-  Spinner,
   SectionMessage,
   xcss,
 } from '@forge/react';
 import { localize, formatSessionEta } from '../shared/i18n';
 import BylineView from './byline/BylineView';
+import EmptyStatePopup from './byline/EmptyStatePopup';
 import useClassifyActions from './byline/useClassifyActions';
 import useClassificationData from './byline/useClassificationData';
 import useDescendantCount from './byline/useDescendantCount';
@@ -89,8 +89,7 @@ const App = () => {
   const currentLevel = config?.levels?.find(
     (l) => l.id === (classification?.level || config?.defaultLevelId),
   );
-  const currentLevelId =
-    currentLevel?.id || config?.defaultLevelId || 'internal';
+  const currentLevelId = currentLevel?.id || config?.defaultLevelId;
 
   const actions = useClassifyActions({
     pageId,
@@ -133,7 +132,11 @@ const App = () => {
     context?.environmentType !== 'PRODUCTION' ||
     context?.license?.active === true;
 
-  if (loading) return <Spinner size="small" />;
+  // Still loading — render nothing. The Forge platform shimmer covers the
+  // brief delay; we avoid flashing a stale BylineView or an empty-state
+  // message that might swap out.
+  if (loading) return null;
+  if (!config?.levels?.length) return <EmptyStatePopup t={t} />;
 
   if (!licensed) {
     return (

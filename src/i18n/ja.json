@@ -17,7 +17,12 @@
     "no_links": "リンクが設定されていません。",
     "no_resources": "連絡先やリンクが設定されていません。",
     "no_history": "分類変更の記録がありません。",
-    "history_truncated": "最新の変更のみ表示しています。"
+    "history_truncated": "最新の変更のみ表示しています。",
+    "empty_state": {
+      "heading": "まだ設定されていません",
+      "body": "この Confluence サイトでは情報分類が設定されていません。このアプリを使用するには、Confluence 管理者がまず分類レベルを選択する必要があります。",
+      "docs_link": "ドキュメントを表示"
+    }
   },
   "classify": {
     "title": "分類を変更",
@@ -258,7 +263,21 @@
     },
     "save_button": "設定を保存",
     "save_success": "設定が保存されました。",
-    "save_error": "設定の保存に失敗しました。"
+    "save_error": "設定の保存に失敗しました。",
+    "access_denied_title": "管理者アクセスが必要です",
+    "access_denied_message": "情報分類の設定は Confluence サイト管理者のみが行えます。",
+    "bootstrap": {
+      "title": "分類レベルをセットアップ",
+      "subtitle": "分類スキームの出発点となるテンプレートを選択してください。レベルは後から名前の変更、並び替え、削除、追加ができます。",
+      "apply_button": "このテンプレートを使用",
+      "scratch_prompt": "または独自に作成:",
+      "scratch_button": "ゼロから始める",
+      "template": {
+        "iso27001": "ISO 27001 (Public / Internal / Confidential / Secret)",
+        "nist": "NIST (Public / Internal / Confidential / Restricted)",
+        "government": "政府 (Unclassified / Confidential / Secret / Top Secret)"
+      }
+    }
   },
   "space_settings": {
     "title": "情報分類設定",
@@ -267,7 +286,9 @@
     "reset_button": "グローバルデフォルトにリセット",
     "save_button": "保存",
     "save_success": "スペース設定が保存されました。",
-    "reset_success": "スペース設定がグローバルデフォルトにリセットされました。"
+    "reset_success": "スペース設定がグローバルデフォルトにリセットされました。",
+    "not_configured_title": "分類はまだ設定されていません",
+    "not_configured_message": "スペースレベルの設定が利用可能になる前に、Confluence サイト管理者が分類スキームを選択する必要があります。"
   },
   "language_names": {
     "en": "英語",

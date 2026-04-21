@@ -9,61 +9,12 @@ import {
   classifyPage,
   findDescendantsToClassify,
 } from '../services/classificationService';
-import { getEffectiveConfig } from '../storage/configStore';
-import { getSpaceConfig } from '../storage/spaceConfigStore';
-import {
-  getClassification,
-  getHistory,
-} from '../services/contentPropertyService';
+import { getHistory } from '../services/contentPropertyService';
 import {
   successResponse,
   errorResponse,
   validationError,
 } from '../utils/responseHelper';
-import { localize } from '../shared/i18n';
-
-/**
- * Resolver: getDynamicProperties
- * Called by Confluence to determine the byline title/icon before the popup opens.
- * Returns the current classification level name so the byline shows e.g. "Internal"
- * instead of the static app name.
- *
- * Context provides: extension.content.id, extension.space.key, locale
- */
-export async function getDynamicPropertiesResolver(req) {
-  try {
-    const pageId = req.context?.extension?.content?.id;
-    const spaceKey = req.context?.extension?.space?.key;
-    const locale = req.context?.locale || 'en';
-
-    if (!pageId || !spaceKey) {
-      return { title: 'Classification' };
-    }
-
-    // Fetch effective config and current classification
-    const spConfig = await getSpaceConfig(spaceKey);
-    const effectiveConfig = await getEffectiveConfig(spaceKey, spConfig);
-    const classification = await getClassification(String(pageId));
-
-    // Find the current level (or fall back to default)
-    const levelId = classification?.level || effectiveConfig.defaultLevelId;
-    const level = effectiveConfig.levels.find((l) => l.id === levelId);
-
-    if (!level) {
-      return { title: effectiveConfig.defaultLevelId || 'Unclassified' };
-    }
-
-    const levelName = localize(level.name, locale);
-
-    return {
-      title: levelName,
-      tooltip: levelName,
-    };
-  } catch (error) {
-    console.error('Error in getDynamicProperties:', error);
-    return { title: 'Classification' };
-  }
-}
 
 /**
  * Resolver: getClassification
@@ -79,16 +30,25 @@ export async function getClassificationResolver(req) {
   }
 
   try {
-    const [result, history] = await Promise.all([
-      getPageClassification(String(pageId), spaceKey),
-      getHistory(String(pageId)),
-    ]);
+    const result = await getPageClassification(String(pageId), spaceKey);
 
     // Strip admin-only fields — minimize data sent to all users.
     // Keep levels intact (including errorMessage, which the classify dialog
     // shows in a red SectionMessage when a disallowed level is selected).
     const config = { ...result.config };
     delete config.languages;
+
+    // Skip the history read when no levels are configured — the popup is
+    // rendered as an empty no-op in that case and the history is unused.
+    if (!config.levels?.length) {
+      return successResponse({
+        ...result,
+        config,
+        history: { truncated: false, entries: [] },
+      });
+    }
+
+    const history = await getHistory(String(pageId));
 
     // Client-driven classify-job state lives in its own KVS namespace and is
     // retrieved via getUserPendingJobs when the modal opens. This resolver

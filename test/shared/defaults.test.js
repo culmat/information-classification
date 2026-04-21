@@ -1,95 +1,86 @@
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_LEVELS, getDefaultConfig } from '../../src/shared/defaults';
+import { TEMPLATES, buildConfigFromTemplate } from '../../src/shared/defaults';
 import { LEVEL_COLORS } from '../../src/shared/constants';
 
-describe('DEFAULT_LEVELS', () => {
-  it('should have exactly 4 default levels', () => {
-    expect(DEFAULT_LEVELS).toHaveLength(4);
+const TEMPLATE_IDS = Object.keys(TEMPLATES);
+
+describe('TEMPLATES registry', () => {
+  it('exposes iso27001, nist, and government', () => {
+    expect(TEMPLATE_IDS).toEqual(
+      expect.arrayContaining(['iso27001', 'nist', 'government']),
+    );
   });
 
-  it('should have unique IDs', () => {
-    const ids = DEFAULT_LEVELS.map((l) => l.id);
+  it.each(TEMPLATE_IDS)('%s template has a labelKey', (id) => {
+    expect(TEMPLATES[id].labelKey).toMatch(/^admin\.bootstrap\.template\./);
+  });
+
+  it.each(TEMPLATE_IDS)('%s template has unique level IDs', (id) => {
+    const ids = TEMPLATES[id].levels.map((l) => l.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('should have sequential sort orders', () => {
-    const orders = DEFAULT_LEVELS.map((l) => l.sortOrder);
-    expect(orders).toEqual([0, 1, 2, 3]);
+  it.each(TEMPLATE_IDS)('%s template has sequential sort orders', (id) => {
+    const orders = TEMPLATES[id].levels.map((l) => l.sortOrder);
+    expect(orders).toEqual(orders.map((_, i) => i));
   });
 
-  it('should have valid colors for all levels', () => {
-    for (const level of DEFAULT_LEVELS) {
+  it.each(TEMPLATE_IDS)('%s template uses valid colors', (id) => {
+    for (const level of TEMPLATES[id].levels) {
       expect(LEVEL_COLORS).toContain(level.color);
     }
   });
 
-  it('should have English names for all levels', () => {
-    for (const level of DEFAULT_LEVELS) {
-      expect(level.name.en).toBeTruthy();
-    }
-  });
+  it.each(TEMPLATE_IDS)(
+    '%s template has English names and descriptions',
+    (id) => {
+      for (const level of TEMPLATES[id].levels) {
+        expect(level.name.en).toBeTruthy();
+        expect(level.description.en).toBeTruthy();
+      }
+    },
+  );
 
-  it('should have English descriptions for all levels', () => {
-    for (const level of DEFAULT_LEVELS) {
-      expect(level.description.en).toBeTruthy();
-    }
-  });
+  it.each(TEMPLATE_IDS)(
+    '%s defaultLevelId references an allowed level',
+    (id) => {
+      const { levels, defaultLevelId } = TEMPLATES[id];
+      const def = levels.find((l) => l.id === defaultLevelId);
+      expect(def).toBeTruthy();
+      expect(def.allowed).toBe(true);
+    },
+  );
 
-  it('should have at least one allowed level', () => {
-    const allowed = DEFAULT_LEVELS.filter((l) => l.allowed);
-    expect(allowed.length).toBeGreaterThan(0);
-  });
-
-  it('should mark secret as disallowed with error message', () => {
-    const secret = DEFAULT_LEVELS.find((l) => l.id === 'secret');
+  it('iso27001 marks secret as disallowed with error message', () => {
+    const secret = TEMPLATES.iso27001.levels.find((l) => l.id === 'secret');
     expect(secret.allowed).toBe(false);
-    expect(secret.errorMessage).toBeTruthy();
-    expect(secret.errorMessage.en).toBeTruthy();
-  });
-
-  it('should mark confidential as requiring protection', () => {
-    const confidential = DEFAULT_LEVELS.find((l) => l.id === 'confidential');
-    expect(confidential.requiresProtection).toBe(true);
-  });
-
-  it('should not require protection for public and internal', () => {
-    const pub = DEFAULT_LEVELS.find((l) => l.id === 'public');
-    const internal = DEFAULT_LEVELS.find((l) => l.id === 'internal');
-    expect(pub.requiresProtection).toBe(false);
-    expect(internal.requiresProtection).toBe(false);
+    expect(secret.errorMessage?.en).toBeTruthy();
   });
 });
 
-describe('getDefaultConfig', () => {
-  it('should return a config with all default levels', () => {
-    const config = getDefaultConfig();
-    expect(config.levels).toHaveLength(4);
-  });
+describe('buildConfigFromTemplate', () => {
+  it.each(TEMPLATE_IDS)(
+    '%s returns a full config passing schema basics',
+    (id) => {
+      const config = buildConfigFromTemplate(id);
+      expect(config.levels.length).toBeGreaterThan(0);
+      expect(config.languages[0].code).toBe('en');
+      expect(config.contacts).toEqual([]);
+      expect(config.links).toEqual([]);
+      expect(
+        config.levels.find((l) => l.id === config.defaultLevelId),
+      ).toBeTruthy();
+    },
+  );
 
-  it('should default to internal', () => {
-    const config = getDefaultConfig();
-    expect(config.defaultLevelId).toBe('internal');
-  });
-
-  it('should have the default level reference an allowed level', () => {
-    const config = getDefaultConfig();
-    const defaultLevel = config.levels.find(
-      (l) => l.id === config.defaultLevelId,
-    );
-    expect(defaultLevel).toBeTruthy();
-    expect(defaultLevel.allowed).toBe(true);
-  });
-
-  it('should have empty contacts and links', () => {
-    const config = getDefaultConfig();
-    expect(config.contacts).toEqual([]);
-    expect(config.links).toEqual([]);
-  });
-
-  it('should return a new object each time (no shared references)', () => {
-    const a = getDefaultConfig();
-    const b = getDefaultConfig();
+  it('returns a new object each call (no shared references)', () => {
+    const a = buildConfigFromTemplate('iso27001');
+    const b = buildConfigFromTemplate('iso27001');
     expect(a).not.toBe(b);
     expect(a.levels).not.toBe(b.levels);
+  });
+
+  it('throws on unknown template id', () => {
+    expect(() => buildConfigFromTemplate('bogus')).toThrow(/Unknown template/);
   });
 });
