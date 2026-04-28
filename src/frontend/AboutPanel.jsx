@@ -43,7 +43,7 @@ const ISSUES_URL = `${REPO_URL}/issues`;
 // listing goes live. Click-through still lands on the Marketplace listing
 // picker, which is acceptable until the real slug is known.
 const MARKETPLACE_REVIEWS_URL =
-  'https://marketplace.atlassian.com/apps/TBD/information-classification-for-confluence?tab=reviews';
+  'https://marketplace.atlassian.com/apps/1978353274?tab=reviews';
 
 /* Logo-clamp pattern: Image would otherwise expand to its default xlarge
    size inside an Inline flex row. We pin the wrapper to a bigger 96px now

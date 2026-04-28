@@ -15,14 +15,14 @@ A Forge app that adds information classification levels to Confluence Cloud page
 ## Privacy Policy
 
 - We do not transfer or store _any_ data outside your Atlassian product.
-- We don't track usage and don't know if and how you are using _Information Classification for Confluene_ - that why we espcially appreciate your [feedback](https://github.com/culmat/information-classification/issues) or [review](https://marketplace.atlassian.com/apps/TBD/information-classification-for-confluence?tab=reviews).
+- We don't track usage and don't know if and how you are using _Information Classification for Confluene_ - that why we espcially appreciate your [feedback](https://github.com/culmat/information-classification/issues) or [review](https://marketplace.atlassian.com/apps/1978353274?tab=reviews).
 - We have no access to _any_ data you store within your Atlassian product.
 - Your data is yours -- no strings attached.
 - The plugin is [fully open source](https://github.com/culmat/information-classification) and anybody can audit it anytime.
 
 ## Installation
 
-Install via [Atlassian Marketplace](https://marketplace.atlassian.com/plugins/tbd).
+Install via [Atlassian Marketplace](https://marketplace.atlassian.com/apps/1978353274?tab=installation).
 
 ## Contributing
 
