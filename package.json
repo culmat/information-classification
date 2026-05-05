@@ -39,7 +39,7 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "@forge/bridge": "5.15.1",
+    "@forge/bridge": "5.16.0",
     "@forge/events": "^2.1.4",
     "@forge/kvs": "^1.6.2",
     "@forge/react": "11.14.1",
