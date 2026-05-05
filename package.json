@@ -42,7 +42,7 @@
     "@forge/bridge": "5.15.1",
     "@forge/events": "^2.1.4",
     "@forge/kvs": "^1.6.2",
-    "@forge/react": "11.14.1",
+    "@forge/react": "11.15.0",
     "@forge/realtime": "^0.3.2",
     "@forge/resolver": "1.7.1",
     "react": "^18.2.0"
